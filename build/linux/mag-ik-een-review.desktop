@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=M.I.E.R.
+Exec=mag-ik-een-review
+Icon=mag-ik-een-review
+Categories=Development;
+Terminal=false
+Keywords=wails
+Version=1.0
+StartupNotify=false

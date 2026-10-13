@@ -1,0 +1,152 @@
+package main
+
+import (
+	"embed"
+	"encoding/json"
+	"fmt"
+	"log"
+	"runtime"
+
+	"github.com/wailsapp/wails/v3/pkg/application"
+)
+
+//go:embed all:frontend/dist
+var assets embed.FS
+
+func init() {
+	application.RegisterEvent[WorkspaceUpdate]("workspace:updated")
+	application.RegisterEvent[PRNotificationEvent]("notifications:pr")
+}
+
+type nativeCommand struct {
+	Action string `json:"action"`
+	Value  string `json:"value,omitempty"`
+}
+
+func main() {
+	credentials := NewCredentialService()
+	repositories := NewRepositoryService(credentials)
+	github := NewGitHubService(credentials)
+	workspace := NewWorkspaceService()
+	var app *application.App
+	desktop := NewDesktopNotificationService()
+	prNotifications := NewPRNotificationService(credentials, func(event PRNotificationEvent) {
+		app.Event.Emit("notifications:pr", event)
+		if event.Desktop {
+			go func() {
+				if err := desktop.send(event); err != nil {
+					log.Printf("Desktop notification could not be delivered: %v", err)
+				}
+			}()
+		}
+	}, desktop.requestPermission)
+	syncService := NewWorkspaceSyncService(repositories, github, func(update WorkspaceUpdate) { app.Event.Emit("workspace:updated", update) })
+	syncService.observePRs = prNotifications.Observe
+	app = application.New(application.Options{
+		Name:        "M.I.E.R.",
+		Description: "A native Git and pull request workspace",
+		Services: []application.Service{
+			application.NewService(NewIntegrationService()),
+			application.NewService(NewEditorService(repositories)),
+			application.NewService(NewLSPService(repositories)),
+			application.NewService(desktop),
+			application.NewService(prNotifications),
+			application.NewService(repositories),
+			application.NewService(credentials),
+			application.NewService(github),
+			application.NewService(workspace),
+			application.NewService(syncService),
+		},
+		Assets: application.AssetOptions{
+			Handler: application.AssetFileServerFS(assets),
+		},
+		Mac: application.MacOptions{
+			ApplicationShouldTerminateAfterLastWindowClosed: true,
+		},
+	})
+	workspace.app = app
+
+	inset := "0px"
+	if runtime.GOOS == "darwin" {
+		inset = "80px"
+	}
+	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
+		Name:             "main",
+		Title:            "M.I.E.R.",
+		Width:            1440,
+		Height:           900,
+		MinWidth:         1000,
+		MinHeight:        650,
+		URL:              "/",
+		BackgroundColour: application.NewRGB(245, 246, 248),
+		JS: fmt.Sprintf(
+			"document.documentElement.dataset.platform = %q; document.documentElement.style.setProperty('--native-titlebar-inset', %q);",
+			runtime.GOOS, inset,
+		),
+		Mac: application.MacWindow{
+			TitleBar:                application.MacTitleBarHiddenInset,
+			InvisibleTitleBarHeight: 50,
+			Appearance:              application.DefaultAppearance,
+		},
+	})
+
+	menu := createNativeMenu(app, window)
+	app.Menu.Set(menu)
+	window.SetMenu(menu)
+
+	if err := app.Run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func createNativeMenu(app *application.App, window *application.WebviewWindow) *application.Menu {
+	menu := application.NewMenu()
+	if runtime.GOOS == "darwin" {
+		menu.AddRole(application.AppMenu)
+	}
+
+	command := func(action, value string) func(*application.Context) {
+		return func(_ *application.Context) {
+			payload, err := json.Marshal(nativeCommand{Action: action, Value: value})
+			if err != nil {
+				log.Printf("Unable to dispatch native command: %v", err)
+				return
+			}
+			window.ExecJS("window.dispatchEvent(new CustomEvent('mag-ik-een-review:command', {detail: " + string(payload) + "}));")
+		}
+	}
+
+	file := menu.AddSubmenu("File")
+	file.Add("Open Repository…").SetAccelerator("CmdOrCtrl+O").OnClick(command("open-repository", ""))
+	file.Add("Create Pull Request…").
+		SetAccelerator("CmdOrCtrl+Shift+N").
+		OnClick(command("create-pr", ""))
+	file.AddSeparator()
+	file.AddRole(application.CloseWindow)
+	if runtime.GOOS != "darwin" {
+		file.AddRole(application.Quit)
+	}
+
+	menu.AddRole(application.EditMenu)
+	view := menu.AddSubmenu("View")
+	view.Add("History").SetAccelerator("CmdOrCtrl+1").OnClick(command("navigate", "history"))
+	view.Add("Changes").SetAccelerator("CmdOrCtrl+2").OnClick(command("navigate", "changes"))
+	view.Add("Pull Requests").SetAccelerator("CmdOrCtrl+3").OnClick(command("navigate", "pull-requests"))
+	view.AddSeparator()
+	view.Add("Command Palette…").SetAccelerator("CmdOrCtrl+K").OnClick(command("command-palette", ""))
+	fullscreenShortcut := "F11"
+	if runtime.GOOS == "darwin" {
+		fullscreenShortcut = "CmdOrCtrl+Control+F"
+	}
+	view.Add("Toggle Full Screen").SetAccelerator(fullscreenShortcut).OnClick(command("toggle-fullscreen", ""))
+	view.AddSeparator()
+	appearance := view.AddSubmenu("Appearance")
+	appearance.AddRadio("System", true).OnClick(command("theme", "system"))
+	appearance.AddRadio("Light", false).OnClick(command("theme", "light"))
+	appearance.AddRadio("Dark", false).OnClick(command("theme", "dark"))
+
+	menu.AddRole(application.WindowMenu)
+	help := menu.AddSubmenu("Help")
+	help.Add("About M.I.E.R.").OnClick(func(_ *application.Context) { app.Menu.ShowAbout() })
+	return menu
+}

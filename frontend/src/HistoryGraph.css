@@ -1,0 +1,119 @@
+.real-history {
+  position: relative;
+  isolation: isolate;
+}
+
+.real-history-content {
+  position: relative;
+  min-width: calc(var(--history-graph-width) + 440px);
+}
+
+.real-history .history-table-heading,
+.real-history .history-row {
+  grid-template-columns: calc(var(--history-graph-width) + 12px) minmax(180px, 1fr) 170px 85px;
+}
+
+.real-history-heading {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  height: 36px;
+  box-sizing: border-box;
+}
+
+.real-history-graph {
+  position: absolute;
+  left: 12px;
+  top: 36px;
+  z-index: 2;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.real-history-row {
+  position: relative;
+  box-sizing: border-box;
+}
+
+.real-history-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.real-history-row .real-history-graph-cell {
+  align-self: stretch;
+}
+
+.real-history-row .real-history-subject {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding-right: 12px;
+}
+
+.real-history-refs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 1 auto;
+  max-width: 55%;
+  min-width: 0;
+}
+
+.real-history-row .real-history-ref {
+  display: block;
+  min-width: 0;
+  max-width: 160px;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 0 1 auto;
+}
+
+.real-history-ref[data-kind="tag"] {
+  color: var(--amber);
+  background: color-mix(in oklch, var(--amber) 9%, var(--surface));
+}
+
+.real-history-extra-refs {
+  font-size: 9px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.real-history-message {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.real-history-empty,
+.real-history-boundary-note {
+  margin: 0;
+  padding: 15px 24px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.real-history-boundary-note {
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 900px) {
+  .real-history-content {
+    min-width: calc(var(--history-graph-width) + 285px);
+  }
+
+  .real-history .history-table-heading,
+  .real-history .history-row {
+    grid-template-columns: calc(var(--history-graph-width) + 12px) minmax(180px, 1fr) 75px;
+  }
+
+  .real-history .real-history-author,
+  .real-history .history-table-heading > span:nth-child(3) {
+    display: none;
+  }
+}

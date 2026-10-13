@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<MsixPackagingToolTemplate
+    xmlns="http://schemas.microsoft.com/msix/packaging/msixpackagingtool/template/2022">
+    <Settings
+        AllowTelemetry="false"
+        ApplyACLsToPackageFiles="true"
+        GenerateCommandLineFile="true"
+        AllowPromptForPassword="false">
+    </Settings>
+    <Installer
+        Path="mag-ik-een-review.exe"
+        Arguments=""
+        InstallLocation="C:\Program Files\M.I.E.R. contributors\mag-ik-een-review">
+    </Installer>
+    <PackageInformation
+        PackageName="mag-ik-een-review"
+        PackageDisplayName="M.I.E.R."
+        PublisherName="CN=M.I.E.R. contributors"
+        PublisherDisplayName="M.I.E.R. contributors"
+        Version="0.1.0.0"
+        PackageDescription="Mag ik een review — a native Git and pull request workspace">
+        <Capabilities>
+            <Capability Name="runFullTrust" />
+            
+        </Capabilities>
+        <Applications>
+            <Application
+                Id="app.magikeenreview.desktop"
+                Description="Mag ik een review — a native Git and pull request workspace"
+                DisplayName="M.I.E.R."
+                ExecutableName="mag-ik-een-review.exe"
+                EntryPoint="Windows.FullTrustApplication">
+                
+            </Application>
+        </Applications>
+        <Resources>
+            <Resource Language="en-us" />
+        </Resources>
+        <Dependencies>
+            <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
+        </Dependencies>
+        <Properties>
+            <Framework>false</Framework>
+            <DisplayName>M.I.E.R.</DisplayName>
+            <PublisherDisplayName>M.I.E.R. contributors</PublisherDisplayName>
+            <Description>Mag ik een review — a native Git and pull request workspace</Description>
+            <Logo>Assets\AppIcon.png</Logo>
+        </Properties>
+    </PackageInformation>
+    <SaveLocation PackagePath="mag-ik-een-review.msix" />
+    <PackageIntegrity>
+        <CertificatePath></CertificatePath>
+    </PackageIntegrity>
+</MsixPackagingToolTemplate>

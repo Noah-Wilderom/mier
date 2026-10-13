@@ -1,0 +1,21 @@
+.local-workspace .local-diff { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.local-diff-body { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; overflow: hidden; background: var(--review-code-background, var(--surface)); }
+.local-workspace .local-diff-heading { flex-shrink: 0; background: var(--surface); }
+.local-workspace .local-diff-heading > code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.local-code-scroll { flex: 1; min-height: 0; overflow: auto; scrollbar-gutter: stable; }
+.local-code { width: max-content; min-width: 100%; min-height: 100%; }
+.local-workspace .local-code-line { display: grid; grid-template-columns: 46px 20px minmax(0, 1fr); min-height: var(--review-code-line-height, 23px); min-width: 100%; font-family: var(--mono); font-size: var(--review-code-font-size, 13px); line-height: var(--review-code-line-height, 23px); }
+.local-workspace .local-code-line > .local-code-number { width: auto; padding-right: 9px; user-select: none; font-size: 12px; font-variant-numeric: tabular-nums; }
+.local-workspace .local-code-line > .local-code-marker { width: auto; text-align: center; padding: 0; user-select: none; font: inherit; }
+.local-workspace .local-code-line > .local-code-text { padding-right: 20px; font: inherit; white-space: pre; user-select: text; tab-size: 4; color: var(--review-code-foreground, var(--text)); }
+.local-code-line.kind-add .local-code-marker { color: var(--green); }
+.local-code-line.kind-remove .local-code-marker { color: var(--red); }
+.local-diff-loading { padding: 18px 20px; font-size: 12px; color: var(--muted); }
+.local-diff-loading > div { display: flex; flex-direction: column; gap: 13px; max-width: 580px; margin-top: 22px; }
+.local-diff-loading > div > span { display: block; height: 12px; border-radius: 3px; background: var(--hover); }
+.local-diff-error { display: flex; align-items: flex-start; gap: 10px; padding: 16px 18px; color: var(--red); font-size: 12px; line-height: 1.6; }
+.local-diff-error > svg { flex-shrink: 0; margin-top: 3px; }
+.local-diff-error > div { flex: 1; min-width: 0; }
+.local-diff-error strong, .local-diff-error span { display: block; }
+.local-diff-error span { margin-top: 3px; overflow-wrap: anywhere; }
+.local-action-error { flex-shrink: 0; }

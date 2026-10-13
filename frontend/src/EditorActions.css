@@ -1,0 +1,16 @@
+.repository-open-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.editor-open-split { position: relative; display: inline-flex; height: 31px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface); }
+.editor-open-primary, .editor-open-chooser { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 100%; font-size: 12px; padding: 5px 9px; white-space: nowrap; }
+.editor-open-primary { border-radius: 4px 0 0 4px; }
+.editor-open-chooser { border-left: 1px solid var(--border); width: 28px; padding: 4px; border-radius: 0 4px 4px 0; }
+.editor-open-primary:hover, .editor-open-chooser:hover, .editor-open-chooser[aria-expanded="true"] { background: var(--hover); }
+.editor-open-primary:disabled, .editor-open-chooser:disabled { cursor: default; pointer-events: none; }
+.editor-open-menu { position: absolute; top: calc(100% + 7px); left: 0; width: 206px; padding: 5px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow); z-index: 80; }
+.editor-open-menu-label { display: block; color: var(--muted); padding: 8px 9px; font-size: 12px; }
+.editor-open-menu > button { display: flex; align-items: center; gap: 9px; text-align: left; padding: 9px; font-size: 13px; width: 100%; border-radius: 4px; }
+.editor-open-menu > button:hover, .editor-open-menu > button:focus-visible { background: var(--hover); }
+.editor-open-menu > button > svg:last-child:not(:first-child) { margin-left: auto; }
+.repository-open-github { height: 31px; padding-inline: 9px; font-size: 12px; white-space: nowrap; }
+@media (max-width: 1200px) { .repository-switcher { max-width: 280px; } .app-topbar .global-search { width: 34px; padding: 5px; } .global-search > kbd { display: none; } }
+@media (max-width: 1050px) { .repository-open-github > span { display: none; } .repository-switcher { max-width: 250px; } .app-topbar > .avatar { display: none; } }
+.editor-logo { display: block; object-fit: contain; flex-shrink: 0; }

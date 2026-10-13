@@ -1,0 +1,39 @@
+.notification-settings { width: 100%; min-width: 0; padding: 18px 0; color: var(--text); }
+.notification-settings-heading { display: flex; align-items: flex-start; gap: 10px; }
+.notification-settings-heading > svg { margin-top: 2px; color: var(--muted); }
+.notification-settings-heading h2 { margin: 0; font-size: 16px; font-weight: 600; line-height: 1.4; }
+.notification-settings-heading p { margin: 4px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.notification-repository-controls { display: flex; align-items: end; gap: 12px; margin-top: 20px; }
+.notification-repository-search { display: flex; align-items: center; position: relative; flex: 1; min-width: 0; }
+.notification-repository-search > svg { position: absolute; left: 9px; color: var(--muted); pointer-events: none; }
+.notification-repository-search .input { width: 100%; padding-left: 32px; min-height: 34px; font-size: 13px; }
+.notification-repository-choice { display: flex; flex: 1.4; flex-direction: column; min-width: 0; gap: 6px; font-size: 12px; font-weight: 500; }
+.notification-repository-choice .input { max-width: 100%; min-height: 34px; background: var(--surface); color: var(--text); font-size: 13px; }
+.notification-repository-identity { margin: 17px 0 0; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.notification-repository-identity > span { color: var(--muted); font-weight: 400; }
+.notification-settings .notification-settings-note { margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.65; }
+.notification-options { padding: 0; margin: 22px 0 0; border: 0; min-width: 0; }
+.notification-options legend { width: 100%; padding: 0 0 8px; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.notification-option { display: flex; align-items: center; position: relative; gap: 11px; min-height: 66px; padding: 12px 0; border-top: 1px solid var(--border); cursor: pointer; }
+.notification-option-icon { flex-shrink: 0; color: var(--muted); }
+.notification-option-copy { display: flex; flex: 1; flex-direction: column; min-width: 0; gap: 4px; }
+.notification-option-copy strong { font-size: 13px; line-height: 1.5; font-weight: 500; }
+.notification-option-copy > span { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.notification-option input { position: absolute; right: 0; width: 42px; height: 28px; margin: 0; opacity: 0; cursor: pointer; }
+.notification-switch { width: 34px; height: 20px; flex-shrink: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--hover); pointer-events: none; }
+.notification-switch::after { content: ''; display: block; width: 14px; height: 14px; margin: 2px; border-radius: 50%; background: var(--muted); transition: transform .12s ease; }
+.notification-option input:checked + .notification-switch { background: var(--accent); border-color: var(--accent); }
+.notification-option input:checked + .notification-switch::after { background: white; transform: translateX(14px); }
+.notification-option input:focus-visible + .notification-switch { outline: 2px solid var(--accent); outline-offset: 3px; }
+.notification-option:has(input:disabled) { cursor: default; }
+.notification-option input:disabled { cursor: default; }
+.notification-option input:disabled + .notification-switch { opacity: .6; }
+.notification-save-status { min-height: 18px; margin: 12px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.notification-save-error { margin-top: 6px; color: var(--red); font-size: 12px; }
+.notification-save-error p { margin: 0 0 8px; line-height: 1.5; overflow-wrap: anywhere; }
+.notification-settings-skeleton { margin-top: 22px; }
+.notification-skeleton-row { display: flex; justify-content: space-between; align-items: center; min-height: 66px; gap: 16px; border-top: 1px solid var(--border); }
+.notification-skeleton-row .skeleton:first-child { display: block; width: min(68%, 270px); height: 28px; border-radius: 3px; }
+.notification-skeleton-row .skeleton:last-child { display: block; width: 34px; height: 20px; border-radius: 12px; }
+@media (max-width: 600px) { .notification-repository-controls { flex-direction: column; align-items: stretch; gap: 12px; } .notification-option { gap: 9px; } }
+@media (prefers-reduced-motion: reduce) { .notification-switch::after { transition: none; } .notification-settings .skeleton { animation: none; } }

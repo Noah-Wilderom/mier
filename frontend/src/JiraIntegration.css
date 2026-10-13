@@ -1,0 +1,22 @@
+.jira-integration { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: start; gap: 14px; padding: 17px 18px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+.jira-integration-logo { display: block; width: 36px; height: 36px; margin-top: 1px; flex-shrink: 0; }
+.jira-integration-details { min-width: 0; }
+.jira-integration-heading { display: flex; align-items: center; gap: 8px; min-height: 19px; }
+.jira-integration-heading h3 { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.4; color: var(--text); }
+.jira-integration-preview { padding: 1px 5px; border: 1px solid var(--border); border-radius: 3px; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.jira-integration .jira-integration-description { margin: 3px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.jira-integration .jira-integration-help { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.jira-integration .jira-integration-status { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.jira-integration .jira-integration-status:empty { display: none; }
+.jira-integration .jira-integration-error { margin: 6px 0 0; color: var(--red); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.jira-install-action { align-self: center; cursor: default; }
+.jira-integration .jira-install-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 120px; min-height: 30px; font-size: 12px; white-space: nowrap; cursor: pointer; }
+.jira-integration .jira-install-button.is-disabled, .jira-integration .jira-install-button:disabled, .jira-integration .jira-install-button[aria-disabled="true"] { pointer-events: none; cursor: default; opacity: .55; }
+.jira-integration .jira-install-button.is-installing { opacity: .75; }
+.jira-install-spinner { width: 13px; height: 13px; flex-shrink: 0; border: 2px solid var(--border); border-top-color: currentColor; border-radius: 50%; animation: jira-install-spin .8s linear infinite; }
+@keyframes jira-install-spin { to { transform: rotate(360deg); } }
+@media (max-width: 600px) {
+  .jira-integration { grid-template-columns: 36px minmax(0, 1fr); }
+  .jira-install-action { grid-column: 2; justify-self: start; }
+}
+@media (prefers-reduced-motion: reduce) { .jira-install-spinner { animation: none; border-style: dotted; } }

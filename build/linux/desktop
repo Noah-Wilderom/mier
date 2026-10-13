@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=M.I.E.R.
+Comment=Mag ik een review — a native Git and pull request workspace
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/mag-ik-een-review %u
+Terminal=false
+Type=Application
+Icon=mag-ik-een-review
+Categories=Development;
+StartupWMClass=mag-ik-een-review
+
+ 

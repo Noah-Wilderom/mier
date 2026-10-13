@@ -1,0 +1,15 @@
+{
+	"fixed": {
+		"file_version": "0.1.0"
+	},
+	"info": {
+		"0000": {
+			"ProductVersion": "0.1.0",
+			"CompanyName": "M.I.E.R. contributors",
+			"FileDescription": "Mag ik een review — a native Git and pull request workspace",
+			"LegalCopyright": "© 2026, M.I.E.R. contributors",
+			"ProductName": "M.I.E.R.",
+			"Comments": "Git and GitHub pull request workspace"
+		}
+	}
+}
