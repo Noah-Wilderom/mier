@@ -7,8 +7,39 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
+
+var composerPathLiteral = regexp.MustCompile(`'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"`)
+
+// Composer can retain the path spelling used during installation, including
+// macOS /var aliases and Windows short paths. Resolve literal absolute paths
+// before rebasing so those aliases cannot point analysis at the dirty checkout.
+func rebaseComposerMetadata(data []byte, root, destination string) []byte {
+	return composerPathLiteral.ReplaceAllFunc(data, func(literal []byte) []byte {
+		quote := string(literal[:1])
+		value := string(literal[1 : len(literal)-1])
+		value = strings.ReplaceAll(value, "\\"+quote, quote)
+		value = strings.ReplaceAll(value, "\\\\", "\\")
+		path := filepath.FromSlash(value)
+		if !filepath.IsAbs(path) {
+			return literal
+		}
+		resolved, err := filepath.EvalSymlinks(path)
+		if err != nil || !insideDirectory(root, resolved) {
+			return literal
+		}
+		relative, err := filepath.Rel(root, resolved)
+		if err != nil {
+			return literal
+		}
+		rebased := filepath.ToSlash(filepath.Join(destination, relative))
+		rebased = strings.ReplaceAll(rebased, "\\", "\\\\")
+		rebased = strings.ReplaceAll(rebased, quote, "\\"+quote)
+		return []byte(quote + rebased + quote)
+	})
+}
 
 // Dependency metadata and source are frozen with the reviewed workspace. Linking
 // an installed directory wholesale would let monorepo aliases escape to dirty
@@ -104,10 +135,7 @@ func (w *workspace) captureDependencies(ctx context.Context, source, destination
 			return errors.New("Installed dependency source exceeds the 128 MiB analysis limit")
 		}
 		if kind == "vendor" && (relative == "autoload.php" || strings.HasPrefix(filepath.ToSlash(relative), "composer/")) {
-			value := string(data)
-			value = strings.ReplaceAll(value, strings.ReplaceAll(w.root, "\\", "\\\\"), strings.ReplaceAll(w.directory, "\\", "\\\\"))
-			value = strings.ReplaceAll(value, filepath.ToSlash(w.root), filepath.ToSlash(w.directory))
-			data = []byte(value)
+			data = rebaseComposerMetadata(data, w.root, w.directory)
 		}
 		return os.WriteFile(target, data, 0600)
 	})

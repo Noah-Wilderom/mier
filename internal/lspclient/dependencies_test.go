@@ -80,6 +80,7 @@ func TestAnalysisScopesCanonicalizeRepositoryAndCacheAliases(t *testing.T) {
 	if err := os.Symlink(real, alias); err != nil {
 		t.Skip("Directory symlinks unavailable")
 	}
+	writeTestFile(t, filepath.Join(real, "repository", "vendor", "composer", "autoload_static.php"), "<?php $baseDir = '"+filepath.ToSlash(filepath.Join(alias, "repository"))+"';\n")
 	w, err := extractWorkspace(context.Background(), filepath.Join(alias, "repository"), filepath.Join(alias, "cache"), ArchiveResult{Revision: testRevision, Tar: sourceArchive(t, map[string]string{"package.json": "{}", "use.ts": "export const selected = true;\n"})})
 	if err != nil {
 		t.Fatal(err)
@@ -93,5 +94,9 @@ func TestAnalysisScopesCanonicalizeRepositoryAndCacheAliases(t *testing.T) {
 		if _, _, _, err := w.read(filepath.Join(w.directory, filepath.FromSlash(path))); err != nil {
 			t.Fatalf("Aliased source was incorrectly outside its scope: %s: %v", path, err)
 		}
+	}
+	metadata, err := os.ReadFile(filepath.Join(w.directory, "vendor", "composer", "autoload_static.php"))
+	if err != nil || strings.Contains(string(metadata), filepath.ToSlash(alias)) || !strings.Contains(string(metadata), filepath.ToSlash(w.directory)) {
+		t.Fatalf("Composer retained an alias to the original checkout: %s %v", metadata, err)
 	}
 }
