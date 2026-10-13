@@ -74,10 +74,23 @@ func pathFromURI(value string) (string, error) {
 	return filepath.Clean(path), nil
 }
 func extractWorkspace(ctx context.Context, root, cache string, archive ArchiveResult) (*workspace, error) {
+	// Temporary directories can have aliases (/var on macOS and 8.3 paths on
+	// Windows). Every scope must use the same canonical spelling as read(), or
+	// valid source files and monorepo dependency links appear to be outside it.
+	root, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return nil, err
+	}
 	directory, err := os.MkdirTemp(cache, "revision-"+archive.Revision[:7]+"-")
 	if err != nil {
 		return nil, err
 	}
+	canonical, err := filepath.EvalSymlinks(directory)
+	if err != nil {
+		_ = os.RemoveAll(directory)
+		return nil, err
+	}
+	directory = canonical
 	confined, err := os.OpenRoot(directory)
 	if err != nil {
 		_ = os.RemoveAll(directory)

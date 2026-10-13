@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -97,7 +98,7 @@ func TestPRNotificationsDefaultsAndPersistentRepositoryIdentity(t *testing.T) {
 		}
 	}
 	info, err := os.Stat(s.configPath)
-	if err != nil || info.Mode().Perm() != 0600 {
+	if err != nil || (runtime.GOOS != "windows" && info.Mode().Perm() != 0600) {
 		t.Fatalf("Unexpected preference file permissions: %v, %v", info, err)
 	}
 	files, _ := filepath.Glob(filepath.Join(filepath.Dir(s.configPath), ".notifications-*"))

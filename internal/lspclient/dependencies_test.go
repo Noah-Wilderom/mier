@@ -68,3 +68,30 @@ func TestPlaintextHoverPreservesLiteralMarkupCharacters(t *testing.T) {
 		}
 	}
 }
+
+func TestAnalysisScopesCanonicalizeRepositoryAndCacheAliases(t *testing.T) {
+	parent := t.TempDir()
+	real := filepath.Join(parent, "actual")
+	writeTestFile(t, filepath.Join(real, "repository", "node_modules", "normal", "index.ts"), "export const installed = true;\n")
+	if err := os.MkdirAll(filepath.Join(real, "cache"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	alias := filepath.Join(parent, "alias")
+	if err := os.Symlink(real, alias); err != nil {
+		t.Skip("Directory symlinks unavailable")
+	}
+	w, err := extractWorkspace(context.Background(), filepath.Join(alias, "repository"), filepath.Join(alias, "cache"), ArchiveResult{Revision: testRevision, Tar: sourceArchive(t, map[string]string{"package.json": "{}", "use.ts": "export const selected = true;\n"})})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.close()
+	canonical, err := filepath.EvalSymlinks(w.directory)
+	if err != nil || canonical != w.directory {
+		t.Fatalf("Workspace directory was not canonical: %q %q %v", w.directory, canonical, err)
+	}
+	for _, path := range []string{"use.ts", "node_modules/normal/index.ts"} {
+		if _, _, _, err := w.read(filepath.Join(w.directory, filepath.FromSlash(path))); err != nil {
+			t.Fatalf("Aliased source was incorrectly outside its scope: %s: %v", path, err)
+		}
+	}
+}

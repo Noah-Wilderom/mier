@@ -526,7 +526,13 @@ func TestHistoryIsBoundedAndPreservesParents(t *testing.T) {
 func TestCancellationAndRepositoryLockWaitAreBounded(t *testing.T) {
 	client, root := testRepository(t, Options{})
 	initialCommit(t, client, root)
-	release, err := client.acquire(context.Background(), root)
+	// Operations lock Git's canonical root, which can differ from t.TempDir on
+	// macOS (/var) and Windows (short paths). Hold the actual operation lock.
+	canonical, err := client.resolveRoot(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	release, err := client.acquire(context.Background(), canonical)
 	if err != nil {
 		t.Fatal(err)
 	}
