@@ -1,0 +1,134 @@
+name: Release desktop applications
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  prepare:
+    name: Validate release and signing key
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      commit: ${{ steps.release.outputs.commit }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+      - name: Validate release
+        id: release
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          UPDATER_PRIVATE_KEY: ${{ secrets.UPDATER_PRIVATE_KEY }}
+        run: |
+          node scripts/release.mjs validate "$RELEASE_TAG"
+          printf 'commit=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Package ${{ matrix.platform }}/${{ matrix.arch }}
+    needs: prepare
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: darwin, arch: amd64, runner: macos-15-intel }
+          - { platform: darwin, arch: arm64, runner: macos-15 }
+          - { platform: linux, arch: amd64, runner: ubuntu-24.04 }
+          - { platform: linux, arch: arm64, runner: ubuntu-24.04-arm }
+          - { platform: windows, arch: amd64, runner: windows-2025 }
+          # Windows uses Wails' CGO-free cross-build for the ARM64 executable.
+          - { platform: windows, arch: arm64, runner: windows-2025 }
+    env:
+      APP_VERSION: ${{ needs.prepare.outputs.version }}
+      CGO_ENABLED: ${{ matrix.platform == 'windows' && '0' || '1' }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-desktop
+      - run: npm ci
+        working-directory: frontend
+      - run: npm test
+        working-directory: frontend
+      - run: node --test scripts/release.test.mjs
+      - run: npm run build
+        working-directory: frontend
+      - run: go test ./...
+      - name: Build and package the target
+        env:
+          TARGET_PLATFORM: ${{ matrix.platform }}
+          TARGET_ARCH: ${{ matrix.arch }}
+        run: node scripts/release.mjs package "$TARGET_PLATFORM" "$TARGET_ARCH" "$APP_VERSION"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            dist/updates/*
+            dist/installers/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Sign updates and attach release assets
+    needs: [prepare, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-desktop
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+      - name: Sign and verify all six update archives
+        env:
+          UPDATER_PRIVATE_KEY: ${{ secrets.UPDATER_PRIVATE_KEY }}
+        run: node scripts/release.mjs manifest "$RELEASE_TAG"
+      - name: Validate the AUR recipe with makepkg
+        run: |
+          docker run --rm \
+            -v "$PWD/dist/aur:/recipe:ro" \
+            -v "$PWD/dist/installers:/downloads:ro" \
+            archlinux:base-devel@sha256:061679925e5d5028f2df9395d441ce6c4b9accf0157ff3486c06b6962e014ef1 \
+            bash -c '
+              set -e
+              useradd --create-home builder
+              install -d -o builder -g builder /tmp/mier-aur
+              cp /recipe/PKGBUILD /recipe/.SRCINFO /tmp/mier-aur/
+              cp /downloads/*.pkg.tar.zst /tmp/mier-aur/
+              chown -R builder:builder /tmp/mier-aur
+              cd /tmp/mier-aur
+              su builder -c "makepkg --printsrcinfo > generated.SRCINFO"
+              diff -u <(sed "s/^[[:space:]]*//" .SRCINFO | sort) <(sed "s/^[[:space:]]*//" generated.SRCINFO | sort)
+              su builder -c "makepkg --nodeps --noconfirm"
+            '
+      - name: Upload installers, update archives, and checksums
+        run: gh release upload "$RELEASE_TAG" dist/updates/* dist/installers/* dist/SHA256SUMS --clobber --repo "$GITHUB_REPOSITORY"
+      - name: Publish the update feed after the downloads are available
+        run: gh release upload "$RELEASE_TAG" dist/manifest.json --clobber --repo "$GITHUB_REPOSITORY"

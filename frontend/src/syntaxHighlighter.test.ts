@@ -13,6 +13,7 @@ test('PHP fragments retain PHPDoc comment scope and distinguish real keywords an
   assert.ok(code.lines[1].every(token => token.type === 1), 'PHPDoc types must remain inside comment grammar scope')
   assert.ok(code.lines[3].some(token => token.content === 'public' && token.type === 0))
   assert.ok(code.lines[5].some(token => token.content === "'home'" && token.type === 2))
+  assert.ok(code.lines[5].some(token => token.content === '];' && token.type === 0), 'Closing quotes must end the string before array punctuation')
   assert.notEqual(code.lines[1].find(token => token.content === ': string}').color, code.lines[3].find(token => token.content === 'public').color)
 })
 

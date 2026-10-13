@@ -1,0 +1,56 @@
+name: Tests
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test on ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, macos-15, windows-2025]
+    env:
+      CGO_ENABLED: ${{ startsWith(matrix.runner, 'windows') && '0' || '1' }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-desktop
+      - run: npm ci
+        working-directory: frontend
+      - run: npm test
+        working-directory: frontend
+      - run: node --test scripts/release.test.mjs
+      - run: npm run build
+        working-directory: frontend
+      - name: Go tests with race detection
+        if: runner.os != 'Windows'
+        run: go test -race -coverprofile=coverage.out ./...
+      - name: Go tests on Windows
+        if: runner.os == 'Windows'
+        run: go test -coverprofile=coverage.out ./...
+      - run: go vet ./...
+      - name: Build the desktop application
+        run: wails3 build
+      - name: Build and inspect Linux distribution packages
+        if: runner.os == 'Linux'
+        run: node scripts/release.mjs linux-packages "$(go env GOARCH)" 0.1.0
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coverage-${{ matrix.runner }}
+          path: coverage.out

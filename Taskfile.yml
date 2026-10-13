@@ -4,6 +4,8 @@ vars:
   APP_NAME: "mag-ik-een-review"
   APP_DISPLAY_NAME: "M.I.E.R."
   BIN_DIR: "bin"
+  APP_VERSION: '{{.APP_VERSION | default "dev"}}'
+  APP_LDFLAGS: '-X main.appVersion={{.APP_VERSION}}'
   PACKAGE_MANAGER: '{{.PACKAGE_MANAGER | default "npm"}}'
   VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
   # Target OS for build/package/run. Defaults to the host OS, and is overridden

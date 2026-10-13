@@ -732,7 +732,6 @@ export default function App() {
             <Icon name="expand" />
           </button>
         )}
-        {live.enabled&&!live.account?.authenticated?<span className="avatar anonymous-avatar"><Icon name="user" size={18}/></span>:<Avatar user={currentUser} size={30}/>}
       </header>
 
       <main

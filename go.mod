@@ -5,6 +5,7 @@ go 1.25.0
 require (
 	github.com/wailsapp/wails/v3 v3.0.0-alpha2.117
 	github.com/zalando/go-keyring v0.2.8
+	golang.org/x/mod v0.35.0
 )
 
 require (

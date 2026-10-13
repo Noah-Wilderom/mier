@@ -110,7 +110,9 @@ async function tokenize(path: string, lines: string[], theme: CodeThemeId): Prom
       // Yield before each bounded chunk so settings/file navigation remain responsive.
       await new Promise<void>(resolve => setTimeout(resolve, 0))
       const chunk = lines.slice(start, start + 200)
-      const result = highlighter.codeToTokens(chunk.join('\n'), { lang: language, theme, grammarState, grammarContextCode: grammarState ? undefined : phpContext, includeExplanation: 'tokenType', tokenizeMaxLineLength: 10_000, tokenizeTimeLimit: 10 })
+      // Cold PHP grammar rules can exceed 10ms and leave closing quotes
+      // unparsed. Keep a per-line budget without truncating normal fragments.
+      const result = highlighter.codeToTokens(chunk.join('\n'), { lang: language, theme, grammarState, grammarContextCode: grammarState ? undefined : phpContext, includeExplanation: 'tokenType', tokenizeMaxLineLength: 10_000, tokenizeTimeLimit: 50 })
       grammarState = result.grammarState
       for (let index = 0; index < chunk.length; index++) {
         const tokens = result.tokens[index] as ThemedToken[] | undefined

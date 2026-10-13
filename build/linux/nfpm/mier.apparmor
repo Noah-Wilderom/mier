@@ -1,0 +1,8 @@
+# Ubuntu's namespace restriction requires this exact executable to be named
+# in a profile before WebKitGTK can create its subprocess sandbox.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile mier /usr/bin/mag-ik-een-review flags=(unconfined) {
+  userns,
+}

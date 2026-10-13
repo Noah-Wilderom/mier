@@ -12,5 +12,5 @@
 .editor-open-menu > button > svg:last-child:not(:first-child) { margin-left: auto; }
 .repository-open-github { height: 31px; padding-inline: 9px; font-size: 12px; white-space: nowrap; }
 @media (max-width: 1200px) { .repository-switcher { max-width: 280px; } .app-topbar .global-search { width: 34px; padding: 5px; } .global-search > kbd { display: none; } }
-@media (max-width: 1050px) { .repository-open-github > span { display: none; } .repository-switcher { max-width: 250px; } .app-topbar > .avatar { display: none; } }
+@media (max-width: 1050px) { .repository-open-github > span { display: none; } .repository-switcher { max-width: 250px; } }
 .editor-logo { display: block; object-fit: contain; flex-shrink: 0; }

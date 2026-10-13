@@ -8,6 +8,7 @@ import (
 	"runtime"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/updater"
 )
 
 //go:embed all:frontend/dist
@@ -24,6 +25,7 @@ type nativeCommand struct {
 }
 
 func main() {
+	updater.HandleHelperMode()
 	credentials := NewCredentialService()
 	repositories := NewRepositoryService(credentials)
 	github := NewGitHubService(credentials)
@@ -90,7 +92,9 @@ func main() {
 		},
 	})
 
-	menu := createNativeMenu(app, window)
+	updatesEnabled := configureUpdates(app)
+	defer app.Updater.StopPeriodicCheck()
+	menu := createNativeMenu(app, window, updatesEnabled)
 	app.Menu.Set(menu)
 	window.SetMenu(menu)
 
@@ -99,7 +103,7 @@ func main() {
 	}
 }
 
-func createNativeMenu(app *application.App, window *application.WebviewWindow) *application.Menu {
+func createNativeMenu(app *application.App, window *application.WebviewWindow, updatesEnabled bool) *application.Menu {
 	menu := application.NewMenu()
 	if runtime.GOOS == "darwin" {
 		menu.AddRole(application.AppMenu)
@@ -147,6 +151,10 @@ func createNativeMenu(app *application.App, window *application.WebviewWindow) *
 
 	menu.AddRole(application.WindowMenu)
 	help := menu.AddSubmenu("Help")
+	help.Add("Check for Updates…").SetEnabled(updatesEnabled).OnClick(func(_ *application.Context) {
+		go checkForUpdates(app)
+	})
+	help.AddSeparator()
 	help.Add("About M.I.E.R.").OnClick(func(_ *application.Context) { app.Menu.ShowAbout() })
 	return menu
 }
