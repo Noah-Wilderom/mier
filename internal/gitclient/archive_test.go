@@ -84,3 +84,32 @@ func TestArchiveComparisonUsesMergeBaseRatherThanLatestBase(t *testing.T) {
 		t.Fatal("Archive comparison checked out another branch")
 	}
 }
+
+func TestCodeArchivesIgnoreExportPackagingAttributes(t *testing.T) {
+	client, root := testRepository(t, Options{})
+	writeFile(t, root, ".gitattributes", "hidden.ts export-ignore\nsubstitute.ts export-subst\n")
+	writeFile(t, root, "hidden.ts", "export const hidden = true;\n")
+	literal := "export const format = '$Format:%h$';\n"
+	writeFile(t, root, "substitute.ts", literal)
+	testGit(t, root, "add", ".")
+	testGit(t, root, "commit", "-m", "Source with packaging attributes")
+	sha := testGit(t, root, "rev-parse", "HEAD")
+	immutable, err := client.ArchiveCommit(context.Background(), root, CommitArchiveRequest{Revision: sha})
+	if err != nil {
+		t.Fatal(err)
+	}
+	index, err := client.ArchiveWorkspace(context.Background(), root, "index")
+	if err != nil {
+		t.Fatal(err)
+	}
+	working, err := client.ArchiveWorkspace(context.Background(), root, "working")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, archive := range []CommitArchiveResult{immutable, index, working} {
+		files := archiveFiles(t, archive.Data)
+		if files["hidden.ts"] != "export const hidden = true;\n" || files["substitute.ts"] != literal {
+			t.Fatalf("Packaging attributes altered code intelligence source: %#v", files)
+		}
+	}
+}

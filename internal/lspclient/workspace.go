@@ -30,6 +30,7 @@ type workspace struct {
 	scopes                    []fileScope
 	sessions                  map[string]*session
 	leases                    int
+	dependencyBytes           int64
 }
 
 func insideDirectory(root, path string) bool {
@@ -83,10 +84,15 @@ func extractWorkspace(ctx context.Context, root, cache string, archive ArchiveRe
 		return nil, err
 	}
 	success := false
+	var captured *workspace
 	defer func() {
 		if !success {
-			confined.Close()
-			_ = os.RemoveAll(directory)
+			if captured != nil {
+				captured.close()
+			} else {
+				confined.Close()
+				_ = os.RemoveAll(directory)
+			}
 		}
 	}()
 	reader := tar.NewReader(bytes.NewReader(archive.Tar))
@@ -148,6 +154,7 @@ func extractWorkspace(ctx context.Context, root, cache string, archive ArchiveRe
 		}
 	}
 	w := &workspace{root: root, revision: archive.Revision, directory: directory, scopes: []fileScope{{directory: directory, label: "", root: confined}}, sessions: map[string]*session{}}
+	captured = w
 	for _, project := range projectDirectories(directory) {
 		relative, _ := filepath.Rel(directory, project)
 		for _, kind := range []string{"node_modules", "vendor"} {
@@ -160,12 +167,9 @@ func extractWorkspace(ctx context.Context, root, cache string, archive ArchiveRe
 				continue
 			}
 			destination := filepath.Join(project, kind)
-			if _, err := os.Lstat(destination); os.IsNotExist(err) {
-				if err = os.Symlink(resolved, destination); err != nil {
-					continue
-				}
+			if err = w.captureDependencies(ctx, resolved, destination, filepath.ToSlash(filepath.Join(relative, kind)), kind); err != nil {
+				return nil, fmt.Errorf("Capture %s source: %w", kind, err)
 			}
-			_ = w.addScope(resolved, filepath.ToSlash(filepath.Join(relative, kind)), true)
 		}
 	}
 	success = true
@@ -197,10 +201,15 @@ func (w *workspace) read(path string) (text, label string, external bool, err er
 	}
 	w.scopeMu.RLock()
 	defer w.scopeMu.RUnlock()
-	for _, scope := range w.scopes {
-		if !insideDirectory(scope.directory, resolved) {
-			continue
+	var selected *fileScope
+	for index := range w.scopes {
+		scope := &w.scopes[index]
+		if insideDirectory(scope.directory, resolved) && (selected == nil || len(scope.directory) > len(selected.directory)) {
+			selected = scope
 		}
+	}
+	if selected != nil {
+		scope := *selected
 		relative, _ := filepath.Rel(scope.directory, resolved)
 		file, err := scope.root.Open(relative)
 		if err != nil {

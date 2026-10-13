@@ -371,6 +371,9 @@ func (m *Manager) Hover(ctx context.Context, request CodePositionRequest) (Hover
 		Range    *Range          `json:"range"`
 	}
 	err = s.rpc.Request(ctx, "textDocument/hover", map[string]any{"textDocument": map[string]any{"uri": fileURI(path)}, "position": Position{request.Line, request.Character}}, &result)
+	if s.peer != nil && (err == nil && hoverContents(result.Contents) == "" || isUnsupportedMethod(err)) {
+		err = s.peer.rpc.Request(ctx, "textDocument/hover", map[string]any{"textDocument": map[string]any{"uri": fileURI(path)}, "position": Position{request.Line, request.Character}}, &result)
+	}
 	if err != nil {
 		return Hover{}, err
 	}
@@ -383,7 +386,7 @@ func (m *Manager) Hover(ctx context.Context, request CodePositionRequest) (Hover
 			result.Range = nil
 		}
 	}
-	return Hover{Contents: contents, Kind: "markdown", Range: result.Range, Revision: w.revision, Language: language}, nil
+	return Hover{Contents: contents, Kind: hoverKind(result.Contents), Range: result.Range, Revision: w.revision, Language: language}, nil
 }
 func (m *Manager) Definition(ctx context.Context, request CodePositionRequest) ([]DefinitionTarget, error) {
 	ctx, cancel := m.requestContext(ctx)
@@ -407,12 +410,25 @@ func (m *Manager) Definition(ctx context.Context, request CodePositionRequest) (
 		return nil, err
 	}
 	var raw json.RawMessage
-	if err = s.rpc.Request(ctx, "textDocument/definition", map[string]any{"textDocument": map[string]any{"uri": fileURI(path)}, "position": Position{request.Line, request.Character}}, &raw); err != nil {
+	err = s.rpc.Request(ctx, "textDocument/definition", map[string]any{"textDocument": map[string]any{"uri": fileURI(path)}, "position": Position{request.Line, request.Character}}, &raw)
+	if isUnsupportedMethod(err) && s.peer != nil {
+		err = s.peer.rpc.Request(ctx, "textDocument/definition", map[string]any{"textDocument": map[string]any{"uri": fileURI(path)}, "position": Position{request.Line, request.Character}}, &raw)
+	}
+	if err != nil {
 		return nil, err
 	}
 	locations, err := parseDefinitions(raw)
 	if err != nil {
 		return nil, err
+	}
+	if len(locations) == 0 && s.peer != nil {
+		if err = s.peer.rpc.Request(ctx, "textDocument/definition", map[string]any{"textDocument": map[string]any{"uri": fileURI(path)}, "position": Position{request.Line, request.Character}}, &raw); err != nil {
+			return nil, err
+		}
+		locations, err = parseDefinitions(raw)
+		if err != nil {
+			return nil, err
+		}
 	}
 	targets := []DefinitionTarget{}
 	release, err := m.lock(ctx)
@@ -502,6 +518,11 @@ func (m *Manager) Close() error {
 type definitionLocation struct {
 	URI   string
 	Range Range
+}
+
+func isUnsupportedMethod(err error) bool {
+	var rpcError *RPCError
+	return errors.As(err, &rpcError) && rpcError.Code == -32601
 }
 
 func validRange(value Range) bool {

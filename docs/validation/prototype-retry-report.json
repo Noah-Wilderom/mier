@@ -1,0 +1,26 @@
+{
+  "baseURL": "http://127.0.0.1:9245",
+  "completedAt": "2026-10-13T19:00:54.891Z",
+  "passed": 1,
+  "failed": 0,
+  "results": [
+    {
+      "name": "Stage all and commit consume only staged files and add history",
+      "status": "passed",
+      "durationMs": 913,
+      "evidence": "All three sample files staged, commit disabled until message supplied, consumed changes and inserted one history record."
+    }
+  ],
+  "errors": [],
+  "screenshots": [],
+  "_evidence": {
+    "recordedOn": "2026-10-13",
+    "context": "isolated headless Chromium; local Vite browser preview",
+    "data": "invented demo/provider fixtures only",
+    "nativeTransport": "mocked where native service calls were exercised",
+    "remoteWrites": false,
+    "realEditorLaunches": false,
+    "historicalPrototype": true,
+    "screenshotsArchived": false
+  }
+}

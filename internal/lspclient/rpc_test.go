@@ -85,6 +85,10 @@ func TestLSPRPCChild(t *testing.T) {
 				documents[params.TextDocument.URI] = params.ContentChanges[0].Text
 			}
 		case "textDocument/hover":
+			if os.Getenv("MIER_LSP_PLAINTEXT_HOVER") == "1" {
+				reply(map[string]any{"contents": map[string]any{"kind": "plaintext", "value": "List<T> contains **literal** markers"}})
+				continue
+			}
 			if vue {
 				hoverID = message.ID
 				write(map[string]any{"jsonrpc": "2.0", "method": "tsserver/request", "params": []any{77, "_vue:quickinfo", map[string]any{"file": "fixture.vue", "line": 1, "offset": 1}}})

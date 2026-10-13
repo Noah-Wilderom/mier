@@ -1,0 +1,30 @@
+{
+  "passed": true,
+  "scenarios": [
+    "headings/lists/fences/emoji",
+    "GFM tables/tasklists",
+    "raw HTML/executable URL filtering",
+    "browser external link",
+    "native OpenURL",
+    "runtime failure browser fallback",
+    "keyboard code scrolling",
+    "light/dark/narrow layout"
+  ],
+  "bounds": {
+    "width": 348,
+    "scrollWidth": 348,
+    "preWidth": 306,
+    "preScrollWidth": 1320
+  },
+  "errors": [],
+  "_evidence": {
+    "recordedOn": "2026-10-13",
+    "context": "isolated headless Chromium; local Vite browser preview",
+    "data": "invented demo/provider fixtures only",
+    "nativeTransport": "mocked where native service calls were exercised",
+    "remoteWrites": false,
+    "realEditorLaunches": false,
+    "historicalPrototype": false,
+    "screenshotsArchived": false
+  }
+}

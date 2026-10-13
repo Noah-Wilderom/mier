@@ -4,13 +4,21 @@
 
 The user approved the generated Review Inbox reference (direction B). Use flat, quiet desktop surfaces, a compact left sidebar, a master-detail pull request list, and a file tree beside readable code. The primary task is careful code review. An expanded Changes workspace hides navigation and the inbox without losing review state.
 
+## Initial reference
+
+The original Repository workspace concept (A), supplied again for the handoff, is preserved unchanged below. It establishes repository context, a PR list next to discussion, a metadata rail, restrained green actions, and native desktop density. The OpenGit name and sample labels in the image are historical; the application is now M.I.E.R. The later Review Inbox direction above describes the current layout. Some illustrated concepts, including reactions, projects, and milestones, are not implemented controls.
+
+![Initial repository workspace concept A](docs/design/initial-repository-workspace.png)
+
+See the [research index](docs/RESEARCH.md) for source references and implementation experiments.
+
 ## Appearance
 
 Follow the system light/dark theme with explicit System, Light, and Dark overrides. Light mode is intended for developers reviewing code in a well-lit work environment; dark mode follows the same hierarchy for evening work. Restrained color: green for actions and approvals, blue for context, red for removals and failures, amber for waiting states. Pair colors with icons and text.
 
 ## Typography
 
-Use the operating system sans-serif stack for navigation, labels, and prose. Use the operating system monospace stack for code, branches, and commit hashes. UI labels are 12–14px; code is 12–13px with generous line spacing; pull request titles are 21px. Code and conversation text remain selectable.
+Use the operating system sans-serif stack for navigation, labels, and prose. Use the operating system monospace stack for code, branches, and commit hashes. UI labels are 12–14px; code defaults to 13px with generous line spacing and is configurable from 12–20px; pull request titles are 21px. Code and conversation text remain selectable.
 
 ## Layout
 
@@ -31,3 +39,7 @@ The desktop app operates on local Git repositories and authenticated GitHub data
 New commits preserve the current code revision and pending review work until Refresh changes is selected. Local draft comments survive reopening and retain their original commit anchors. An explicitly labelled browser/demo workspace remains available for exploring the interface. Jira installation is currently a three-second backend preview.
 
 Notification preferences belong to each GitHub repository. All PR event types and in-app toasts default on; desktop notifications default off. Importing existing data never creates notification floods.
+
+Local and PR code use the same grammar highlighting and independent light/dark syntax theme preferences. Each appearance offers four cards with real code previews. Language intelligence has a quiet availability indicator; missing tools link to configuration rather than failing every hover. Definition navigation opens a read-only file pane and retains the underlying review state.
+
+Editor actions use a main launch button and adjacent selector with the official editor logos. The GitHub action is a separate button. Comment headers use profile pictures with initials as a fallback, a Bot badge without the literal [bot] suffix, and an Author badge when the commenter opened the PR.

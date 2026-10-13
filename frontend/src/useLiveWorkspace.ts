@@ -56,7 +56,7 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
     setItems(prsRef.current.some(pr=>pr.number===next.number)?prsRef.current.map(pr=>pr.number===next.number?merged:pr):[merged,...prsRef.current])
   },[setItems,saveDraft])
   const applyUpdate=useCallback((update:WorkspaceUpdate)=>{
-    if(update.repository||update.pullRequests)setRepositoryCards(cards=>({...cards,[update.path]:{...cards[update.path],path:update.path,name:update.repository?.name??cards[update.path]?.name??repositoryName(update.path),branch:update.repository?.currentBranch??cards[update.path]?.branch,host:update.host||cards[update.path]?.host,owner:update.owner||cards[update.path]?.owner,repo:update.repo||cards[update.path]?.repo,...(update.pullRequests?{openPullRequests:update.pullRequests.filter(pr=>['open','draft'].includes(pr.status)).length}:{})}}))
+    if(update.repository||update.pullRequests||update.error)setRepositoryCards(cards=>({...cards,[update.path]:{...cards[update.path],path:update.path,name:update.repository?.name??cards[update.path]?.name??repositoryName(update.path),branch:update.repository?.currentBranch??cards[update.path]?.branch,host:update.host||cards[update.path]?.host,owner:update.owner||cards[update.path]?.owner,repo:update.repo||cards[update.path]?.repo,...(update.pullRequests||update.error?{loadingPullRequests:false}:{}),...(update.pullRequests?{openPullRequests:update.pullRequests.filter(pr=>['open','draft'].includes(pr.status)).length}:{})}}))
     if(update.path!==repoRef.current?.root)return
     if(update.repository && Date.parse((update as WorkspaceUpdate & {repositoryUpdatedAt?:string}).repositoryUpdatedAt??update.updatedAt)>localMutationAt.current){repoRef.current=update.repository;setRepository(update.repository)}
     const identity=repoRef.current&&identityFor(repoRef.current)
@@ -160,9 +160,26 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
   const diff=useCallback(async(path:string,staged:boolean):Promise<ChangedFile>=>{const repo=repoRef.current;if(!repo)throw new Error('Open a repository first.');return mapRepositoryDiff(await services.repository.diff(repo.root,path,staged))},[])
   const useDemo=useCallback(()=>{setEnabled(false);configureCurrentUser('noah');setError('')},[])
   useEffect(()=>{
-    const initialize=()=>{if(!hasNativeBackend())return;setAvailable(true);setEnabled(true);void services.workspace.recentRepositories().then(paths=>{setRecent(paths);for(const path of paths)void services.repository.snapshot(path).then(snapshot=>{const identity=identityFor(snapshot);setRepositoryCards(cards=>({...cards,[path]:{...cards[path],path,name:snapshot.name,branch:snapshot.currentBranch,host:identity?.host,owner:identity?.owner,repo:identity?.repo}}))}).catch(()=>{})}).catch(issue=>setError(String(issue)))}
+    let initialized=false
+    let canceled=false
+    const initialize=()=>{
+      if(initialized||!hasNativeBackend())return
+      initialized=true;setAvailable(true);setEnabled(true)
+      void services.workspace.recentRepositories().then(paths=>{
+        if(canceled)return
+        setRecent(paths)
+        for(const path of paths)void services.repository.snapshot(path).then(snapshot=>{
+          if(canceled)return
+          const identity=identityFor(snapshot)
+          setRepositoryCards(cards=>({...cards,[snapshot.root]:{...cards[snapshot.root],path:snapshot.root,name:snapshot.name,branch:snapshot.currentBranch,host:identity?.host,owner:identity?.owner,repo:identity?.repo,loadingPullRequests:!!identity}}))
+          return services.sync.startWatch({path:snapshot.root,host:identity?.host??'',owner:identity?.owner??'',repo:identity?.repo??''}).catch(()=>{
+            if(!canceled)setRepositoryCards(cards=>({...cards,[snapshot.root]:{...cards[snapshot.root],loadingPullRequests:false}}))
+          })
+        }).catch(()=>{})
+      }).catch(issue=>{if(!canceled)setError(String(issue))})
+    }
     initialize();window.addEventListener('wails:runtime-config-ready',initialize)
-    return()=>window.removeEventListener('wails:runtime-config-ready',initialize)
+    return()=>{canceled=true;window.removeEventListener('wails:runtime-config-ready',initialize)}
   },[])
   useEffect(()=>subscribeWorkspaceUpdates(applyUpdate,error=>setError(error.message)),[applyUpdate])
   useEffect(()=>{const online=()=>void refresh();window.addEventListener('online',online);return()=>window.removeEventListener('online',online)},[refresh])

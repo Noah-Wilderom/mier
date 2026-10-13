@@ -77,6 +77,7 @@ export function codeLocationFromSelection(container: HTMLElement): DOMCodeLocati
 
 type HoverState = { location: DOMCodeLocation; x: number; y: number; loading: boolean; result?: LSPHover; error?: string }
 type ReaderEntry = { target: LSPDefinitionTarget; document: LSPDefinitionDocument }
+const completeRevision = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i
 
 function languageFor(position: DOMCodeLocation): string | undefined {
   const supplied = position.element.dataset.codeLanguage
@@ -105,17 +106,20 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
   const container = useRef<HTMLDivElement>(null)
   const hoverPanel = useRef<HTMLDivElement>(null)
   const hoverTimer = useRef<ReturnType<typeof setTimeout>>()
+  const hoverRefreshTimer = useRef<ReturnType<typeof setTimeout>>()
   const hideTimer = useRef<ReturnType<typeof setTimeout>>()
   const hoverSequence = useRef(0)
   const navigationSequence = useRef(0)
   const hoverAbort = useRef<AbortController>()
   const navigationAbort = useRef<AbortController>()
   const locationRef = useRef<DOMCodeLocation>()
+  const hoverPosition = useRef<DOMCodeLocation>()
+  const hoverEligible = useRef(false)
   const mounted = useRef(true)
   const gPressedAt = useRef(0)
   const requestedHead = headRevision ?? headSha
   const requestedBase = baseRevision ?? baseSha
-  const active = (enabled ?? nativeAvailable) && !!root && (/^[a-f0-9]{40,64}$/i.test(requestedHead) || requestedHead === 'working' || requestedHead === 'index')
+  const active = (enabled ?? nativeAvailable) && !!root && (completeRevision.test(requestedHead) || requestedHead === 'working' || requestedHead === 'index')
   const context = `${root}\u0000${host ?? ''}\u0000${owner ?? ''}\u0000${repo ?? ''}\u0000${pullRequest ?? ''}\u0000${headSha}\u0000${baseSha ?? ''}\u0000${requestedHead}\u0000${requestedBase ?? ''}\u0000${revisionKey ?? ''}`
   const currentContext = useRef(context)
   currentContext.current = context
@@ -126,10 +130,14 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
 
   const clearHover = () => {
     clearTimeout(hoverTimer.current)
+    clearTimeout(hoverRefreshTimer.current)
     clearTimeout(hideTimer.current)
+    hideTimer.current = undefined
     hoverSequence.current++
     hoverAbort.current?.abort()
     hoverAbort.current = undefined
+    hoverPosition.current = undefined
+    hoverEligible.current = false
     setHover(undefined)
   }
 
@@ -144,6 +152,7 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
       hoverAbort.current?.abort()
       navigationAbort.current?.abort()
       clearTimeout(hoverTimer.current)
+      clearTimeout(hoverRefreshTimer.current)
       clearTimeout(hideTimer.current)
       window.removeEventListener('wails:runtime-config-ready', detect)
     }
@@ -238,7 +247,7 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
 
   const requestFor = (position: DOMCodeLocation): CodePositionRequest | undefined => {
     const revision = position.revision || (position.side === 'old' ? requestedBase : requestedHead)
-    if (!active || !revision || (!/^[a-f0-9]{40,64}$/i.test(revision) && revision !== 'working' && revision !== 'index')) return undefined
+    if (!active || !revision || (!completeRevision.test(revision) && revision !== 'working' && revision !== 'index')) return undefined
     const compare = position.side === 'old' && !position.revision && !!pullRequest && !headRevision && !baseRevision
     return { root, revision, path: position.path, host, owner, repo, pullRequest, line: position.line, character: position.character, lineText: position.lineText, ...(compare ? { comparisonHead: headSha } : {}) }
   }
@@ -293,7 +302,7 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
       const found = await services.lsp.definition(request, controller.signal)
       if (!mounted.current || sequence !== navigationSequence.current || currentContext.current !== expectedContext) return
       const resolvedSnapshot = !!request.comparisonHead || request.revision === 'working' || request.revision === 'index'
-      if (found.some(target => !/^[a-f0-9]{40,64}$/i.test(target.revision) || (!resolvedSnapshot && target.revision !== request.revision))) throw new Error('The definition response belongs to another revision. Try again.')
+      if (found.some(target => !completeRevision.test(target.revision) || (!resolvedSnapshot && target.revision !== request.revision))) throw new Error('The definition response belongs to another revision. Try again.')
       if (!found.length) setNotice('The language server found no definition at this position.')
       else if (found.length === 1) {
         await openTarget(found[0])
@@ -359,21 +368,27 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
     if (!active || !container.current || busy) return
     if (hoverPanel.current?.contains(event.target as Node)) {
       clearTimeout(hideTimer.current)
+      hideTimer.current = undefined
+      hoverEligible.current = true
       return
     }
     const position = codeLocationAtPoint(container.current, event.target, event.clientX, event.clientY)
     if (!position) {
+      hoverEligible.current = false
       clearTimeout(hoverTimer.current)
       if (!hideTimer.current) hideTimer.current = setTimeout(() => {hideTimer.current = undefined;clearHover()}, 180)
       return
     }
     clearTimeout(hideTimer.current)
     hideTimer.current = undefined
-    const previous = locationRef.current
+    hoverEligible.current = true
+    const previous = hoverPosition.current
     locationRef.current = position
     if (previous?.path === position.path && previous.line === position.line && previous.side === position.side && previous.character === position.character) return
+    hoverPosition.current = position
     setLocation(position)
     clearTimeout(hoverTimer.current)
+    clearTimeout(hoverRefreshTimer.current)
     if (!serverStatuses?.some(server => server.language === languageFor(position) && server.available)) {clearHover();return}
     const sequence = ++hoverSequence.current
     hoverAbort.current?.abort()
@@ -391,15 +406,28 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
         const result = await services.lsp.hover(request, controller.signal)
         if (!mounted.current || sequence !== hoverSequence.current || currentContext.current !== expectedContext) return
         const resolvedSnapshot = !!request.comparisonHead || request.revision === 'working' || request.revision === 'index'
-        if (!/^[a-f0-9]{40,64}$/i.test(result.revision) || (!resolvedSnapshot && result.revision !== request.revision)) throw new Error('The hover response belongs to another revision.')
+        if (!completeRevision.test(result.revision) || (!resolvedSnapshot && result.revision !== request.revision)) throw new Error('The hover response belongs to another revision.')
         setHover(result.contents ? { location: position, x, y, loading: false, result } : undefined)
+        // Phpactor may return a short authentic result while its initial index warms.
+        // Keep it visible and refresh once while the same symbol remains active.
+        if (result.language === 'php') hoverRefreshTimer.current = setTimeout(async () => {
+          if (!mounted.current || !hoverEligible.current || sequence !== hoverSequence.current || currentContext.current !== expectedContext) return
+          const refreshController = new AbortController()
+          hoverAbort.current = refreshController
+          try {
+            const refreshed = await services.lsp.hover(request, refreshController.signal)
+            if (!mounted.current || !hoverEligible.current || sequence !== hoverSequence.current || currentContext.current !== expectedContext || refreshController.signal.aborted) return
+            if (!completeRevision.test(refreshed.revision) || (!resolvedSnapshot && refreshed.revision !== request.revision)) return
+            if (refreshed.contents) setHover({ location: position, x, y, loading: false, result: refreshed })
+          } catch { /* Retain the last valid symbol result if the warmup refresh fails. */ }
+        }, 1_000)
       } catch (issue) {
         if (!controller.signal.aborted && mounted.current && sequence === hoverSequence.current && currentContext.current === expectedContext) setHover({ location: position, x, y, loading: false, error: issue instanceof Error ? issue.message : 'Symbol information could not be loaded.' })
       }
     }, 450)
   }
 
-  return <div className="code-intelligence" ref={container} onPointerMove={pointerMove} onPointerLeave={() => {clearTimeout(hoverTimer.current);hideTimer.current = setTimeout(() => {hideTimer.current = undefined;clearHover()}, 180)}} onClick={event => {
+  return <div className="code-intelligence" ref={container} onPointerMove={pointerMove} onPointerLeave={() => {hoverEligible.current = false;clearTimeout(hoverTimer.current);hideTimer.current = setTimeout(() => {hideTimer.current = undefined;clearHover()}, 180)}} onClick={event => {
     if (!container.current) return
     const position = codeLocationAtPoint(container.current, event.target, event.clientX, event.clientY)
     if (position) {
@@ -428,6 +456,6 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
       </div>
     </section>}
     {!!targets.length && <div className="code-intelligence-targets" role="dialog" aria-label="Choose a definition"><div><strong>Definitions</strong><button className="icon-button" type="button" aria-label="Close definition choices" onClick={() => setTargets([])}><Icon name="close" size={14} /></button></div><ul>{targets.map(target => <li key={target.id || `${target.uri}:${target.range.start.line}:${target.range.start.character}`}><button type="button" disabled={busy} onClick={() => void openTarget(target)}><Icon name="file" size={16} /><span><strong>{target.path}:{target.range.start.line + 1}</strong><span>{target.external ? 'Dependency file' : 'Repository file'} · {target.language}</span></span><Icon name="chevron-right" size={14} /></button></li>)}</ul></div>}
-    {hover && <div ref={hoverPanel} className="code-intelligence-hover" role="dialog" aria-label="Symbol information" style={{ left: hover.x, top: hover.y }} onKeyDown={event => {if (event.key === 'Escape') {event.preventDefault();event.stopPropagation();clearHover()}}}><div className="code-hover-heading"><span>{hover.result?.language ?? 'Symbol information'}</span><button className="icon-button" type="button" aria-label="Close symbol information" onClick={clearHover}><Icon name="close" size={13} /></button></div>{hover.loading ? <div className="code-hover-loading" role="status"><span className="sr-only">Loading symbol information…</span><span className="skeleton" aria-hidden="true" /><span className="skeleton" aria-hidden="true" /></div> : hover.error ? <p className="code-hover-error" role="alert">{hover.error}{onOpenSettings && <button className="btn-ghost" type="button" onClick={onOpenSettings}>Language server settings</button>}</p> : hover.result && <Markdown>{hover.result.contents}</Markdown>}<button className="btn-ghost code-hover-definition" type="button" disabled={hover.loading || busy || !!hover.error} onClick={() => void goToDefinition(hover.location)}>Go to definition<kbd>F12</kbd></button></div>}
+    {hover && <div ref={hoverPanel} className="code-intelligence-hover" role="dialog" aria-label="Symbol information" style={{ left: hover.x, top: hover.y }} onKeyDown={event => {if (event.key === 'Escape') {event.preventDefault();event.stopPropagation();clearHover()}}}><div className="code-hover-heading"><span>{hover.result?.language ?? 'Symbol information'}</span><button className="icon-button" type="button" aria-label="Close symbol information" onClick={clearHover}><Icon name="close" size={13} /></button></div>{hover.loading ? <div className="code-hover-loading" role="status"><span className="sr-only">Loading symbol information…</span><span className="skeleton" aria-hidden="true" /><span className="skeleton" aria-hidden="true" /></div> : hover.error ? <p className="code-hover-error" role="alert">{hover.error}{onOpenSettings && <button className="btn-ghost" type="button" onClick={onOpenSettings}>Language server settings</button>}</p> : hover.result && (hover.result.kind === 'plaintext' ? <div className="code-hover-plaintext">{hover.result.contents}</div> : <Markdown>{hover.result.contents}</Markdown>)}<button className="btn-ghost code-hover-definition" type="button" disabled={hover.loading || busy || !!hover.error} onClick={() => void goToDefinition(hover.location)}>Go to definition<kbd>F12</kbd></button></div>}
   </div>
 }

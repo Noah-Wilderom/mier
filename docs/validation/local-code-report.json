@@ -1,0 +1,58 @@
+{
+  "passed": true,
+  "requests": [
+    {
+      "path": "app/First.php",
+      "staged": false
+    },
+    {
+      "path": "app/Second.php",
+      "staged": false
+    },
+    {
+      "path": "app/Second.php",
+      "staged": false
+    },
+    {
+      "path": "app/Second.php",
+      "staged": false
+    },
+    {
+      "path": "app/Second.php",
+      "staged": false
+    },
+    {
+      "path": "app/Second.php",
+      "staged": true
+    }
+  ],
+  "stageCalls": [
+    {
+      "paths": [
+        "app/Second.php"
+      ],
+      "stage": true
+    },
+    {
+      "paths": [
+        "app/Second.php"
+      ],
+      "stage": true
+    }
+  ],
+  "commitCalls": [
+    "Keep message on failure",
+    "Keep message on failure"
+  ],
+  "errors": [],
+  "_evidence": {
+    "recordedOn": "2026-10-13",
+    "context": "isolated headless Chromium; local Vite browser preview",
+    "data": "invented demo/provider fixtures only",
+    "nativeTransport": "mocked where native service calls were exercised",
+    "remoteWrites": false,
+    "realEditorLaunches": false,
+    "historicalPrototype": false,
+    "screenshotsArchived": false
+  }
+}

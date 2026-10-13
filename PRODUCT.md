@@ -22,9 +22,15 @@ GitHub pull requests have an inbox and Conversation, Changes, Commits, and Check
 
 Authentication reuses an existing GitHub CLI login or a validated token saved in the OS credential store. Accounts are selected by host, including enterprise hosts. Secrets remain in the Go backend and credential store; application account metadata contains hostnames and usernames, not tokens. HTTPS Git operations can use the same host-specific account, while SSH follows the user's existing configuration.
 
+Local and PR code share grammar highlighting, configurable font size, and four syntax themes per appearance. Installed PHP, TypeScript / JavaScript, and Vue language servers provide symbol hovers and definition navigation in isolated revision snapshots. Definitions open in a read-only viewer, including available dependency sources, without changing the user's checkout. Local analysis distinguishes staged and working tree content.
+
+Five inboxes distinguish all PRs, the user's PRs, requested reviews, assigned PRs, and drafts. Comments show account pictures, Bot badges, and Author badges. Editor launch actions support VSCode, PhpStorm, and Zed with remembered selection and a separate GitHub browser action.
+
+Repository notification preferences cover opened, closed, merged, and review-requested events. In-app toasts and all event types default on; desktop notifications default off. The initial imported snapshot establishes a silent baseline. Settings also includes a Jira installation card with a three-second backend placeholder; a real Jira integration remains future work.
+
 ## Review Continuity
 
-The active repository, pull request inbox, and selected PR refresh in the background every 15 seconds. Updates bring in discussions, reviews, checks, and local changes while preserving the selected file and review progress. A manual refresh is available. Timeouts, offline operation, permission failures, and rate limits must remain understandable without discarding useful local state.
+Imported recent repositories and their pull request inboxes refresh in the background every 15 seconds, including the selected PR while it is watched. Updates bring in discussions, reviews, checks, and local changes while preserving the selected file and review progress. A manual refresh is available. Timeouts, offline operation, permission failures, and rate limits must remain understandable without discarding useful local state.
 
 New commits never silently replace a diff during review. Show an explicit new-commit notice and let the reviewer choose **Refresh changes**. Keep draft comments, mark drafts attached to an older head as outdated, and require them to be repositioned before submission. Review and merge writes verify the expected head revision.
 

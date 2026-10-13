@@ -9,6 +9,7 @@ export interface RepositoryCard {
   owner?: string
   repo?: string
   openPullRequests?: number
+  loadingPullRequests?: boolean
 }
 
 export function repositoryName(path: string): string {
@@ -41,7 +42,10 @@ export default function RepositorySelector({items, selectedPath, loading, busy, 
     return () => window.removeEventListener('pointerdown', outside)
   }, [open])
   useEffect(() => {if (open) anchor.current?.querySelector(`[data-repository-index="${index}"]`)?.scrollIntoView({block:'nearest'})}, [index, open])
-  const count = (item: RepositoryCard) => <span className="repository-pr-count" title="Open pull requests" aria-label={loading && item.path === selectedPath ? 'Loading open pull request count' : item.openPullRequests !== undefined ? `${item.openPullRequests} open pull requests` : 'Pull request count has not loaded'}><Icon name="pull-request" size={14}/>{loading && item.path === selectedPath ? <span className="skeleton skeleton-count" aria-hidden="true"/> : item.openPullRequests ?? '—'}</span>
+  const count = (item: RepositoryCard) => {
+    const pending = !!item.loadingPullRequests || (loading && item.path === selectedPath)
+    return <span className="repository-pr-count" title="Open pull requests" aria-label={pending ? 'Loading open pull request count' : item.openPullRequests !== undefined ? `${item.openPullRequests} open pull requests` : 'Pull request count has not loaded'}><Icon name="pull-request" size={14}/>{pending ? <span className="skeleton skeleton-count" aria-hidden="true"/> : item.openPullRequests ?? '—'}</span>
+  }
   return <div className="repository-switcher" ref={anchor}>
     <button className="repository-switcher-trigger" ref={trigger} aria-label={`Select repository, current ${selected?.name ?? 'none'}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => {setOpen(value => !value); setQuery(''); setIndex(0)}}>
       <Icon name={selected?.host ? 'github' : 'folder'} size={20}/>

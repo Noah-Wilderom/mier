@@ -112,3 +112,38 @@ func TestWorkingSnapshotSkipsExternalSymlinkSource(t *testing.T) {
 		t.Fatal("Working snapshot followed an external file link")
 	}
 }
+
+func TestWorkingArchiveIncludesDirtyAssumeUnchangedAndSkipWorktreeSources(t *testing.T) {
+	client, root := testRepository(t, Options{})
+	writeFile(t, root, "assumed.ts", "export const value = 'INDEX';\n")
+	writeFile(t, root, "skipped.ts", "export const value = 'INDEX';\n")
+	testGit(t, root, "add", ".")
+	testGit(t, root, "commit", "-m", "Source files")
+	testGit(t, root, "update-index", "--assume-unchanged", "assumed.ts")
+	testGit(t, root, "update-index", "--skip-worktree", "skipped.ts")
+	writeFile(t, root, "assumed.ts", "export const value = 'ACTUAL WORKING';\n")
+	writeFile(t, root, "skipped.ts", "export const value = 'ACTUAL WORKING';\n")
+	working, err := client.ArchiveWorkspace(context.Background(), root, "working")
+	if err != nil {
+		t.Fatal(err)
+	}
+	index, err := client.ArchiveWorkspace(context.Background(), root, "index")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"assumed.ts", "skipped.ts"} {
+		if !strings.Contains(archiveFiles(t, working.Data)[name], "ACTUAL WORKING") || !strings.Contains(archiveFiles(t, index.Data)[name], "INDEX") {
+			t.Fatalf("Hidden working edit was mixed with index source: %s", name)
+		}
+	}
+	if err = os.Remove(filepath.Join(root, "skipped.ts")); err != nil {
+		t.Fatal(err)
+	}
+	sparse, err := client.ArchiveWorkspace(context.Background(), root, "working")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(archiveFiles(t, sparse.Data)["skipped.ts"], "INDEX") {
+		t.Fatal("Omitted sparse-checkout file lost its captured index source")
+	}
+}

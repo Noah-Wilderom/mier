@@ -1,0 +1,72 @@
+{
+  "passed": true,
+  "startupWatches": [
+    {
+      "path": "/qa/alpha",
+      "host": "github.com",
+      "owner": "qa",
+      "repo": "alpha"
+    },
+    {
+      "path": "/qa/beta",
+      "host": "github.com",
+      "owner": "qa",
+      "repo": "beta"
+    },
+    {
+      "path": "/qa/gamma",
+      "host": "github.com",
+      "owner": "qa",
+      "repo": "gamma"
+    }
+  ],
+  "editorCalls": [
+    {
+      "name": "main.EditorService.PreferredEditor",
+      "args": []
+    },
+    {
+      "name": "main.EditorService.PreferredEditor",
+      "args": []
+    },
+    {
+      "name": "main.EditorService.OpenRepository",
+      "args": [
+        "/qa/alpha",
+        "phpstorm"
+      ]
+    },
+    {
+      "name": "main.EditorService.OpenRepository",
+      "args": [
+        "/qa/alpha",
+        "phpstorm"
+      ]
+    },
+    {
+      "name": "main.EditorService.OpenRepository",
+      "args": [
+        "/qa/alpha",
+        "phpstorm"
+      ]
+    },
+    {
+      "name": "main.EditorService.PreferredEditor",
+      "args": []
+    }
+  ],
+  "externalLinks": [
+    "https://github.com/qa/alpha"
+  ],
+  "errors": [],
+  "_evidence": {
+    "recordedOn": "2026-10-13",
+    "context": "isolated headless Chromium; local Vite browser preview",
+    "data": "invented demo/provider fixtures only",
+    "nativeTransport": "mocked where native service calls were exercised",
+    "remoteWrites": false,
+    "realEditorLaunches": false,
+    "historicalPrototype": false,
+    "screenshotsArchived": false
+  }
+}

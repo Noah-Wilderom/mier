@@ -1,0 +1,207 @@
+{
+  "baseURL": "http://127.0.0.1:9245",
+  "completedAt": "2026-10-13T19:00:54.891Z",
+  "passed": 11,
+  "failed": 0,
+  "results": [
+    {
+      "name": "PR selection, search, status and repository filters",
+      "status": "passed",
+      "durationMs": 1152,
+      "evidence": "Correct PR detail follows search/filter; empty states recover; file filtering respects full paths."
+    },
+    {
+      "name": "Expanded review preserves selection, viewed state and unsent drafts; Esc restores layout",
+      "status": "passed",
+      "durationMs": 1717,
+      "evidence": "DiffView selection + viewed flag + unsent inline/summary text survive expand/collapse; layout modes preserve draft; saved pending comment persists across reload."
+    },
+    {
+      "name": "Thread reply and resolution, formal approval, SHA-bound merge and history",
+      "status": "passed",
+      "durationMs": 5630,
+      "evidence": "Reply persisted, unresolved thread blocks removed, Noah approval references exact head SHA, merge method and history record agree."
+    },
+    {
+      "name": "Failed checks block merge; draft/self-review restrictions hold",
+      "status": "passed",
+      "durationMs": 905,
+      "evidence": "Required failed checks prevent merge; authors cannot approve their PR; draft reviews stay disabled."
+    },
+    {
+      "name": "Create draft validates branch/title, mark ready enables review lifecycle",
+      "status": "passed",
+      "durationMs": 968,
+      "evidence": "Invalid and duplicate branch pairs prevented; draft143 created with expected title/body, marked ready, running checks remain blockers."
+    },
+    {
+      "name": "Stage all and commit consume only staged files and add history",
+      "status": "passed",
+      "durationMs": 913,
+      "evidence": "All three sample files staged, commit disabled until message supplied, consumed changes and inserted one history record."
+    },
+    {
+      "name": "Theme preferences, native DOM commands, command palette and keyboard navigation",
+      "status": "passed",
+      "durationMs": 1001,
+      "evidence": "Explicit themes work; system preference follows live OS media changes; shell DOM events and palette route into same UI behavior."
+    },
+    {
+      "name": "1440×900 light normal and expanded screenshots; equal split columns",
+      "status": "passed",
+      "durationMs": 836,
+      "evidence": {
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        },
+        "document": {
+          "width": 1440,
+          "height": 900
+        },
+        "body": {
+          "width": 1440,
+          "height": 900
+        },
+        "offendingElements": []
+      }
+    },
+    {
+      "name": "1440×900 dark normal and expanded screenshots",
+      "status": "passed",
+      "durationMs": 853,
+      "evidence": {
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        },
+        "document": {
+          "width": 1440,
+          "height": 900
+        },
+        "body": {
+          "width": 1440,
+          "height": 900
+        },
+        "offendingElements": []
+      }
+    },
+    {
+      "name": "1024×768 compact desktop normal and expanded screenshots, no page overflow",
+      "status": "passed",
+      "durationMs": 847,
+      "evidence": {
+        "normal": {
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "document": {
+            "width": 1024,
+            "height": 768
+          },
+          "body": {
+            "width": 1024,
+            "height": 768
+          },
+          "offendingElements": [
+            {
+              "tag": "SPAN",
+              "class": "muted",
+              "text": "Changed"
+            }
+          ]
+        },
+        "expanded": {
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "document": {
+            "width": 1024,
+            "height": 768
+          },
+          "body": {
+            "width": 1024,
+            "height": 768
+          },
+          "offendingElements": []
+        }
+      }
+    },
+    {
+      "name": "390×844 mobile containment screenshot and expanded review control",
+      "status": "passed",
+      "durationMs": 789,
+      "evidence": {
+        "normal": {
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "document": {
+            "width": 390,
+            "height": 844
+          },
+          "body": {
+            "width": 390,
+            "height": 844
+          },
+          "offendingElements": [
+            {
+              "tag": "SPAN",
+              "class": "muted",
+              "text": "Changed"
+            }
+          ]
+        },
+        "expanded": {
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "document": {
+            "width": 390,
+            "height": 844
+          },
+          "body": {
+            "width": 390,
+            "height": 844
+          },
+          "offendingElements": [
+            {
+              "tag": "SPAN",
+              "class": "muted",
+              "text": "Changed"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "screenshots": [
+    "/tmp/opengit-qa/screenshots/failure-6.png",
+    "/tmp/opengit-qa/screenshots/normal-light-1440.png",
+    "/tmp/opengit-qa/screenshots/expanded-light-1440.png",
+    "/tmp/opengit-qa/screenshots/normal-dark-1440.png",
+    "/tmp/opengit-qa/screenshots/expanded-dark-1440.png",
+    "/tmp/opengit-qa/screenshots/normal-light-1024.png",
+    "/tmp/opengit-qa/screenshots/expanded-light-1024.png",
+    "/tmp/opengit-qa/screenshots/normal-mobile-390.png",
+    "/tmp/opengit-qa/screenshots/expanded-mobile-390.png"
+  ],
+  "testAdjustments": [
+    "Stage/commit test selector corrected for fixture containing an initially staged file; scenario passed on retry."
+  ],
+  "_evidence": {
+    "recordedOn": "2026-10-13",
+    "context": "isolated headless Chromium; local Vite browser preview",
+    "data": "invented demo/provider fixtures only",
+    "nativeTransport": "mocked where native service calls were exercised",
+    "remoteWrites": false,
+    "realEditorLaunches": false,
+    "historicalPrototype": true,
+    "screenshotsArchived": false
+  }
+}

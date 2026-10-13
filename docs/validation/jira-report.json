@@ -1,0 +1,26 @@
+{
+  "passed": true,
+  "elapsedMs": 3000,
+  "requests": 3,
+  "duplicateClickRequests": 1,
+  "idleLabel": "Install Jira app",
+  "disabledCursor": "default",
+  "disabledPointerEvents": "none",
+  "layout": {
+    "width": 348,
+    "scrollWidth": 348,
+    "cardWidth": 314,
+    "cardScrollWidth": 314
+  },
+  "errors": [],
+  "_evidence": {
+    "recordedOn": "2026-10-13",
+    "context": "isolated headless Chromium; local Vite browser preview",
+    "data": "invented demo/provider fixtures only",
+    "nativeTransport": "mocked where native service calls were exercised",
+    "remoteWrites": false,
+    "realEditorLaunches": false,
+    "historicalPrototype": false,
+    "screenshotsArchived": false
+  }
+}

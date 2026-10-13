@@ -1,0 +1,41 @@
+{
+  "recordedOn": "2026-10-13",
+  "kind": "recorded observations from failing and passing isolated browser assertions",
+  "cases": [
+    {
+      "name": "PHPDoc grammar scope",
+      "before": {
+        "keywordClassMatchesInsidePHPDoc": [
+          "return",
+          "string",
+          "return",
+          "string"
+        ],
+        "assertion": "failed: PHPDoc must not use generic keyword regex"
+      },
+      "after": {
+        "assertion": "passed: PHPDoc spans retain comment grammar scope",
+        "persistentTest": "frontend/src/syntaxHighlighter.test.ts"
+      }
+    },
+    {
+      "name": "Delayed saved editor preference",
+      "fixture": {
+        "savedPreference": "zed",
+        "explicitUserChoice": "phpstorm",
+        "preferenceDelayMs": 600
+      },
+      "before": {
+        "label": "Open in Zed",
+        "assertion": "failed: delayed preference replaced explicit choice"
+      },
+      "after": {
+        "label": "Open in PhpStorm",
+        "assertion": "passed: explicit choice retained"
+      }
+    }
+  ],
+  "data": "invented fixtures only",
+  "remoteWrites": false,
+  "realEditorLaunches": false
+}

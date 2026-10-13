@@ -1,0 +1,73 @@
+# Implementation architecture
+
+This describes M.I.E.R. as implemented on 2026-10-13. Product scope and intent are in [PRODUCT.md](../PRODUCT.md); run/build instructions are in [README.md](../README.md). The initial reference image and current visual decisions are in [DESIGN.md](../DESIGN.md).
+
+## Boundaries and runtime
+
+The Go application owns filesystem access, Git, credentials, provider requests, background polling, native editor launches, notifications, and language-server processes. React renders structured data and invokes typed service adapters; browser demo actions use separate sample state. Running Vite alone does not access repositories or GitHub.
+
+`main.go` registers services and the `workspace:updated` / `notifications:pr` Wails events, embeds `frontend/dist`, and creates the native window and menu. The project pins Go Wails and CLI `v3.0.0-alpha2.117` and npm runtime `3.0.0-beta.29`. The active application service namespace is `main.*`. Do not derive binding names from the module slug or upgrade one runtime independently without checking transport and generated bindings.
+
+`frontend/src/services.ts` is the typed RPC boundary, including cancellation for LSP calls. `native.ts` owns native commands, browser opening, full screen, and the runtime handshake. Native availability requires an actual Wails OS environment. Importing the runtime in a normal browser does not create a live backend.
+
+## Module map
+
+| Area | Go ownership | Frontend ownership |
+| --- | --- | --- |
+| Repository selection and recent paths | `workspaceservice.go` | `LiveSetup.tsx`, `RepositorySelector.tsx` |
+| Git state and operations | `repositoryservice.go`, `internal/gitclient/` | `useLiveWorkspace.ts`, `LocalChangesView.tsx`, `HistoryGraph.tsx` |
+| GitHub and enterprise accounts | `credentialservice.go`, `githubservice.go`, `internal/githubclient/` | `services.ts`, `liveData.ts`, `LiveSetup.tsx` |
+| Background synchronization | `workspace_sync.go` | `useLiveWorkspace.ts`, `Loading.tsx` |
+| PR review and drafts | Provider mutations and revision checks | `App.tsx`, `ReviewWorkspace.tsx`, `reviewRevision.ts`, `reviewDrafts.ts` |
+| Markdown and identities | GitHub user/comment DTOs | `Markdown.tsx`, `Avatar.tsx` |
+| Code highlighting and preferences | No server dependency | `syntaxHighlighter.ts`, `codeReviewPreferences.ts`, `CodeReviewSettings.tsx` |
+| Language intelligence | `lspservice.go`, `internal/lspclient/`, Git snapshot APIs | `CodeIntelligence.tsx`, `LanguageServerSettings.tsx` |
+| Notifications | `prnotificationservice.go`, `desktopnotificationservice.go` | `NotificationSettings.tsx`, `NotificationToasts.tsx` |
+| Editor launching | `editorservice.go` | `EditorActions.tsx` |
+| Jira placeholder | `integrationservice.go` | `JiraIntegration.tsx` |
+
+## Git and provider execution
+
+Git runs through direct argument vectors with repository locks, contexts, bounded output, and timeouts. Normal operations do not build shell command strings. Pull is fast-forward only; push does not force. PR checkout handles existing branches and rejects unsafe dirty/divergent states. Snapshot HEAD is the actual checkout's `headSha`; history includes other branches and must not be used to guess HEAD.
+
+The credential service resolves an app-saved OS keychain token before an existing `gh` login for the selected hostname. Account metadata contains no tokens. HTTPS Git receives ephemeral host-scoped configuration; SSH uses the existing user configuration. Credentials stay in Go, and errors/remotes are redacted. Redirects and Git tracing do not carry authentication to another host.
+
+GitHub uses REST for lists, files, lifecycle, checks, and mutations, and GraphQL for review threads and metadata unavailable through those REST responses. Pagination, ETags, Link headers, rate-limit cooldowns, and cancellation are handled by the provider client. The current review-comment query uses `fullDatabaseId`; side belongs to the thread. See [Git/GitHub/Wails research](RESEARCH_GIT_GITHUB_WAILS.md) for the merged-PR schema regression and observed API behavior.
+
+Mutations reconcile canonical provider state after success. If a remote action succeeds but reloading fails, `RemoteActionAppliedError` distinguishes that outcome from a rejected action so the UI does not blindly repeat a write. Reviews and merges carry an expected head SHA. Permissions and merge protection are enforced by GitHub; missing protection information is presented as unknown.
+
+## Refresh and review continuity
+
+Native startup reads recent repositories locally and starts a watch for each valid imported repository. Each repository worker refreshes every 15 seconds. Local data becomes visible before provider requests complete. Workers do not overlap for the same repository, queue manual refreshes, cancel abandoned work, and use a bounded poll request context. A later local snapshot prevents slow HTTP results from restoring pre-mutation Git state.
+
+`useLiveWorkspace.ts` maps events into repository cards and the active PR workspace. Inactive repository events still update counts. Initial count requests show skeletons; errors end the pending state without inventing a count. Assignee/reviewer metadata updates even when the selected PR already has a loaded detail view.
+
+`reviewRevision.ts` preserves the displayed diff/head/base and draft anchors when new commits arrive. Conversation/check state can update while the UI offers **Refresh changes**. Accepting the revision replaces the diff explicitly, retains old drafts as outdated, and retains viewed progress only for unchanged files. `reviewDrafts.ts` persists review state per provider/repository/PR. An open inline composer also keeps its original head if the user refreshes before saving it.
+
+Local diff reloads retain the visible code during a same-file background request. Changing file or staged/unstaged side shows a skeleton without exposing the previous file's content. Failed background refreshes retain usable code and offer Retry; failed commits retain the commit message.
+
+## Code analysis
+
+Shiki provides grammar highlighting shared by PR diffs, local diffs, definition files, and settings previews. Old/new sequences keep independent grammar state and reset across omitted hunks. Unknown or oversized sources remain exact plain text. Code font and theme preferences are separate from application appearance.
+
+The LSP manager creates private revision snapshots and owns stdio JSON-RPC processes. PR sides use exact Git blobs and merge-base comparisons; staged and unstaged views use immutable content digests of index/working snapshots. Packaging attributes must not alter source content. Workspace package links resolve inside the selected snapshot; installed dependency source is isolated there. Definitions receive opaque grants tied to source revision and frozen content rather than accepting arbitrary frontend file paths.
+
+UTF-16 positions, exact line-text validation, canceled requests, bounded caches, process cleanup, and read-only edit-request handling protect review continuity. Vue has a TypeScript companion process with its plugin and broker; empty Vue script-semantic results fall back to that companion. PHP can initially return partial information while indexing, so the UI preserves the first result and performs one canceled-safe warmup refresh. See [language intelligence](LANGUAGE_INTELLIGENCE.md) and [LSP research](RESEARCH_LSP.md).
+
+## Preferences and delivery
+
+OS configuration lives below the platform's user configuration directory in `mag-ik-een-review/`: `accounts.json`, `workspace.json`, `notifications.json`, `editor.json`, and `language-servers.json`. Secrets live separately in the OS credential store. Configuration writers use atomic replacement and private file permissions where supported. LSP session data uses the OS user cache directory.
+
+Frontend storage includes `mag-ik-een-review.appearance`, `mier.code-review.preferences.v1`, and `mag-ik-een-review.review-drafts.v1`. Do not merge demo state into live repository state or erase saved drafts when changing appearance or navigation.
+
+Notification preferences key by normalized remote identity, so different local clones share one policy. The first snapshot establishes a silent baseline; missing PRs do not imply closes. Older provider timestamps cannot undo a newer baseline and duplicate events. Event types/toasts default on; desktop delivery defaults off. The native notification backend initializes only when requested and handles permission separately from in-app toast delivery.
+
+The editor split button remembers successful editor launches; selecting a menu item cannot be overwritten by a late preference response. The GitHub browser action is independent. Jira's current backend is only a cancelable three-second placeholder.
+
+## Scope and next seams
+
+Local staging/commits and PR checkout are integrated into the UI. Branch creation, checkout, fetch, pull, and push have tested backend methods; a full branch-management interface and dedicated fetch/pull/push toolbar remain follow-up UI work. PR creation can push the compare branch, but a separate Compare preview is not wired into that form.
+
+Other provider integrations, conflict editing, rebase/cherry-pick/stash UI, comment reactions, PR projects/milestones, framework-specific LSP plugins, completion/rename/diagnostics, and signed multi-platform packaging remain outside the current implementation. The initial design image depicts some of these concepts; it is not evidence that the corresponding controls are implemented.
+
+Keep new hosting providers behind the provider boundary, framework server configuration behind the LSP manager, and view-state continuity in the review helpers. Validate each distribution OS's window behavior, credentials, editor discovery, notification permissions, and process cleanup before claiming a tested platform release.

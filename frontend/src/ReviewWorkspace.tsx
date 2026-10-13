@@ -221,12 +221,22 @@ export default function ReviewWorkspace({ pr, onUpdate, onNotify, focusMode, onT
   const navigableFiles = useMemo(() => groups.flatMap(([, files]) => files), [groups])
   const splitRows = useMemo(() => alignLines(file?.lines ?? [], ignoreWhitespace), [file, ignoreWhitespace])
   const hunkHeaders = useMemo(() => [...(file?.rawPatch ?? '').matchAll(/^@@ .+? @@.*$/gm)].map(match => match[0]), [file])
-  const unifiedLines = useMemo(() => (file?.lines ?? []).flatMap(line => {
-    if (!ignoreWhitespace || line.kind === 'context') return [line]
-    const paired = splitRows.find(row => line.kind === 'remove' ? row.old?.oldLine === line.oldLine : row.next?.newLine === line.newLine)
-    if (paired?.old?.kind !== 'context' || paired.next?.kind !== 'context') return [line]
-    return line.kind === 'remove' ? [] : [{ ...line, kind: 'context' as const, oldLine: paired.old.oldLine }]
-  }), [file, splitRows, ignoreWhitespace])
+  const unifiedLines = useMemo(() => {
+    const lines = file?.lines ?? []
+    if (!ignoreWhitespace) return lines
+    const oldRows = new Map<string, SplitRow>()
+    const newRows = new Map<string, SplitRow>()
+    for (const row of splitRows) {
+      if (row.old) oldRows.set(syntaxLineKey(row.old, 'old'), row)
+      if (row.next) newRows.set(syntaxLineKey(row.next, 'new'), row)
+    }
+    return lines.flatMap(line => {
+      if (line.kind === 'context') return [line]
+      const paired = line.kind === 'remove' ? oldRows.get(syntaxLineKey(line, 'old')) : newRows.get(syntaxLineKey(line, 'new'))
+      if (paired?.old?.kind !== 'context' || paired.next?.kind !== 'context') return [line]
+      return line.kind === 'remove' ? [] : [{ ...line, kind: 'context' as const, oldLine: paired.old.oldLine }]
+    })
+  }, [file, splitRows, ignoreWhitespace])
   const editable = ['open', 'draft'].includes(pr.status) && pr.provider?.detailLoaded !== false
   const composerOutdated = composerHeadSha !== null && composerHeadSha !== pr.headSha
   const composerDetached = commentAt !== null && (composerPath !== file?.path || !file?.lines.some(line => commentAt.side === 'old' ? line.oldLine === commentAt.line : line.newLine === commentAt.line))

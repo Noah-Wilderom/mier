@@ -23,6 +23,7 @@
 .code-intelligence-hover { position: fixed; z-index: 90; width: min(470px, calc(100vw - 20px)); max-height: min(420px, calc(100vh - 20px)); overflow: auto; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); box-shadow: 0 8px 28px rgb(0 0 0 / 15%); }
 .code-hover-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 11px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 12px; }
 .code-intelligence-hover > .markdown-body { padding: 9px 12px 11px; font-size: 12px; }
+.code-hover-plaintext { padding: 9px 12px 11px; font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 .code-hover-loading { padding: 13px 12px; }
 .code-hover-loading .skeleton { display: block; height: 12px; margin-bottom: 9px; width: 90%; }
 .code-hover-loading .skeleton:last-child { width: 65%; margin-bottom: 0; }

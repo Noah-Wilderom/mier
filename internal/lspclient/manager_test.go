@@ -247,6 +247,17 @@ func TestVueUsesPeerTypeScriptBrokerAndPlugin(t *testing.T) {
 	if err != nil || hover.Contents != "Vue broker reached the peer TypeScript server" {
 		t.Fatalf("Hybrid Vue server did not get broker response: %#v, %v", hover, err)
 	}
+	// Vue can remain alive while its peer exits. The next request must create
+	// both a viable peer and a fresh Vue session instead of failing forever.
+	for _, w := range m.workspaces {
+		if peer := w.sessions["vue-typescript"]; peer != nil {
+			peer.rpc.Close()
+		}
+	}
+	hover, err = m.Hover(context.Background(), request)
+	if err != nil || hover.Contents != "Vue broker reached the peer TypeScript server" {
+		t.Fatalf("Vue did not recover from dead peer: %#v, %v", hover, err)
+	}
 }
 
 func TestCachedSnapshotsConcurrencyAndEvictedDefinitionGrants(t *testing.T) {

@@ -96,7 +96,7 @@ func TestUnbornStagingPartialChangesAndRenames(t *testing.T) {
 	client, root := testRepository(t, Options{})
 	ctx := context.Background()
 	state := snapshot(t, client, root)
-	if state.HasHead || state.CurrentBranch != "main" || len(state.History) != 0 {
+	if state.HasHead || state.HeadSHA != "" || state.CurrentBranch != "main" || len(state.History) != 0 {
 		t.Fatalf("Invalid unborn state: %#v", state)
 	}
 	names := []string{"review.txt", " leading space.txt", "-notes.txt"}
@@ -249,6 +249,33 @@ func TestBranchOperationsPreserveWorkAndRejectUnsafeRefs(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(root, "unrelated.txt")); err != nil {
 		t.Fatal("Safe checkout removed unrelated work")
+	}
+}
+
+func TestSnapshotHeadMatchesCheckoutWhenOtherBranchHasNewerHistory(t *testing.T) {
+	client, root := testRepository(t, Options{})
+	ctx := context.Background()
+	mainHead := initialCommit(t, client, root)
+	if err := client.CreateBranch(ctx, root, "feature/newer"); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Checkout(ctx, root, "feature/newer"); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, root, "review.txt", "newer branch\n")
+	if err := client.Stage(ctx, root, []string{"review.txt"}); err != nil {
+		t.Fatal(err)
+	}
+	featureHead, err := client.Commit(ctx, root, "Newer branch commit")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Checkout(ctx, root, "main"); err != nil {
+		t.Fatal(err)
+	}
+	state := snapshot(t, client, root)
+	if state.HeadSHA != mainHead || state.HeadSHA == featureHead {
+		t.Fatalf("Snapshot HEAD does not identify the displayed checkout: %+v", state)
 	}
 }
 

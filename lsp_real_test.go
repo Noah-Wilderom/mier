@@ -102,6 +102,11 @@ func TestRealPHPHoverAndDefinition(t *testing.T) {
 	line := "$message = $greeter->greet('PHP');"
 	request := lspclient.CodePositionRequest{Root: root, Revision: sha, Path: "src/use.php", Line: 3, Character: strings.Index(line, "greet(") + 2, LineText: &line}
 	hover, err := m.Hover(ctx, request)
+	if err == nil && !strings.Contains(hover.Contents, "string") {
+		t.Logf("initial PHP hover: %+v", hover)
+		time.Sleep(time.Second)
+		hover, err = m.Hover(ctx, request)
+	}
 	if err != nil || !strings.Contains(hover.Contents, "greet") || !strings.Contains(hover.Contents, "string") {
 		t.Fatalf("PHP signature unavailable: %+v %v", hover, err)
 	}

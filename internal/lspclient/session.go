@@ -190,6 +190,16 @@ func (s *session) supportsVueBroker() bool {
 	}
 	return false
 }
+func hoverKind(raw json.RawMessage) string {
+	var markup struct {
+		Kind string `json:"kind"`
+	}
+	if json.Unmarshal(raw, &markup) == nil && markup.Kind == "plaintext" {
+		return "plaintext"
+	}
+	return "markdown"
+}
+
 func hoverContents(raw json.RawMessage) string {
 	if len(raw) == 0 || string(raw) == "null" {
 		return ""

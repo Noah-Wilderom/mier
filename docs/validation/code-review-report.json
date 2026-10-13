@@ -1,0 +1,41 @@
+{
+  "passed": true,
+  "stored": {
+    "fontSize": 20,
+    "lightTheme": "catppuccin-latte",
+    "darkTheme": "nord"
+  },
+  "persisted": {
+    "fontSize": 20,
+    "lightTheme": "catppuccin-latte",
+    "darkTheme": "nord"
+  },
+  "font": "20px",
+  "asymmetric": {
+    "rowHeight": 115,
+    "cells": [
+      {
+        "height": 115,
+        "background": "oklch(0.963 0.022 25)"
+      },
+      {
+        "height": 115,
+        "background": "oklch(0.951 0.032 151)"
+      }
+    ],
+    "nextTop": 373,
+    "bottom": 373
+  },
+  "savedOriginalHead": "old-review-head",
+  "errors": [],
+  "_evidence": {
+    "recordedOn": "2026-10-13",
+    "context": "isolated headless Chromium; local Vite browser preview",
+    "data": "invented demo/provider fixtures only",
+    "nativeTransport": "mocked where native service calls were exercised",
+    "remoteWrites": false,
+    "realEditorLaunches": false,
+    "historicalPrototype": false,
+    "screenshotsArchived": false
+  }
+}
