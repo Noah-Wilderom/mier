@@ -7,6 +7,7 @@ export type {
     CheckRun,
     Comment,
     Commit,
+    CommitDiff,
     CommitStatus,
     CreateRequest,
     MergeResult,

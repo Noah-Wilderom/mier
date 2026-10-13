@@ -79,6 +79,27 @@ func (s *RepositoryService) CreateBranch(ctx context.Context, path, branch strin
 	return s.client.CreateBranch(ctx, path, branch)
 }
 
+func (s *RepositoryService) CreateAndCheckoutBranch(ctx context.Context, path, branch string) error {
+	if s.initErr != nil {
+		return s.initErr
+	}
+	return s.client.CreateAndCheckoutBranch(ctx, path, branch)
+}
+
+func (s *RepositoryService) DeleteBranch(ctx context.Context, path, branch string) error {
+	if s.initErr != nil {
+		return s.initErr
+	}
+	return s.client.DeleteBranch(ctx, path, branch)
+}
+
+func (s *RepositoryService) RenameBranch(ctx context.Context, path, branch, name string) error {
+	if s.initErr != nil {
+		return s.initErr
+	}
+	return s.client.RenameBranch(ctx, path, branch, name)
+}
+
 func (s *RepositoryService) Fetch(ctx context.Context, path, remote string) error {
 	if s.initErr != nil {
 		return s.initErr
@@ -107,11 +128,11 @@ func (s *RepositoryService) Clone(ctx context.Context, url, directory string) (R
 	return s.client.Clone(ctx, url, directory)
 }
 
-func (s *RepositoryService) CheckoutPullRequest(ctx context.Context, path string, number int) error {
+func (s *RepositoryService) CheckoutPullRequest(ctx context.Context, path string, number int, remote string) error {
 	if s.initErr != nil {
 		return s.initErr
 	}
-	return s.client.CheckoutPullRequest(ctx, path, number)
+	return s.client.CheckoutPullRequest(ctx, path, number, remote)
 }
 
 func (s *RepositoryService) Compare(ctx context.Context, path, base, head string) ([]ChangedFile, error) {
@@ -119,4 +140,11 @@ func (s *RepositoryService) Compare(ctx context.Context, path, base, head string
 		return nil, s.initErr
 	}
 	return s.client.Compare(ctx, path, base, head)
+}
+
+func (s *RepositoryService) CommitDiff(ctx context.Context, path, revision string) ([]ChangedFile, error) {
+	if s.initErr != nil {
+		return nil, s.initErr
+	}
+	return s.client.CommitDiff(ctx, path, revision)
 }

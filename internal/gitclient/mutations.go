@@ -92,6 +92,72 @@ func (c *Client) CreateBranch(ctx context.Context, path, branch string) error {
 	})
 }
 
+// CreateAndCheckoutBranch creates and selects a branch in one locked operation.
+// On a new repository, naming HEAD preserves the index and working files.
+func (c *Client) CreateAndCheckoutBranch(ctx context.Context, path, branch string) error {
+	return c.withRepository(ctx, path, c.options.LocalTimeout, func(ctx context.Context, root string) error {
+		if err := c.validateBranch(ctx, root, branch); err != nil {
+			return err
+		}
+		status, err := c.status(ctx, root)
+		if err != nil {
+			return err
+		}
+		if !status.HasHead {
+			if _, err := c.run(ctx, root, c.options.LocalTimeout, "show-ref", "--verify", "--quiet", "refs/heads/"+branch); err == nil {
+				return fmt.Errorf("branch %q already exists", branch)
+			} else if !isExitCode(err, 1) {
+				return err
+			}
+			_, err = c.run(ctx, root, c.options.LocalTimeout, "symbolic-ref", "HEAD", "refs/heads/"+branch)
+			return err
+		}
+		_, err = c.run(ctx, root, c.options.LocalTimeout, "switch", "--no-guess", "--create", branch, "--no-track", "HEAD")
+		return err
+	})
+}
+
+// DeleteBranch removes only a local branch whose commits are reachable from
+// the checked-out HEAD. Git also rejects branches used by another worktree.
+func (c *Client) DeleteBranch(ctx context.Context, path, branch string) error {
+	return c.withRepository(ctx, path, c.options.LocalTimeout, func(ctx context.Context, root string) error {
+		if err := c.validateBranch(ctx, root, branch); err != nil {
+			return err
+		}
+		status, err := c.status(ctx, root)
+		if err != nil {
+			return err
+		}
+		if branch == status.CurrentBranch {
+			return errors.New("Switch to another branch before deleting this one")
+		}
+		if !status.HasHead {
+			return errors.New("Create a commit before deleting branches")
+		}
+		if _, err := c.run(ctx, root, c.options.LocalTimeout, "merge-base", "--is-ancestor", "refs/heads/"+branch, "HEAD"); err != nil {
+			if isExitCode(err, 1) {
+				return errors.New("This branch has commits that are not merged into the current branch; its work has been preserved")
+			}
+			return err
+		}
+		_, err = c.run(ctx, root, c.options.LocalTimeout, "branch", "--delete", "--", branch)
+		return err
+	})
+}
+
+func (c *Client) RenameBranch(ctx context.Context, path, branch, name string) error {
+	return c.withRepository(ctx, path, c.options.LocalTimeout, func(ctx context.Context, root string) error {
+		if err := c.validateBranch(ctx, root, branch); err != nil {
+			return err
+		}
+		if err := c.validateBranch(ctx, root, name); err != nil {
+			return err
+		}
+		_, err := c.run(ctx, root, c.options.LocalTimeout, "branch", "--move", "--", branch, name)
+		return err
+	})
+}
+
 func (c *Client) Checkout(ctx context.Context, path, branch string) error {
 	return c.withRepository(ctx, path, c.options.LocalTimeout, func(ctx context.Context, root string) error {
 		if err := c.validateBranch(ctx, root, branch); err != nil {

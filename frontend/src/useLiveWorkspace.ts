@@ -3,21 +3,20 @@ import { configureCurrentUser, type ChangedFile, type MergeMethod, type PullRequ
 import { configureGitHubAccount, mapPullRequest, mapPullRequestSummary, mapRepositoryDiff, mapRepositorySnapshot, RemoteActionAppliedError, syncPullRequest } from './liveData'
 import { repositoryName, type RepositoryCard } from './RepositorySelector'
 import { readReviewDrafts, restoreReviewDraft, reviewDraftStorageKey, type SavedReviewDraft } from './reviewDrafts'
-import { hasNativeBackend, services, subscribeWorkspaceUpdates, type AccountStatus, type RepositoryIdentity, type RepositorySnapshot, type WorkspaceUpdate } from './services'
+import { hasNativeBackend, services, subscribeWorkspaceUpdates, type AccountStatus, type RepositorySnapshot, type WorkspaceUpdate } from './services'
+import type { GitAction } from './gitWorkspace'
+import { preferredRemote, gitHubIdentity as identityFor } from './gitWorkspace'
 
 const emptyHistory: ReturnType<typeof mapRepositorySnapshot>['history'] = []
 const emptyChanges: ReturnType<typeof mapRepositorySnapshot>['changes'] = []
 
-function identityFor(snapshot: RepositorySnapshot): RepositoryIdentity | undefined {
-  const remote = (snapshot.remotes ?? []).find(remote => remote.name === 'origin' && remote.owner && remote.repository) ?? (snapshot.remotes ?? []).find(remote => remote.owner && remote.repository)
-  return remote ? { host: remote.host, owner: remote.owner, repo: remote.repository } : undefined
-}
 export { preserveReviewRevision } from './reviewRevision'
 import { preserveReviewRevision } from './reviewRevision'
 
 export function useLiveWorkspace(notify: (message:string)=>void) {
   const [available,setAvailable]=useState(hasNativeBackend)
   const [enabled,setEnabled]=useState(hasNativeBackend)
+  const enabledRef=useRef(hasNativeBackend())
   const [repository,setRepository]=useState<RepositorySnapshot|null>(null)
   const [prs,setPrs]=useState<PullRequest[]>([])
   const [account,setAccount]=useState<AccountStatus|null>(null)
@@ -38,6 +37,7 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
   const detailRequests=useRef(new Map<number,Promise<void>>())
   const queue=useRef(Promise.resolve())
   const activeEpoch=useRef(0)
+  const openIntent=useRef(0)
   const localMutationAt=useRef(0)
   const setItems=useCallback((items:PullRequest[])=>{prsRef.current=items;setPrs(items)},[])
   const saveDraft=useCallback((pr:PullRequest)=>{
@@ -57,13 +57,15 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
   },[setItems,saveDraft])
   const applyUpdate=useCallback((update:WorkspaceUpdate)=>{
     if(update.repository||update.pullRequests||update.error)setRepositoryCards(cards=>({...cards,[update.path]:{...cards[update.path],path:update.path,name:update.repository?.name??cards[update.path]?.name??repositoryName(update.path),branch:update.repository?.currentBranch??cards[update.path]?.branch,host:update.host||cards[update.path]?.host,owner:update.owner||cards[update.path]?.owner,repo:update.repo||cards[update.path]?.repo,...(update.pullRequests||update.error?{loadingPullRequests:false}:{}),...(update.pullRequests?{openPullRequests:update.pullRequests.filter(pr=>['open','draft'].includes(pr.status)).length}:{})}}))
+    if(!enabledRef.current)return
     if(update.path!==repoRef.current?.root)return
     if(update.repository && Date.parse((update as WorkspaceUpdate & {repositoryUpdatedAt?:string}).repositoryUpdatedAt??update.updatedAt)>localMutationAt.current){repoRef.current=update.repository;setRepository(update.repository)}
     const identity=repoRef.current&&identityFor(repoRef.current)
     const eventIdentity=update.host&&update.owner&&update.repo?{host:update.host,owner:update.owner,repo:update.repo}:undefined
     if(JSON.stringify(identity)!==JSON.stringify(eventIdentity)){
-      ++activeEpoch.current;setItems([]);setSelected(0);selectedRef.current=0;setLoadingPullRequests(!!identity)
-      void services.sync.startWatch({path:update.path,host:identity?.host??'',owner:identity?.owner??'',repo:identity?.repo??''}).catch(issue=>{setLoadingPullRequests(false);setError(String(issue))})
+      const epoch=++activeEpoch.current;setItems([]);setSelected(0);selectedRef.current=0;setLoadingPullRequests(!!identity);setAccount(null);detailRequests.current.clear();latestRevisions.current.clear()
+      void services.sync.startWatch({path:update.path,host:identity?.host??'',owner:identity?.owner??'',repo:identity?.repo??''}).catch(issue=>{if(epoch===activeEpoch.current){setLoadingPullRequests(false);setError(String(issue))}})
+      if(identity)void services.credentials.accountStatus(identity.host).then(status=>{if(epoch!==activeEpoch.current)return;setAccount(status);if(status.authenticated)configureGitHubAccount(status);else{setLoadingPullRequests(false);setError(status.error||`Connect your account for ${identity.host} to load pull requests.`)}}).catch(issue=>{if(epoch===activeEpoch.current){setLoadingPullRequests(false);setError(String(issue))}})
       return
     }
     if(update.pullRequests||update.error)setLoadingPullRequests(false)
@@ -76,14 +78,14 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
     if(update.pullRequest&&identity)applyDetail(mapPullRequest(update.pullRequest,identity))
     setError(update.error??'');setUpdatedAt(update.updatedAt)
   },[applyDetail,setItems])
-  const perform=useCallback(async<T,>(operation:()=>Promise<T>):Promise<T>=>{
-    const run=queue.current.then(async()=>{setBusy(true);try{return await operation()}catch(issue){const message=issue instanceof Error?issue.message:String(issue);setError(message);notify(message);throw issue}finally{setBusy(false)}})
+  const perform=useCallback(async<T,>(operation:()=>Promise<T>,epoch?:number):Promise<T>=>{
+    const run=queue.current.then(async()=>{setBusy(true);try{if(epoch!==undefined&&epoch!==activeEpoch.current)throw new Error('The active repository changed. Run this action from its repository.');return await operation()}catch(issue){if(epoch===undefined||epoch===activeEpoch.current){const message=issue instanceof Error?issue.message:String(issue);setError(message);notify(message)}throw issue}finally{setBusy(false)}})
     queue.current=run.then(()=>undefined,()=>undefined)
     return run
   },[notify])
   const refresh=useCallback(async()=>{
-    const repo=repoRef.current;if(!repo)return
-    try{await services.sync.refresh(repo.root)}catch(issue){setError(issue instanceof Error?issue.message:String(issue))}
+    const repo=repoRef.current,epoch=activeEpoch.current;if(!repo)return
+    try{await services.sync.refresh(repo.root)}catch(issue){if(epoch===activeEpoch.current)setError(issue instanceof Error?issue.message:String(issue))}
   },[])
   const loadDetail=useCallback(async(number:number,force=false)=>{
     const repo=repoRef.current,identity=repo&&identityFor(repo);if(!repo||!identity||number<=0)return
@@ -91,19 +93,22 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
     const detail=mapPullRequest(await services.github.getPullRequest(identity.host,identity.owner,identity.repo,number),identity)
     if(epoch===activeEpoch.current)applyDetail(detail,force)
   },[applyDetail])
-  const openRepository=useCallback(async(path?:string)=>perform(async()=>{
+  const openRepository=useCallback(async(path?:string)=>{const intent=++openIntent.current;return perform(async()=>{
+    if(intent!==openIntent.current)return
     const chosen=path??await services.workspace.chooseRepository();if(!chosen)return
     setOpeningRepository(chosen.split(/[\\/]/).filter(Boolean).pop()||chosen)
     try{
       const snapshot=await services.repository.open(chosen)
+      if(intent!==openIntent.current)return
       const epoch=++activeEpoch.current
       detailRequests.current.clear();localMutationAt.current=0
-      repoRef.current=snapshot;setRepository(snapshot);setEnabled(true);setItems([]);setSelected(0);selectedRef.current=0;latestRevisions.current.clear();setError('');setAccount(null)
+      repoRef.current=snapshot;setRepository(snapshot);enabledRef.current=true;setEnabled(true);setItems([]);setSelected(0);selectedRef.current=0;latestRevisions.current.clear();setError('');setAccount(null)
       const identity=identityFor(snapshot)
       setRepositoryCards(cards=>({...cards,[snapshot.root]:{...cards[snapshot.root],path:snapshot.root,name:snapshot.name,branch:snapshot.currentBranch,host:identity?.host,owner:identity?.owner,repo:identity?.repo}}))
       setLoadingPullRequests(!!identity)
       // Start the background worker immediately; local Git is ready before account/network requests finish.
       await services.sync.startWatch({path:snapshot.root,host:identity?.host??'',owner:identity?.owner??'',repo:identity?.repo??''})
+      if(epoch!==activeEpoch.current)return
       void services.workspace.rememberRepository(snapshot.root).then(()=>services.workspace.recentRepositories()).then(setRecent).catch(issue=>setError(String(issue)))
       if(identity)void services.credentials.accountStatus(identity.host).then(status=>{
         if(epoch!==activeEpoch.current)return
@@ -113,52 +118,94 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
       }).catch(issue=>{if(epoch===activeEpoch.current){setLoadingPullRequests(false);setError(issue instanceof Error?issue.message:String(issue))}})
       setUpdatedAt(new Date().toISOString());notify(`Opened ${snapshot.name}.`)
     }finally{setOpeningRepository('')}
-  }),[notify,perform,setItems])
-  const connect=useCallback(async(host:string,token?:string)=>perform(async()=>{
+  })},[notify,perform,setItems])
+  const connect=useCallback(async(host:string,token?:string)=>{const epoch=activeEpoch.current;return perform(async()=>{
     const status=token?await services.credentials.saveToken(host,token):await services.credentials.accountStatus(host)
+    if(epoch!==activeEpoch.current)return
     const activeIdentity=repoRef.current&&identityFor(repoRef.current)
     const isActiveAccount=!activeIdentity||activeIdentity.host.toLowerCase()===status.host.toLowerCase()
     if(isActiveAccount)setAccount(status)
     if(!status.authenticated)throw new Error(status.error||`No account connected for ${host}. Run gh auth login --hostname ${host} or save a token.`)
     if(isActiveAccount)configureGitHubAccount(status);setError('');if(repoRef.current&&isActiveAccount)setEnabled(true);await refresh();notify(`Connected as ${status.login} on ${status.host}.`)
-  }),[perform,refresh,notify])
+  },epoch)},[perform,refresh,notify])
   const selectPullRequest=useCallback((number:number)=>{
     selectedRef.current=number;setSelected(number)
     const repo=repoRef.current;if(!repo)return
     void services.sync.watchPullRequest(repo.root,number).catch(()=>{})
     if(!prsRef.current.find(pr=>pr.number===number)?.provider?.detailLoaded&&!detailRequests.current.has(number)){
-      const request=loadDetail(number).catch(issue=>setError(issue instanceof Error?issue.message:String(issue))).finally(()=>detailRequests.current.delete(number))
+      const epoch=activeEpoch.current
+      const request=loadDetail(number).catch(issue=>{if(epoch===activeEpoch.current)setError(issue instanceof Error?issue.message:String(issue))}).finally(()=>{if(detailRequests.current.get(number)===request)detailRequests.current.delete(number)})
       detailRequests.current.set(number,request)
     }
   },[loadDetail])
-  const updatePullRequest=useCallback(async(previous:PullRequest,next:PullRequest)=>perform(async()=>{
+  const updatePullRequest=useCallback(async(previous:PullRequest,next:PullRequest)=>{const epoch=activeEpoch.current;return perform(async()=>{
     let canonical:PullRequest
-    try{canonical=await syncPullRequest(previous,next)}catch(issue){if(issue instanceof RemoteActionAppliedError){await loadDetail(previous.number).catch(()=>{});void refresh()}throw issue}
+    try{canonical=await syncPullRequest(previous,next)}catch(issue){if(issue instanceof RemoteActionAppliedError&&epoch===activeEpoch.current){await loadDetail(previous.number).catch(()=>{});void refresh()}throw issue}
+    if(epoch!==activeEpoch.current)return
     applyDetail(canonical);
     setItems(prsRef.current.map(p=>p.number===next.number?{...p,pendingComments:next.pendingComments,viewedFiles:next.viewedFiles}:p));
     if(canonical!==next)notify("Pull request updated.");
     const saved=prsRef.current.find(pr=>pr.number===next.number)
     if(saved)saveDraft(saved)
     setError('')
-  }),[applyDetail,perform,setItems,notify,saveDraft,loadDetail,refresh])
-  const acceptNewCommits=useCallback(async()=>perform(async()=>{await loadDetail(selectedRef.current,true);notify('Review updated to the latest commits. Draft comments from earlier commits are retained for you to reposition.')}),[loadDetail,notify,perform])
-  const merge=useCallback(async(pr:PullRequest,method:MergeMethod)=>perform(async()=>{
+  },epoch)},[applyDetail,perform,setItems,notify,saveDraft,loadDetail,refresh])
+  const acceptNewCommits=useCallback(async()=>{const epoch=activeEpoch.current,number=selectedRef.current;return perform(async()=>{await loadDetail(number,true);if(epoch===activeEpoch.current)notify('Review updated to the latest commits. Draft comments from earlier commits are retained for you to reposition.')},epoch)},[loadDetail,notify,perform])
+  const merge=useCallback(async(pr:PullRequest,method:MergeMethod)=>{const epoch=activeEpoch.current;return perform(async()=>{
     const p=pr.provider;if(!p)throw new Error('This pull request is not connected to GitHub.')
     await services.github.mergePullRequest(p.host,p.owner,p.repo,p.number,method,pr.headSha)
-    await loadDetail(pr.number,true);await refresh();notify(`Pull request #${pr.number} merged.`)
-  }),[loadDetail,notify,perform,refresh])
-  const create=useCallback(async(title:string,body:string,base:string,head:string,draft:boolean)=>perform(async()=>{
-    const repo=repoRef.current,identity=repo&&identityFor(repo);if(!identity)throw new Error('Open a repository with a GitHub remote first.')
+    if(epoch!==activeEpoch.current)return
+    setItems(prsRef.current.map(item=>item.number===pr.number?{...item,status:'merged'}:item))
+    try{await loadDetail(pr.number,true)}catch{if(epoch===activeEpoch.current)setError(`Pull request #${pr.number} was merged, but its details could not be refreshed. Refresh to load them.`)}
+    if(epoch!==activeEpoch.current)return
+    await refresh();notify(`Pull request #${pr.number} merged.`)
+  },epoch)},[loadDetail,notify,perform,refresh,setItems])
+  const create=useCallback(async(title:string,body:string,base:string,head:string,draft:boolean)=>{const epoch=activeEpoch.current;const repo=repoRef.current,identity=repo&&identityFor(repo);return perform(async()=>{
+    if(!identity)throw new Error('Open a repository with a GitHub remote first.')
     const result=await services.github.createPullRequest(identity.host,identity.owner,identity.repo,{title,body,base,head,draft})
-    await refresh();await loadDetail(result.number,true);notify(`Created pull request #${result.number}.`);return result.number
-  }),[loadDetail,notify,perform,refresh])
-  const git=useCallback(async(action:'fetch'|'pull'|'push'|'checkout'|'createBranch'|'checkoutPullRequest'|'stage'|'unstage'|'commit',argument?:string|string[])=>perform(async()=>{
-    const repo=repoRef.current;if(!repo)throw new Error('Open a Git repository first.')
-    switch(action){case 'fetch':await services.repository.fetch(repo.root,'origin');break;case 'pull':await services.repository.pull(repo.root,'origin');break;case 'push':await services.repository.push(repo.root,'origin');break;case 'checkout':await services.repository.checkout(repo.root,String(argument));break;case 'checkoutPullRequest':await services.repository.checkoutPullRequest(repo.root,Number(argument));break;case 'createBranch':await services.repository.createBranch(repo.root,String(argument));break;case 'stage':await services.repository.stage(repo.root,argument as string[]);break;case 'unstage':await services.repository.unstage(repo.root,argument as string[]);break;case 'commit':await services.repository.commit(repo.root,String(argument));break}
-    const snapshot=await services.repository.snapshot(repo.root);localMutationAt.current=Date.now();repoRef.current=snapshot;setRepository(snapshot);setRepositoryCards(cards=>({...cards,[snapshot.root]:{...cards[snapshot.root],path:snapshot.root,name:snapshot.name,branch:snapshot.currentBranch}}));setError('');notify(action==='commit'?'Commit created.':`${action[0].toUpperCase()+action.slice(1)} completed.`)
-  }),[notify,perform])
+    if(epoch!==activeEpoch.current)throw new Error(`Pull request #${result.number} was created in ${identity.owner}/${identity.repo}. Reopen that repository to view it.`)
+    setItems([mapPullRequestSummary(result,identity),...prsRef.current.filter(item=>item.number!==result.number)])
+    try{await loadDetail(result.number,true)}catch{if(epoch===activeEpoch.current)setError(`Pull request #${result.number} was created, but its details could not be loaded. Refresh to load it; do not create it again.`)}
+    if(epoch!==activeEpoch.current)throw new Error(`Pull request #${result.number} was created in ${identity.owner}/${identity.repo}. Reopen that repository to view it.`)
+    await refresh();notify(`Created pull request #${result.number}.`);return result.number
+  },epoch)},[loadDetail,notify,perform,refresh,setItems])
+  const git=useCallback(async(action:GitAction,argument?:string|string[],remote?:string)=>{
+    const repo=repoRef.current,epoch=activeEpoch.current
+    return perform(async()=>{
+      if(!repo)throw new Error('Open a Git repository first.')
+      const target=remote??preferredRemote(repo)
+      switch(action){
+        case 'fetch':await services.repository.fetch(repo.root,target);break
+        case 'pull':await services.repository.pull(repo.root,target);break
+        case 'push':await services.repository.push(repo.root,target);break
+        case 'checkout':await services.repository.checkout(repo.root,String(argument));break
+        case 'checkoutPullRequest':{
+          const identity=identityFor(repo),source=repo.remotes?.find(item=>item.host===identity?.host&&item.owner===identity?.owner&&item.repository===identity?.repo)?.name
+          if(!source)throw new Error('This repository needs a matching GitHub remote to check out a pull request.')
+          await services.repository.checkoutPullRequest(repo.root,Number(argument),source);break
+        }
+        case 'createBranch':await services.repository.createBranch(repo.root,String(argument));break
+        case 'createAndCheckoutBranch':await services.repository.createAndCheckoutBranch(repo.root,String(argument));break
+        case 'deleteBranch':await services.repository.deleteBranch(repo.root,String(argument));break
+        case 'renameBranch':{const [branch,name]=argument as string[];await services.repository.renameBranch(repo.root,branch,name);break}
+        case 'stage':await services.repository.stage(repo.root,argument as string[]);break
+        case 'unstage':await services.repository.unstage(repo.root,argument as string[]);break
+        case 'commit':await services.repository.commit(repo.root,String(argument));break
+      }
+      if(epoch!==activeEpoch.current)return
+      // Mark the mutation before reloading: an older background poll must not
+      // restore the pre-action branch/index while this request is in flight.
+      localMutationAt.current=Date.now()
+      let snapshot:RepositorySnapshot
+      try{snapshot=await services.repository.snapshot(repo.root)}catch(issue){throw new Error(`The Git action completed, but the repository could not be refreshed. Refresh before repeating the action. ${issue instanceof Error?issue.message:String(issue)}`)}
+      if(epoch!==activeEpoch.current)return
+      repoRef.current=snapshot;setRepository(snapshot);setRepositoryCards(cards=>({...cards,[snapshot.root]:{...cards[snapshot.root],path:snapshot.root,name:snapshot.name,branch:snapshot.currentBranch}}));setError('')
+      const messages:Partial<Record<GitAction,string>>={commit:'Commit created.',createBranch:'Branch created.',createAndCheckoutBranch:'New branch created and checked out.',deleteBranch:'Local branch deleted.',renameBranch:'Local branch renamed.',checkout:'Branch checked out.',checkoutPullRequest:'Pull request branch checked out.'}
+      notify(messages[action]??(action==='push'?`Pushed to ${target}.`:action==='fetch'?`Fetched from ${target}.`:action==='pull'?`Pulled from ${target}.`:`${action[0].toUpperCase()+action.slice(1)} completed.`))
+    },epoch)
+  },[notify,perform])
   const diff=useCallback(async(path:string,staged:boolean):Promise<ChangedFile>=>{const repo=repoRef.current;if(!repo)throw new Error('Open a repository first.');return mapRepositoryDiff(await services.repository.diff(repo.root,path,staged))},[])
-  const useDemo=useCallback(()=>{setEnabled(false);configureCurrentUser('noah');setError('')},[])
+  const commitDiff=useCallback(async(sha:string)=>{const repo=repoRef.current;if(!repo)throw new Error('Open a repository first.');return {files:(await services.repository.commitDiff(repo.root,sha)).map(mapRepositoryDiff)}},[])
+  const useDemo=useCallback(()=>{++activeEpoch.current;++openIntent.current;enabledRef.current=false;repoRef.current=null;setRepository(null);setEnabled(false);setItems([]);setAccount(null);configureCurrentUser('noah');setError('')},[setItems])
   useEffect(()=>{
     let initialized=false
     let canceled=false
@@ -184,5 +231,5 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
   useEffect(()=>subscribeWorkspaceUpdates(applyUpdate,error=>setError(error.message)),[applyUpdate])
   useEffect(()=>{const online=()=>void refresh();window.addEventListener('online',online);return()=>window.removeEventListener('online',online)},[refresh])
   const mapped=useMemo(()=>repository?mapRepositorySnapshot(repository):null,[repository])
-  return {available,enabled,repository,identity:repository?identityFor(repository):undefined,prs,account,recent,repositoryCards,busy,openingRepository,loadingPullRequests,error,updatedAt,selected,history:mapped?.history??emptyHistory,changes:mapped?.changes??emptyChanges,branch:mapped?.branch??'',openRepository,connect,selectPullRequest,updatePullRequest,acceptNewCommits,merge,create,git,diff,refresh,useDemo}
+  return {available,enabled,repository,identity:repository?identityFor(repository):undefined,prs,account,recent,repositoryCards,busy,openingRepository,loadingPullRequests,error,updatedAt,selected,history:mapped?.history??emptyHistory,changes:mapped?.changes??emptyChanges,branch:mapped?.branch??'',openRepository,connect,selectPullRequest,updatePullRequest,acceptNewCommits,merge,create,git,diff,commitDiff,refresh,useDemo}
 }

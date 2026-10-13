@@ -16,7 +16,7 @@ A desktop Git client built with Wails v3, targeting Linux, Windows, and macOS. C
 
 ## Implemented Workspace
 
-The native app opens or clones a real repository, reads its Git history and working tree, and uses its remote to identify the GitHub repository. Local Git work includes staged and unstaged diffs, staging, commits, branches, checkout, fetch, fast-forward pull, and push. The standalone browser demo uses separate sample data for exploring the interface.
+The native app opens or clones a real repository, reads its Git history and working tree, and uses its remote to identify the GitHub repository. Local Git work includes staged and unstaged diffs, staging, commits, branch creation/checkout/rename/merged-only deletion, fetch, fast-forward pull, and push. The repository toolbar exposes remote selection and tracking status. Branch comparisons and history inspection show committed file changes without changing the checkout or index. The standalone browser demo uses separate sample data for exploring the interface.
 
 GitHub pull requests have an inbox and Conversation, Changes, Commits, and Checks views. Descriptions and discussions render Markdown, GFM tables and task lists, code fences, and emoji shortcodes; raw HTML is disabled and external links open in the browser. Users can create or update PRs, change draft status, close and reopen PRs, edit reviewer/assignee/label metadata, write comments, submit reviews with inline comments, reply to and resolve discussions, and merge with a permitted strategy. GitHub remains the authority for permissions, checks, protection, and merge eligibility. Writes report failure instead of presenting an unsuccessful action as complete.
 
@@ -26,7 +26,7 @@ Local and PR code share grammar highlighting, configurable font size, and four s
 
 Five inboxes distinguish all PRs, the user's PRs, requested reviews, assigned PRs, and drafts. Comments show account pictures, Bot badges, and Author badges. Editor launch actions support VSCode, PhpStorm, and Zed with remembered selection and a separate GitHub browser action.
 
-Repository notification preferences cover opened, closed, merged, and review-requested events. In-app toasts and all event types default on; desktop notifications default off. The initial imported snapshot establishes a silent baseline. Settings also includes a Jira installation card with a three-second backend placeholder; a real Jira integration remains future work.
+Repository notification preferences cover opened, closed, merged, and review-requested events. In-app toasts and all event types default on; desktop notifications default off. The initial imported snapshot establishes a silent baseline. Settings marks Jira as coming soon; installation is disabled until a real integration exists.
 
 ## Review Continuity
 
@@ -36,11 +36,13 @@ New commits never silently replace a diff during review. Show an explicit new-co
 
 Expanding Changes gives code the full window while retaining the selected file, viewed files, and drafts. Escape returns to the previous workspace; an open dialog or command palette handles Escape first.
 
+Commit messages and PR creation drafts persist per repository across navigation and restart. PR creation previews the local committed comparison and requires the compare branch to be published to the matching GitHub remote. Commit inspection shows the selected SHA's changes, including root and merge commits, and identifies unavailable GitHub patches. Rejected writes retain draft text. Accepted remote actions remain successful when a follow-up read fails; the user can refresh without repeating the write. Requests from an abandoned repository cannot update the active workspace.
+
 ## Scope and Validation
 
 GitKraken provides a reference for pull request breadth, not a claim that every GitKraken operation is implemented. GitHub is the current provider; other hosting integrations, conflict-resolution editing, rebasing, cherry-picking, and stash management remain future work. Inaccessible protection details and missing or limited patches are communicated as such.
 
-Linux builds, isolated local Git operations, provider HTTP tests, frontend tests, and background sync tests have been exercised. Local Git cross-compilation and available Wails target tasks do not establish tested Windows/macOS desktop distribution. Native packaging, signing, and runtime behavior require validation on each target platform.
+The retained suite covers isolated Git operations, provider HTTP requests, frontend logic, and browser workflows through the Wails RPC transport. CI tests and builds Linux, macOS, and Windows, with Linux distribution package inspection. The release workflow builds both architectures for all three platforms and signs the updater archives. Native window behavior, real keychain/provider writes, and installer upgrades still need target-platform release qualification. See [validation](docs/VALIDATION.md) and [release readiness](docs/PRODUCTION.md) for the evidence and remaining external setup.
 
 ## Brand Personality
 

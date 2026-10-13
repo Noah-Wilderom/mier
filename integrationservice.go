@@ -2,35 +2,18 @@ package main
 
 import (
 	"context"
-	"time"
+	"errors"
 )
 
-const jiraInstallDelay = 3 * time.Second
+// IntegrationService reserves the integration boundary until a real provider
+// is implemented. Unsupported requests must never report installation success.
+type IntegrationService struct{}
 
-// IntegrationService provides the requested Jira installation preview.
-// No account connection or external installation is performed yet.
-type IntegrationService struct {
-	installDelay time.Duration
-}
-
-func NewIntegrationService() *IntegrationService {
-	return &IntegrationService{installDelay: jiraInstallDelay}
-}
+func NewIntegrationService() *IntegrationService { return &IntegrationService{} }
 
 func (s *IntegrationService) InstallJira(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	delay := s.installDelay
-	if delay <= 0 {
-		delay = jiraInstallDelay
-	}
-	timer := time.NewTimer(delay)
-	defer timer.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return ctx.Err()
-	}
+	return errors.New("Jira integration is not available yet")
 }

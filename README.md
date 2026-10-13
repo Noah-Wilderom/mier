@@ -4,7 +4,7 @@
 
 **Mag ik een review?** A desktop workspace for Git repositories and GitHub pull requests, built with Wails 3, Go, React, and TypeScript.
 
-Browse commits, manage local changes, and review pull requests with inline comments, syntax highlighting, and light or dark appearance.
+Manage branches and local changes, compare commits, and review pull requests with inline comments, syntax highlighting, and light or dark appearance.
 
 [Download the latest release](https://github.com/Noah-Wilderom/mier/releases/latest) · macOS, Windows, and Linux · Intel/AMD and ARM64
 

@@ -48,6 +48,8 @@ Build frontend assets before Go tests: the Go executable embeds `frontend/dist`,
 ```sh
 npm --prefix frontend ci
 npm --prefix frontend test
+npx --prefix frontend playwright install --with-deps chromium webkit
+npm --prefix frontend run test:ui
 node --test scripts/release.test.mjs
 npm --prefix frontend run build
 go test ./...
@@ -55,7 +57,7 @@ go vet ./...
 wails3 build
 ```
 
-The test workflow runs these checks on Linux, macOS, and Windows, with Go race detection on Linux and macOS. Linux CI also builds all four installer formats and extracts them to verify architecture, dependencies, desktop files, permissions, and bundled AppImage subprocesses. The release helper passes `GOARCH` to Wails' build/package commands and validates the executable's actual CPU architecture before archiving it. `ARCH` is a Task variable; the Wails command wrappers replace it with their resolved `GOARCH`.
+The test workflow runs native checks on Linux, macOS, and Windows, with Go race detection on Linux and macOS. A separate Linux job runs the retained Chromium/WebKit UI suite and retains failure traces. The release workflow also requires that UI suite on its Linux AMD64 job before publication. Linux CI builds all four installer formats and extracts them to verify architecture, dependencies, desktop files, permissions, and bundled AppImage subprocesses. The release helper passes `GOARCH` to Wails' build/package commands and validates the executable's actual CPU architecture before archiving it. `ARCH` is a Task variable; the Wails command wrappers replace it with their resolved `GOARCH`.
 
 The release workflow generates the AUR recipe after both Linux builds finish and includes it in the release checksums. Publishing that recipe to the AUR is a separate maintainer action; this workflow does not modify the AUR or Omarchy's package repository. The repository currently has no project `LICENSE`, so package metadata reports `unknown` instead of inheriting the template's MIT declaration. Choose the project license before publishing to the AUR.
 

@@ -60,6 +60,16 @@ func (s *GitHubService) GetPullRequest(ctx context.Context, host, owner, repo st
 	}
 	return client.GetPullRequest(ctx, owner, repo, number)
 }
+
+func (s *GitHubService) GetCommitDiff(ctx context.Context, host, owner, repo, sha string) (*githubclient.CommitDiff, error) {
+	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
+	client, err := s.client(ctx, host)
+	if err != nil {
+		return nil, err
+	}
+	return client.GetCommitDiff(ctx, owner, repo, sha)
+}
 func (s *GitHubService) CreatePullRequest(ctx context.Context, host, owner, repo string, input githubclient.CreateRequest) (githubclient.PullRequestSummary, error) {
 	client, err := s.client(ctx, host)
 	if err != nil {

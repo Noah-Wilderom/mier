@@ -188,7 +188,7 @@ function fileStatus(status: string): ChangedFile["status"] {
   return "modified";
 }
 
-function mapChangedFile(raw: GitHubChangedFile): ChangedFile {
+export function mapChangedFile(raw: GitHubChangedFile): ChangedFile {
   const patch = raw.patch ?? "";
   const binary = raw.binary === true || /^(?:Binary files .+ differ|GIT binary patch)/m.test(patch);
   const parsed = parsePatch(patch);

@@ -49,13 +49,14 @@ Repository access and token permissions determine which operations GitHub permit
 
 - Inspect commit history, local and remote branches, remotes, tracking status, and working tree changes.
 - View staged and unstaged diffs, stage or unstage selected files, and commit staged changes.
-- Create and check out branches; fetch, pull, and push through the Git backend. Pull uses fast-forward-only behavior; push sets upstream tracking and does not force-push.
+- Use the repository toolbar to create, switch, rename, or delete merged local branches, choose a remote, fetch, pull, and push. Pull uses fast-forward-only behavior; push sets upstream tracking and does not force-push. Delete confirmation never force-deletes unmerged work.
+- Compare committed branch changes in a read-only dialog and inspect individual history or PR commits without checking them out. Root commits compare against an empty tree; merge commits compare against the first parent.
 - Browse, search, and filter real open, draft, closed, and merged pull requests. Inspect Conversation, Changes, Commits, and Checks.
 - Use separate inboxes for all PRs, your PRs, requested reviews, PRs assigned to you, and drafts. Comment authors show profile pictures, an Author badge when appropriate, and a Bot badge for bot accounts.
 - Review split or unified diffs, filter files, mark files viewed, and expand code review to the full window. Selected files, viewed progress, and pending comments remain in place when expanding or returning to the inbox.
 - Read Markdown descriptions and comments with headings, lists, code fences, tables, task lists, and emoji shortcodes. External web links open in the browser; raw HTML is disabled.
 - Write conversation comments and inline review drafts, reply to discussions, resolve or reopen threads, and submit an approval, request for changes, or comment review.
-- Create draft or open PRs, edit titles and descriptions, change draft status, close or reopen PRs, and edit reviewers, assignees, and labels. Push the compare branch before creating a PR.
+- Create draft or open PRs with a committed comparison preview, edit titles and descriptions, change draft status, close or reopen PRs, and edit reviewers, assignees, and labels. Publish the compare branch before creating a PR. Commit messages and PR creation drafts are saved per repository across navigation and restart.
 - Merge with a strategy allowed by the repository. GitHub enforces checks, review requirements, permissions, and protection. Reviews and merges verify the expected head commit so an unseen revision cannot be submitted accidentally.
 - Open the current repository in VSCode, PhpStorm, or Zed using the editor split button. VSCode is the default; successful launches remember the last editor. A separate GitHub button opens the selected PR or repository in your browser.
 
@@ -73,7 +74,7 @@ Language servers are detected from project dependencies or PATH. **Settings → 
 
 **Settings → Notifications** configures each GitHub repository independently. Pull request opened, closed, merged, and review requested events default on. In-app toasts default on; desktop notifications default off and request OS permission when enabled. The first imported snapshot establishes a baseline without notifying about historical activity. Subsequent successful background refreshes detect transitions.
 
-**Settings → Apps** includes a Jira card. Its Install button currently invokes a cancelable three-second backend placeholder and displays a disabled loading state; it does not install or authenticate Jira yet.
+**Settings → Apps** marks Jira as **Coming soon**. Installation stays disabled until account connection and issue linking are implemented; backend calls also return an explicit unavailable error.
 
 ## Live updates during a review
 
@@ -115,13 +116,17 @@ Keyboard shortcuts:
 ```sh
 cd frontend
 npm test
+npx playwright install --with-deps chromium webkit
+npm run test:ui
 npm run build
 cd ..
 go test ./...
 wails3 build
 ```
 
-The native build is written to `bin/` (`bin/mag-ik-een-review` on Linux). Run the built app with `wails3 task run`. The Wails tasks include Linux, Windows, and macOS targets; see the [Wails cross-platform build guide](https://v3.wails.io/guides/build/cross-platform/) for required toolchains. Linux builds and isolated Git/provider tests have been exercised here. Local Git Go cross-compilation does not establish that Windows or macOS desktop binaries, keychains, packaging, or signing have been tested.
+The native build is written to `bin/` (`bin/mag-ik-een-review` on Linux). Run the built app with `wails3 task run`. Build frontend assets before Go tests because the executable embeds `frontend/dist`; stop the Wails watcher during verification. CI builds all three desktop OSes, while target-platform keychain, notification, installer upgrade, and signing qualification remain separate. See [validation](VALIDATION.md) and the [Wails cross-platform guide](https://v3.wails.io/guides/build/cross-platform/).
+
+`npm run test:ui` type-checks and runs the retained Chromium/WebKit suite in `frontend/tests/`. Playwright starts a separate Vite server on port 9255 and fixtures intercept Wails' HTTP RPC calls; no provider or user repository is modified. Tests retain traces/screenshots on failure. Linux WebKit uses Mesa software rendering and the suite runs one browser worker to remain usable on small desktop/CI hosts. [Playwright web-server configuration](https://playwright.dev/docs/test-webserver) and [API fixtures](https://playwright.dev/docs/mock) explain that harness.
 
 Automated provider tests use fake HTTP servers and credential stores. They cover pagination, rate limits, permissions, review threads, mutation payloads, and stale-head protection without changing a remote user repository. Sync tests cover the 15-second default, cancellation, queued refreshes, and preservation of local data after provider failures.
 

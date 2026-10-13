@@ -8,7 +8,8 @@
     "build:dev": "tsc && vite build --minify false --mode development",
     "build": "tsc && vite build --mode production",
     "preview": "vite preview",
-    "test": "node --test src/*.test.ts"
+    "test": "node --test src/*.test.ts",
+    "test:ui": "tsc -p tsconfig.ui.json && playwright test"
   },
   "dependencies": {
     "@shikijs/langs": "^4.5.0",
@@ -22,6 +23,8 @@
     "shiki": "^4.5.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.0",
+    "@types/node": "24.19.2",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^6.0.0",

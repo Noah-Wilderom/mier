@@ -448,6 +448,7 @@ export const services = {
     listAccounts: async () => (await invoke<Account[] | null>("main.CredentialService.ListAccounts")) ?? [],
   },
   github: {
+    getCommitDiff: (host: string, owner: string, repo: string, sha: string) => invoke<{sha:string; files:GitHubChangedFile[]; warnings:string[]}>("main.GitHubService.GetCommitDiff", host, owner, repo, sha),
     listPullRequests: async (host: string, owner: string, repo: string, state: "open" | "closed" | "all" = "open") => (await invoke<PullRequestSummary[] | null>("main.GitHubService.ListPullRequests", host, owner, repo, state)) ?? [],
     getPullRequest: (host: string, owner: string, repo: string, number: number) => invoke<PullRequestDetail>("main.GitHubService.GetPullRequest", host, owner, repo, number),
     createPullRequest: (host: string, owner: string, repo: string, request: CreatePullRequestRequest) => invoke<PullRequestSummary>("main.GitHubService.CreatePullRequest", host, owner, repo, request),
@@ -465,6 +466,7 @@ export const services = {
     setLabels: async (host: string, owner: string, repo: string, number: number, labels: string[]) => (await invoke<string[] | null>("main.GitHubService.SetLabels", host, owner, repo, number, labels)) ?? [],
   },
   repository: {
+    commitDiff: async (root: string, revision: string) => (await invoke<RepositoryDiff[] | null>("main.RepositoryService.CommitDiff", root, revision)) ?? [],
     open: (path: string) => invoke<RepositorySnapshot>("main.RepositoryService.Open", path),
     snapshot: (path: string) => invoke<RepositorySnapshot>("main.RepositoryService.Snapshot", path),
     diff: (path: string, file: string, staged: boolean) => invoke<RepositoryDiff>("main.RepositoryService.Diff", path, file, staged),
@@ -473,8 +475,11 @@ export const services = {
     unstage: (path: string, files: string[]) => invoke<void>("main.RepositoryService.Unstage", path, files),
     commit: (path: string, message: string) => invoke<string>("main.RepositoryService.Commit", path, message),
     checkout: (path: string, branch: string) => invoke<void>("main.RepositoryService.Checkout", path, branch),
-    checkoutPullRequest: (path: string, number: number) => invoke<void>("main.RepositoryService.CheckoutPullRequest", path, number),
+    checkoutPullRequest: (path: string, number: number, remote: string) => invoke<void>("main.RepositoryService.CheckoutPullRequest", path, number, remote),
     createBranch: (path: string, branch: string) => invoke<void>("main.RepositoryService.CreateBranch", path, branch),
+    createAndCheckoutBranch: (path: string, branch: string) => invoke<void>("main.RepositoryService.CreateAndCheckoutBranch", path, branch),
+    deleteBranch: (path: string, branch: string) => invoke<void>("main.RepositoryService.DeleteBranch", path, branch),
+    renameBranch: (path: string, branch: string, name: string) => invoke<void>("main.RepositoryService.RenameBranch", path, branch, name),
     fetch: (path: string, remote: string) => invoke<void>("main.RepositoryService.Fetch", path, remote),
     pull: (path: string, remote: string) => invoke<void>("main.RepositoryService.Pull", path, remote),
     push: (path: string, remote: string) => invoke<void>("main.RepositoryService.Push", path, remote),

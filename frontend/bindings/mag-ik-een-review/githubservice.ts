@@ -21,6 +21,10 @@ export function CreatePullRequest(host: string, owner: string, repo: string, inp
     return $Call.ByID(1541012802, host, owner, repo, input);
 }
 
+export function GetCommitDiff(host: string, owner: string, repo: string, sha: string): $CancellablePromise<githubclient$0.CommitDiff | null> {
+    return $Call.ByID(2420156920, host, owner, repo, sha);
+}
+
 export function GetPullRequest(host: string, owner: string, repo: string, $number: number): $CancellablePromise<githubclient$0.PullRequestDetail | null> {
     return $Call.ByID(2856222730, host, owner, repo, $number);
 }

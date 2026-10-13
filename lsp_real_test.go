@@ -102,9 +102,15 @@ func TestRealPHPHoverAndDefinition(t *testing.T) {
 	line := "$message = $greeter->greet('PHP');"
 	request := lspclient.CodePositionRequest{Root: root, Revision: sha, Path: "src/use.php", Line: 3, Character: strings.Index(line, "greet(") + 2, LineText: &line}
 	hover, err := m.Hover(ctx, request)
-	if err == nil && !strings.Contains(hover.Contents, "string") {
-		t.Logf("initial PHP hover: %+v", hover)
-		time.Sleep(time.Second)
+	// Phpactor reports partial symbols while indexing. Wait for the actual
+	// signature within a bound instead of relying on one machine's startup speed.
+	warmup := time.Now().Add(12 * time.Second)
+	for err == nil && !strings.Contains(hover.Contents, "string") && time.Now().Before(warmup) {
+		select {
+		case <-ctx.Done():
+			t.Fatal(ctx.Err())
+		case <-time.After(500 * time.Millisecond):
+		}
 		hover, err = m.Hover(ctx, request)
 	}
 	if err != nil || !strings.Contains(hover.Contents, "greet") || !strings.Contains(hover.Contents, "string") {

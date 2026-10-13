@@ -54,6 +54,12 @@ export interface Commit {
     "url": string;
 }
 
+export interface CommitDiff {
+    "sha": string;
+    "files": ChangedFile[] | null;
+    "warnings": string[] | null;
+}
+
 export interface CommitStatus {
     "id": number;
     "context": string;

@@ -57,6 +57,7 @@ const icons: Record<string, ReactNode> = {
   "chevron-left": <path d="m15 6-6 6 6 6" />,
   "chevron-up": <path d="m6 15 6-6 6 6" />,
   plus: <path d="M12 5v14M5 12h14" />,
+  edit: <><path d="m16 3 5 5-12 12-6 1 1-6L16 3Z"/><path d="m14 5 5 5"/></>,
   search: (
     <>
       <circle cx="10.5" cy="10.5" r="6.5" />

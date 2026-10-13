@@ -1,0 +1,60 @@
+.app-shell.has-repository-toolbar { grid-template-rows: 56px auto minmax(0, 1fr) 27px; }
+.has-repository-toolbar .sidebar { grid-row: 1 / 4; }
+.has-repository-toolbar .main-workspace { grid-row: 3; }
+.has-repository-toolbar .app-statusbar { grid-row: 4; }
+.repository-toolbar { grid-column: 2; grid-row: 2; min-width: 0; border-bottom: 1px solid var(--border); background: var(--panel); }
+.repository-toolbar-row { display: flex; align-items: center; gap: 7px; min-height: 43px; padding: 5px 12px; }
+.repository-toolbar .btn { min-height: 30px; height: 30px; padding-inline: 8px; font-size: 12px; white-space: nowrap; }
+.repository-branch-button { max-width: 250px; }
+.repository-branch-button > span { overflow: hidden; text-overflow: ellipsis; }
+.repository-remote select { max-width: 160px; padding: 4px 7px; height: 30px; font-size: 12px; }
+.repository-tracking { display: flex; gap: 9px; color: var(--muted); font-size: 11px; white-space: nowrap; }
+.repository-toolbar-spacer { flex: 1; }
+.repository-operation-error { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-top: 1px solid var(--border); color: var(--red); font-size: 12px; }
+.repository-operation-error > span { flex: 1; overflow-wrap: anywhere; }
+.repository-modal { width: min(950px, calc(100vw - 40px)); max-height: calc(100dvh - 70px); padding: 0; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 9px; box-shadow: var(--shadow); overflow: auto; }
+.repository-modal::backdrop { background: oklch(0.1 0 0 / .4); }
+.repository-modal-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 18px; border-bottom: 1px solid var(--border); }
+.repository-modal-heading h2 { font-size: 17px; }
+.branch-manager, .branch-comparison { padding: 18px; }
+.branch-create { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding-bottom: 16px; }
+.branch-create > label:first-child { grid-column: 1 / -1; }
+.branch-create .checkbox-label { font-size: 12px; }
+.branch-search { display: block; margin-block: 14px 8px; }
+.branch-list { max-height: 350px; overflow: auto; border-top: 1px solid var(--border); }
+.branch-row { display: flex; align-items: center; gap: 8px; padding: 11px 2px; border-bottom: 1px solid var(--border); }
+.branch-description { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.branch-description strong { font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
+.branch-description span { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+.branch-row .btn { font-size: 12px; padding: 5px 9px; }
+.branch-edit { border: 1px solid var(--border); border-radius: 6px; background: var(--panel); padding: 12px; margin-block: 12px; }
+.branch-edit p { line-height: 1.6; font-size: 13px; }
+.branch-edit-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.branch-empty, .comparison-empty { padding: 24px 12px; color: var(--muted); font-size: 13px; }
+.comparison-selectors { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: 12px; }
+.comparison-selectors select, .comparison-file select { display: block; margin-top: 7px; width: 100%; min-width: 0; }
+.comparison-selectors > svg { align-self: center; margin-top: 20px; }
+.comparison-note { color: var(--muted); font-size: 12px; line-height: 1.6; margin-block: 12px; }
+.comparison-summary { display: flex; align-items: center; gap: 12px; font-size: 12px; margin-block: 15px 8px; }
+.comparison-summary > span:last-child { margin-left: auto; }
+.comparison-error { display: flex; align-items: center; gap: 10px; margin-block: 12px; color: var(--red); font-size: 12px; }
+.comparison-error > span { flex: 1; overflow-wrap: anywhere; }
+.comparison-code { max-height: 430px; overflow: auto; border: 1px solid var(--border); border-radius: 5px; margin-top: 10px; background: var(--surface); }
+.comparison-code-lines { min-width: max-content; }
+.comparison-code-line { display: grid; grid-template-columns: 42px 42px 23px minmax(0, 1fr); min-height: var(--review-code-line-height, 24px); line-height: var(--review-code-line-height, 24px); font-family: var(--mono); font-size: var(--review-code-font-size, 12px); }
+.comparison-code-line.kind-add { background: var(--green-soft); }
+.comparison-code-line.kind-remove { background: var(--red-soft); }
+.comparison-code-line.kind-hunk { color: var(--blue); background: var(--panel); }
+.comparison-line-number { padding-right: 8px; text-align: right; color: var(--muted); user-select: none; }
+.comparison-line-marker { text-align: center; color: var(--muted); user-select: none; }
+.comparison-code-line > code { padding-right: 16px; white-space: pre; tab-size: 4; font: inherit; }
+.create-pr-pane .comparison-preview { margin-block: 16px; }
+.pull-request-commit-preview { padding: 18px; }
+.pull-request-commit-preview > code { display: block; overflow-wrap: anywhere; font-size: 12px; }
+.commit-inspector .comparison-code { max-height: 380px; }
+@media (max-width: 1080px) {
+  .repository-toolbar-row { flex-wrap: wrap; }
+  .repository-branch-button { max-width: 180px; }
+  .repository-tracking { display: none; }
+  .repository-toolbar-row .btn { font-size: 11px; padding-inline: 7px; }
+}

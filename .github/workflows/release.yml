@@ -70,6 +70,12 @@ jobs:
       - run: node --test scripts/release.test.mjs
       - run: npm run build
         working-directory: frontend
+      - name: Browser regression tests
+        if: matrix.platform == 'linux' && matrix.arch == 'amd64'
+        working-directory: frontend
+        run: |
+          npx playwright install --with-deps chromium webkit
+          npm run test:ui
       - run: go test ./...
       - name: Build and package the target
         env:

@@ -24,7 +24,7 @@ The Go application owns filesystem access, Git, credentials, provider requests, 
 | Language intelligence | `lspservice.go`, `internal/lspclient/`, Git snapshot APIs | `CodeIntelligence.tsx`, `LanguageServerSettings.tsx` |
 | Notifications | `prnotificationservice.go`, `desktopnotificationservice.go` | `NotificationSettings.tsx`, `NotificationToasts.tsx` |
 | Editor launching | `editorservice.go` | `EditorActions.tsx` |
-| Jira placeholder | `integrationservice.go` | `JiraIntegration.tsx` |
+| Planned Jira integration | `integrationservice.go` rejects unavailable installation | `JiraIntegration.tsx` displays Coming soon |
 
 ## Git and provider execution
 
@@ -44,7 +44,7 @@ Native startup reads recent repositories locally and starts a watch for each val
 
 `reviewRevision.ts` preserves the displayed diff/head/base and draft anchors when new commits arrive. Conversation/check state can update while the UI offers **Refresh changes**. Accepting the revision replaces the diff explicitly, retains old drafts as outdated, and retains viewed progress only for unchanged files. `reviewDrafts.ts` persists review state per provider/repository/PR. An open inline composer also keeps its original head if the user refreshes before saving it.
 
-Local diff reloads retain the visible code during a same-file background request. Changing file or staged/unstaged side shows a skeleton without exposing the previous file's content. Failed background refreshes retain usable code and offer Retry; failed commits retain the commit message.
+Local diff reloads retain the visible code during a same-file background request. Changing file or staged/unstaged side shows a skeleton without exposing the previous file's content. Failed background refreshes retain usable code and offer Retry. `workspaceDrafts.ts` and `usePersistentDraft.ts` save commit and PR creation drafts under separate repository keys, report storage failures, and keep rejected writes editable. Repository epochs prevent obsolete responses and queued actions from changing a newer workspace; opening a repository or entering the demo invalidates earlier context.
 
 ## Code analysis
 
@@ -58,16 +58,18 @@ UTF-16 positions, exact line-text validation, canceled requests, bounded caches,
 
 OS configuration lives below the platform's user configuration directory in `mag-ik-een-review/`: `accounts.json`, `workspace.json`, `notifications.json`, `editor.json`, and `language-servers.json`. Secrets live separately in the OS credential store. Configuration writers use atomic replacement and private file permissions where supported. LSP session data uses the OS user cache directory.
 
-Frontend storage includes `mag-ik-een-review.appearance`, `mier.code-review.preferences.v1`, and `mag-ik-een-review.review-drafts.v1`. Do not merge demo state into live repository state or erase saved drafts when changing appearance or navigation.
+Frontend storage includes `mag-ik-een-review.appearance`, `mier.code-review.preferences.v1`, `mag-ik-een-review.review-drafts.v1`, `mier.commit-draft.v1:<root>`, and `mier.pull-request-draft.v1:<identity>`. Demo draft keys are separate. Do not merge demo state into live repository state or erase saved drafts when changing appearance or navigation.
 
 Notification preferences key by normalized remote identity, so different local clones share one policy. The first snapshot establishes a silent baseline; missing PRs do not imply closes. Older provider timestamps cannot undo a newer baseline and duplicate events. Event types/toasts default on; desktop delivery defaults off. The native notification backend initializes only when requested and handles permission separately from in-app toast delivery.
 
-The editor split button remembers successful editor launches; selecting a menu item cannot be overwritten by a late preference response. The GitHub browser action is independent. Jira's current backend is only a cancelable three-second placeholder.
+The editor split button remembers successful editor launches; selecting a menu item cannot be overwritten by a late preference response. The GitHub browser action is independent. Jira installation is unavailable in both the frontend and backend. `ErrorBoundary.tsx` offers workspace reload recovery for render failures.
 
 ## Scope and next seams
 
-Local staging/commits and PR checkout are integrated into the UI. Branch creation, checkout, fetch, pull, and push have tested backend methods; a full branch-management interface and dedicated fetch/pull/push toolbar remain follow-up UI work. PR creation can push the compare branch, but a separate Compare preview is not wired into that form.
+`RepositoryToolbar.tsx` provides branch creation, switching, rename, merged-only deletion, remote selection, fetch, pull, push, and a comparison dialog. `BranchComparison.tsx` uses Git's merge-base comparison; the same preview is embedded in `LiveCreatePullRequest`. PR publishing and checkout choose the remote matching the provider identity rather than a different tracking remote. Known GitLab/Bitbucket remotes remain local Git contexts; custom hosts support GitHub Enterprise.
 
-Other provider integrations, conflict editing, rebase/cherry-pick/stash UI, comment reactions, PR projects/milestones, framework-specific LSP plugins, completion/rename/diagnostics, and signed multi-platform packaging remain outside the current implementation. The initial design image depicts some of these concepts; it is not evidence that the corresponding controls are implemented.
+`CommitChanges.tsx` loads history changes from `RepositoryService.CommitDiff`, comparing with the first parent or the empty tree for a root commit. PR commit inspection uses `GitHubService.GetCommitDiff`, validates the full immutable SHA, paginates files inside the commit object, and preserves patch-unavailable states. It does not replace the PR's review diff or draft anchors. Comparison requests ignore responses after their revision/repository selection changes.
+
+Other provider integrations, conflict editing, rebase/cherry-pick/stash UI, comment reactions, PR projects/milestones, framework-specific LSP plugins, completion/rename/diagnostics, OS-signed installers, and notarization remain outside the current implementation. The initial design image depicts some of these concepts; it is not evidence that the corresponding controls are implemented. [Releasing](RELEASING.md) describes the six-target pipeline and signed updater separately from installer signing.
 
 Keep new hosting providers behind the provider boundary, framework server configuration behind the LSP manager, and view-state continuity in the review helpers. Validate each distribution OS's window behavior, credentials, editor discovery, notification permissions, and process cleanup before claiming a tested platform release.

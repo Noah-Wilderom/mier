@@ -18,8 +18,8 @@ export function Checkout(path: string, branch: string): $CancellablePromise<void
     return $Call.ByID(2509728233, path, branch);
 }
 
-export function CheckoutPullRequest(path: string, $number: number): $CancellablePromise<void> {
-    return $Call.ByID(4036037655, path, $number);
+export function CheckoutPullRequest(path: string, $number: number, remote: string): $CancellablePromise<void> {
+    return $Call.ByID(4036037655, path, $number, remote);
 }
 
 export function Clone(url: string, directory: string): $CancellablePromise<$models.RepositorySnapshot> {
@@ -30,12 +30,24 @@ export function Commit(path: string, message: string): $CancellablePromise<strin
     return $Call.ByID(2780214668, path, message);
 }
 
+export function CommitDiff(path: string, revision: string): $CancellablePromise<$models.ChangedFile[] | null> {
+    return $Call.ByID(2272119163, path, revision);
+}
+
 export function Compare(path: string, base: string, head: string): $CancellablePromise<$models.ChangedFile[] | null> {
     return $Call.ByID(2889286020, path, base, head);
 }
 
+export function CreateAndCheckoutBranch(path: string, branch: string): $CancellablePromise<void> {
+    return $Call.ByID(1675197098, path, branch);
+}
+
 export function CreateBranch(path: string, branch: string): $CancellablePromise<void> {
     return $Call.ByID(3149525421, path, branch);
+}
+
+export function DeleteBranch(path: string, branch: string): $CancellablePromise<void> {
+    return $Call.ByID(1816875810, path, branch);
 }
 
 export function Diff(path: string, file: string, staged: boolean): $CancellablePromise<$models.ChangedFile> {
@@ -56,6 +68,10 @@ export function Pull(path: string, remote: string): $CancellablePromise<void> {
 
 export function Push(path: string, remote: string): $CancellablePromise<void> {
     return $Call.ByID(3195577453, path, remote);
+}
+
+export function RenameBranch(path: string, branch: string, name: string): $CancellablePromise<void> {
+    return $Call.ByID(2385371099, path, branch, name);
 }
 
 export function Snapshot(path: string): $CancellablePromise<$models.RepositorySnapshot> {

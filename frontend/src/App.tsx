@@ -37,6 +37,11 @@ import CodeIntelligence from "./CodeIntelligence";
 import {CodeReviewSettings} from "./CodeReviewSettings";
 import LanguageServerSettings from "./LanguageServerSettings";
 import {NotificationToasts, type PullRequestNotice} from "./NotificationToasts";
+import RepositoryToolbar from "./RepositoryToolbar";
+import CommitChanges, {type LoadCommitDiff} from "./CommitChanges";
+import Modal from "./Modal";
+import { services } from "./services";
+import { mapChangedFile } from "./liveData";
 
 type Destination =
   | "inbox"
@@ -150,6 +155,7 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [focusMode, setFocusMode] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [inspectedCommit, setInspectedCommit] = useState<Commit | null>(null);
   const [palette, setPalette] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
   const [commandIndex, setCommandIndex] = useState(0);
@@ -169,11 +175,8 @@ export default function App() {
   }, []);
   const [theme, setTheme] = useState<ThemePreference>(() => {
     try {
-      return (
-        (localStorage.getItem(
-          "mag-ik-een-review.appearance",
-        ) as ThemePreference) || "system"
-      );
+      const saved=localStorage.getItem("mag-ik-een-review.appearance");
+      return saved==='dark'||saved==='light'?saved:'system';
     } catch {
       return "system";
     }
@@ -200,6 +203,13 @@ export default function App() {
   useEffect(() => { if (live.enabled && live.repository && selected > 0 && live.prs.some(pr=>pr.number===selected)) live.selectPullRequest(selected) }, [live.enabled, live.repository?.root, selected,live.prs.length]);
   const reviewNotify = (message:string) => { if (!live.enabled || /pending|draft|copied|clipboard|unavailable/i.test(message)) notify(message) };
   const pr = prs.find((p) => p.number === selected);
+  useEffect(()=>setInspectedCommit(null),[live.enabled,live.repository?.root,selected,destination]);
+  const provider=pr?.provider;
+  const loadPRCommit:LoadCommitDiff=useCallback(async sha=>{
+    if(!provider)throw new Error('This pull request is not connected to GitHub.');
+    const result=await services.github.getCommitDiff(provider.host,provider.owner,provider.repo,sha);
+    return {files:(result.files??[]).map(mapChangedFile),warnings:result.warnings??[]};
+  },[provider?.host,provider?.owner,provider?.repo]);
   const isPRView = ["inbox", "mine", "requested", "assigned", "drafts"].includes(
     destination,
   );
@@ -339,6 +349,7 @@ export default function App() {
       command(event.action, event.value),
     );
     const keyboard = (event: KeyboardEvent) => {
+      if (document.querySelector('dialog[open]')) return;
       const mod = event.metaKey || event.ctrlKey;
       if (mod && event.key.toLowerCase() === "k") {
         event.preventDefault();
@@ -552,7 +563,7 @@ export default function App() {
     action.label.toLowerCase().includes(commandQuery.toLowerCase()),
   );
   return (
-    <div className={`app-shell ${focusMode ? "review-focused" : ""}`}>
+    <div className={`app-shell ${focusMode ? "review-focused" : ""} ${live.enabled && live.repository && !focusMode && destination !== 'settings' ? 'has-repository-toolbar' : ''}`}>
       <aside className="sidebar" aria-label="Workspace navigation">
         <div className="brand">
           <span className="brand-mark">
@@ -734,6 +745,8 @@ export default function App() {
         )}
       </header>
 
+      {live.enabled && live.repository && !focusMode && destination !== 'settings' && <RepositoryToolbar key={live.repository.root} repository={live.repository} busy={live.busy} onGit={live.git} onRefresh={live.refresh}/>}
+
       <main
         aria-busy={!!live.openingRepository||(isPRView&&live.loadingPullRequests)}
         className={`main-workspace ${isPRView ? "pr-layout" : "single-layout"}`}
@@ -880,7 +893,7 @@ export default function App() {
         )}
         {live.enabled && !live.repository && destination !== "settings" && <RepositoryWelcome live={live} onOpen={()=>void live.openRepository().catch(()=>{})} onDemo={live.useDemo}/>}
         {isPRView && (!live.enabled || !!live.repository) &&
-          (creating ? (live.enabled ? <LiveCreatePullRequest live={live} onCancel={()=>setCreating(false)} onCreated={number=>{setSelected(number);setCreating(false);setTab('conversation');setFilter('open')}}/> :
+          (creating ? (live.enabled ? <LiveCreatePullRequest key={JSON.stringify([live.repository?.root,live.identity])} live={live} onCancel={()=>setCreating(false)} onCreated={number=>{setSelected(number);setCreating(false);setTab('conversation');setFilter('open')}}/> :
             <CreatePullRequest
               prs={prs}
               onCancel={() => setCreating(false)}
@@ -976,9 +989,9 @@ export default function App() {
                         <code>{commit.sha.slice(0, 7)}</code>
                         <button
                           className="icon-button"
-                          title="Inspect changed files"
-                          aria-label={`Inspect ${commit.subject}`}
-                          onClick={() => setTab("changes")}
+                          title={live.enabled?"Inspect this commit's changed files":"Review the sample pull request changes"}
+                          aria-label={live.enabled?`Inspect ${commit.subject}`:`Review changes for ${commit.subject}`}
+                          onClick={() => live.enabled?setInspectedCommit(commit):setTab("changes")}
                         >
                           <Icon name="arrow-right" />
                         </button>
@@ -1019,14 +1032,18 @@ export default function App() {
           ))}
         {destination === "history" && (!live.enabled || !!live.repository) && (
           <HistoryView
+            key={live.enabled ? live.repository?.root : 'demo'}
             history={history}
             branch={branch}
             repositoryName={live.enabled?live.repository?.name??"Repository":"mag-ik-een-review (sample)"}
             onReview={() => navigate("inbox")}
+            root={live.repository?.root}
+            loadCommitDiff={live.enabled?live.commitDiff:undefined}
           />
         )}
         {destination === "local-changes" && (!live.enabled || !!live.repository) && (
           <LocalChangesView
+            key={live.enabled ? live.repository?.root : 'demo'}
             changes={localChanges}
             branch={branch}
             root={live.enabled ? live.repository?.root : undefined}
@@ -1082,6 +1099,7 @@ export default function App() {
         </span>
       </footer>
       <NotificationToasts onOpen={openNotice}/>
+      {inspectedCommit&&live.enabled&&provider&&<Modal title={inspectedCommit.subject} onClose={()=>setInspectedCommit(null)}><div className="pull-request-commit-preview"><code>{inspectedCommit.sha}</code><CommitChanges requestKey={JSON.stringify([provider.host,provider.owner,provider.repo,inspectedCommit.sha])} sha={inspectedCommit.sha} loadDiff={loadPRCommit}/></div></Modal>}
       {toast && (
         <div className="toast" role="status">
           <Icon name="check-circle" size={18} />
@@ -2129,11 +2147,15 @@ function HistoryView({
   branch,
   repositoryName,
   onReview,
+  root,
+  loadCommitDiff,
 }: {
   history: Commit[];
   branch: string;
   repositoryName: string;
   onReview: () => void;
+  root?: string;
+  loadCommitDiff?: LoadCommitDiff;
 }) {
   const [selected, setSelected] = useState(history[0]?.sha);
   const commit = history.find((c) => c.sha === selected) || history[0];
@@ -2172,6 +2194,7 @@ function HistoryView({
               <code>{branch}</code>
             </dd>
           </dl>
+          {loadCommitDiff&&<CommitChanges requestKey={JSON.stringify([root,commit.sha])} sha={commit.sha} loadDiff={loadCommitDiff}/>}
         </div>
       )}
     </section>

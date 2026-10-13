@@ -1,67 +1,69 @@
 # Validation record
 
-Final code verification on **2026-10-13**, before the documentation handoff. Repository code, generated bindings, and the Linux binary were tested/built after the final LSP and UI fixes.
+Production-readiness work verified on **2026-10-13**. The earlier documentation handoff is preserved in [the historical record](validation/handoff-2026-10-13.md); its temporary QA paths and Jira simulation are historical, not the current test suite.
 
 ## Environment
 
 | Component | Observed version |
 | --- | --- |
-| Native build host | Linux amd64 |
-| Go | 1.26.1; module minimum 1.25.0 |
-| Node / npm | 26.1.0 / 11.13.0 |
+| Native host | Ubuntu 24.04, Linux amd64, GTK 4 / WebKitGTK 6 |
+| Go | 1.27.2; module minimum 1.25.0 |
+| Node / npm | 24.21.0 / 11.19.0 |
 | Wails CLI and Go module | 3.0.0-alpha2.117 |
 | npm Wails runtime | 3.0.0-beta.29 |
-| Vite build output | 8.3.4 |
-| Highlighting | Shiki 4.5.0 |
-| PHP runtime / Phpactor | 8.5.10 / 2026.10.07.0 |
+| Vite / Shiki | 8.3.4 / 4.5.0 |
+| Playwright | 1.64.0; Chromium and WebKit projects |
+| PHP / Phpactor | 8.3.6 / 2026.10.07.0 |
 | TypeScript / language server | 5.9.3 / 6.0.2 |
-| Vue language server / TypeScript plugin | 3.3.13 / 3.3.13 |
+| Vue server / TypeScript plugin | 3.3.13 / 3.3.13 |
 
-The language-server tools used for smoke tests were installed in `/tmp/mier-lsp-smoke-tools`, outside application/user repository dependencies. No global server installation was performed.
+Actual language-server tools were installed outside the repository in `/tmp/mier-lsp-smoke-tools`. Phpactor indexing uses a bounded warmup in its smoke test. Browser tests run one worker; headless Linux WebKit uses Mesa software rendering because this host's GPU device is not available to the user.
 
-## Final commands and results
+## Commands and results
 
-| Command | Result |
+| Check | Result |
 | --- | --- |
-| `go test -race ./...` | Passed all packages with tests; platform helper directories without tests are reported as such |
-| `MIER_LSP_SMOKE_TOOLS=/tmp/mier-lsp-smoke-tools go test -race -run '^TestReal' -count=1 -v .` | All five actual language-server tests passed |
-| `cd frontend && npm test` | 40 tests passed, zero failed/skipped |
-| `cd frontend && npm run build` | TypeScript and production Vite build passed |
-| `wails3 build` | Binding generation, frontend build, and native Linux production build passed |
-| Focused `go vet ./internal/lspclient ./internal/gitclient .` | Passed |
+| `npm --prefix frontend test` | 46 passed, zero failed or skipped |
+| `npm --prefix frontend run test:ui` | 24 passed across Chromium and WebKit; includes TypeScript checking of the harness |
+| Modal focus regression after the final focus change | Both browser projects passed |
+| `npm --prefix frontend run build` | TypeScript and production frontend build passed |
+| `go test -race ./...` | All ordinary package tests passed |
+| `go vet ./...` | Passed |
+| `MIER_LSP_SMOKE_TOOLS=/tmp/mier-lsp-smoke-tools go test -race -timeout 3m -run '^TestReal' -count=1 -v .` | All five actual PHP/TypeScript/Vue tests passed |
+| `node --test scripts/release.test.mjs` | 10 passed |
+| `actionlint .github/workflows/test.yml .github/workflows/release.yml` | Passed |
+| `wails3 build` | Binding generation and Linux production build passed; 9 bound RPC services, 57 methods, 48 models, 2 events |
 
-Final native output: `bin/mag-ik-een-review`, a stripped, dynamically linked Linux x86-64 ELF executable, approximately 16.5 MB. Wails reported 9 RPC services, 52 methods, 47 models, and 2 events during generation. The official editor logo assets are present in the built frontend.
+Go embeds `frontend/dist`, so frontend builds and Go checks were sequenced with the Wails watcher stopped. The native app was launched from the production binary, rather than Vite's standalone demo.
 
-The initial design image was copied unchanged; its SHA-256 is `c388dee5bc6e3249ae25db31f42b3680c2d03600b0c7698bf74939834bf06035`.
+## Retained regression coverage
 
-## Meaningful automated coverage
+`frontend/tests/` now holds the browser workflow suite. The fixture supplies a desktop environment and intercepts the real Wails HTTP RPC protocol, including provider errors and delayed responses. It does not modify a user repository or send a GitHub write. Tests cover:
 
-**Git/provider/backend:** temporary repository staging, partial changes, rename/unborn handling, commit and branch state, real graph ancestry, safe PR checkout, literal argv handling, host-scoped credential use, redaction, pagination/ETags/rate limits, stale-head mutation checks, GraphQL comment-side/BigInt parsing, sync timing/cancellation/manual refresh ordering, notification defaults/baselines/transitions/old-response rejection, fake native notifications and editor launches, and Jira timing/cancellation.
+- Branch creation rejection/retry, draft retention, duplicate suppression, dialog focus and Escape restoration.
+- Tracking remote selection, incorrect pull targets, and network failure recovery.
+- Comparisons with out-of-order responses, committed previews, and unavailable patches.
+- Local diff retry, failed commits, staging, commit draft restoration across navigation and reload, and completed drafts clearing after their composer unmounts.
+- PR creation preview, correct publishing remote, and failed creation draft restoration.
+- Per-commit history/PR inspection and exact immutable commit requests.
+- New PR commits preserving the reviewed code until explicitly accepted.
+- Repository switching and isolation of pending requests and saved draft text.
+- Account removal using the confirmed account's hostname, invalid appearance recovery, and Jira's unavailable state.
 
-**Frontend repository tests:** immutable review state and blockers, stable comment anchors, formal review ordering, safe Markdown/GFM/emoji rendering, graph topology, preservation and explicit acceptance of new revisions, saved draft recovery, grammar state across PHPDoc/escaped strings/old-new hunks, all eight syntax themes, plain-text fallback, and preference storage synchronization.
+New backend tests cover dirty/unborn branch creation, protected merged-only deletion, rename/tracking preservation, provider-specific PR checkout, root/merge commit diffs without checkout/index mutation, immutable GitHub commit validation and pagination, and canonical path/dependency metadata handling across OS aliases. Existing Git, provider, sync, notification, editor, highlighting, and review-draft tests remain in the suite.
 
-**Actual LSP tests:** PHP cross-file hover/definition; index/working signatures and content recapture; committed TypeScript analysis despite dirty checkout changes; TypeScript library definition viewing; Vue script semantics through the companion server; and monorepo workspace links resolving the selected committed package. These use disposable Git repositories, not a user checkout.
+Actual language-server checks exercised PHP cross-file signatures/definitions, staged/working signatures, TypeScript commit and SDK definitions, Vue/TypeScript cooperation, and monorepo workspace links bound to the selected revision.
 
-## Browser/RPC verification
+## Native and CI evidence
 
-Isolated headless Chromium tests used service/transport fixtures and no real provider mutations. They verified:
+The Linux production binary opened through the native folder dialog in a disposable Git repository. Its comparison dialog displayed the committed branch change while the working file remained dirty. Creating and selecting a new branch from the UI preserved that dirty work. Native staging and commit actions then produced a clean working tree; history displayed the committed change. [The native comparison screenshot](validation/native-comparison.png) records the actual GTK/WebKit window.
 
-- Local-first repository opening, skeleton transitions, long names, larger text, searchable selector keyboard behavior, and PR counts.
-- Real DTO-to-view Markdown and profile mapping; image fallback and protocol validation; Bot/Author badges and the assigned inbox updating with assignee changes.
-- Initial recent-repository watches starting once despite repeated runtime-ready events; inactive counts updating and errors ending count skeletons.
-- PR head updates preserving code/viewed progress/drafts, explicit refresh retaining earlier-head drafts, and an unsaved composer retaining its original head even after refresh/failure/retry.
-- PHP token scopes, selected text/tabs/emoji, blank-line dimensions, eight previews, font/theme persistence, split/unified renamed-file positions, and paired wrapped-row alignment.
-- Local staged/unstaged grammar/LSP positions, no stale file while switching, no full-skeleton blink on same-file refresh, retry with preserved code, and message preservation on failed commit.
-- Editor default/remembered selection, official logo decoding, delayed-preference race, duplicate launch suppression, loading/disabled cursor behavior, errors/retry, and the independent GitHub browser action.
-- LSP UTF-16 caret mapping, Ctrl/Cmd-click/F12/gD, read-only dependency navigation, draft continuity, stale responses/cancellation, plaintext rendering, same-symbol hover reentry, and canceled-safe PHP warmup refresh.
-- Jira's left spinner, normal disabled cursor, three-second backend flow, retry, and reduced motion; notification per-repository defaults/channel settings, permission denial, and saving failures.
+[Cross-platform CI run 38482044287](https://github.com/Noah-Wilderom/mier/actions/runs/38482044287) passed on Linux, macOS, and Windows after canonical source scopes and Composer metadata rebasing were fixed. Those runners also built the native application; Linux built and inspected DEB/RPM/Arch/AppImage packages. That run predates the remaining workspace feature commit; its subsequent workflow includes the retained browser job as well.
 
-Redacted retained reports are under [validation/](validation/). The temporary scripts and screenshots used for additional session QA remain under `/tmp/opengit-qa`, `/tmp/mier-live-qa`, `/tmp/mier-lsp-ui-qa.cjs`, `/tmp/mier-lsp-settings-qa.cjs`, and `/tmp/mier-php-hover-qa.cjs`. These paths are session artifacts and may disappear; repository tests above are the durable suite.
+## Limits
 
-## Limits of verification
+Provider writes, OS keychain operations, external editor launching, OS notification delivery, macOS/Windows native interaction, six-target installation, and a real previous-version updater migration still require release qualification. HTTP fixtures and native compilation do not establish those outcomes. Installers remain unsigned initially, as requested.
 
-No test submitted a real GitHub mutation, launched a real editor, installed Jira, or delivered a real OS notification. Read-only GitHub schema/public merged-PR queries were exercised separately and are recorded in the [provider research](RESEARCH_GIT_GITHUB_WAILS.md).
+The updater private key is outside Git; configuring the Actions secret, selecting a project license, publishing an AUR package, and qualifying actual platform installs are tracked in [release readiness](PRODUCTION.md). No live GitHub release was published during verification.
 
-Linux production compilation is verified. The final binary was not an end-to-end native window/permission/signing test, and Windows/macOS desktop distributions were not validated. Earlier Go package cross-compilation and available Wails target tasks do not change that limit. Framework-specific PHP integrations and other PR providers were not tested or implemented.
-
-The build emits nonfatal Vite warnings about chunks above 500 kB and an npm warning for the project's `minimum-release-age` setting. Highlighting languages/themes load lazily; further bundle optimization can be evaluated independently. Passing these checks is not a repository-wide security audit or a claim of complete GitKraken feature parity.
+Vite's large-chunk and npm's unsupported `minimum-release-age` configuration warnings remain nonfatal. This record is evidence for the current implementation, not a claim of exhaustive Git-provider parity.

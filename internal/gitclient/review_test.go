@@ -100,6 +100,26 @@ func TestPullRequestCheckoutPreservesExistingBranchesAndDirtyWork(t *testing.T) 
 	}
 }
 
+func TestPullRequestCheckoutSelectsTheProviderRemote(t *testing.T) {
+	client, root := testRepository(t, Options{})
+	ctx := context.Background()
+	head := initialCommit(t, client, root)
+	bare := filepath.Join(t.TempDir(), "provider.git")
+	testGit(t, filepath.Dir(bare), "init", "--bare", "--initial-branch=main", bare)
+	testGit(t, root, "remote", "add", "enterprise", bare)
+	testGit(t, root, "remote", "add", "origin", filepath.Join(t.TempDir(), "wrong-provider.git"))
+	if err := client.Push(ctx, root, "enterprise"); err != nil {
+		t.Fatal(err)
+	}
+	testGit(t, root, "--git-dir="+bare, "update-ref", "refs/pull/12/head", head)
+	if err := client.CheckoutPullRequest(ctx, root, 12, "enterprise"); err != nil {
+		t.Fatal(err)
+	}
+	if snapshot(t, client, root).CurrentBranch != "pr-12" || testGit(t, root, "rev-parse", "HEAD") != head {
+		t.Fatal("PR checkout did not use the selected provider remote")
+	}
+}
+
 func TestCompareUsesMergeBaseAndIgnoresWorkingChanges(t *testing.T) {
 	client, root := testRepository(t, Options{})
 	ctx := context.Background()
