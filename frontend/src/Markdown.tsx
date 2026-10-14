@@ -51,6 +51,11 @@ const components: Components = {
   },
 }
 
-export const Markdown = memo(function Markdown({ children, className = '', codeBlock }: { children: string; className?: string; codeBlock?: Components['pre'] }) {
-  return <div className={`markdown-body ${className}`.trim()}><ReactMarkdown skipHtml remarkPlugins={[remarkGfm, remarkGemoji]} components={codeBlock ? { ...components, pre: codeBlock } : components} urlTransform={url => markdownURL(url) || ''}>{children}</ReactMarkdown></div>
+export const Markdown = memo(function Markdown({ children, className = '', codeBlock, attachmentsAsLinks = false }: { children: string; className?: string; codeBlock?: Components['pre']; attachmentsAsLinks?: boolean }) {
+  const rendered: Components = { ...components, ...(codeBlock ? { pre: codeBlock } : {}) }
+  if (attachmentsAsLinks) rendered.img = ({ src, alt }) => {
+    const url = markdownURL(src)
+    return url && !url.startsWith('#') ? <a href={url} target="_blank" rel="noopener noreferrer" onClick={event => { if (hasNativeBackend()) { event.preventDefault(); void openExternalURL(url) } }}>Attachment: {alt || 'Open in browser'}</a> : <span>{alt}</span>
+  }
+  return <div className={`markdown-body ${className}`.trim()}><ReactMarkdown skipHtml remarkPlugins={[remarkGfm, remarkGemoji]} components={rendered} urlTransform={url => markdownURL(url) || ''}>{children}</ReactMarkdown></div>
 })

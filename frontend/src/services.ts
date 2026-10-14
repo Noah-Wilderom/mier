@@ -130,16 +130,28 @@ export interface JiraStatus {
   scopes: string[]; state: 'idle' | 'authorizing' | 'verifying' | 'failed'; error: string; sites: JiraSite[]; defaultSiteId: string;
 }
 export interface JiraRepositoryPreferences { siteId: string; projects: string[]; acceptanceField: string }
-export interface JiraPullRequest { repository: RepositoryIdentity; number: number; branch: string; title: string; body: string; refresh?: boolean }
-export interface JiraIssue {
+export interface TicketPullRequest { repository: RepositoryIdentity; number: number; branch: string; title: string; body: string; refresh?: boolean }
+export type JiraPullRequest = TicketPullRequest;
+export interface TicketIssue {
   id: string; key: string; summary: string; url: string; type: string; status: string; statusCategory: string;
   assignee: string; priority: string; labels: string[]; parentKey: string; description: unknown; acceptanceCriteria: unknown;
   comments: { id: string; author: string; createdAt: string; body: unknown }[]; commentsError: string; updatedAt: string;
 }
+export type JiraIssue = TicketIssue;
 export interface JiraTickets {
   site: JiraSite; preferences: JiraRepositoryPreferences; tickets: { key: string; sources: string[]; issue?: JiraIssue; error: string }[]; hidden: string[]; truncated: boolean;
 }
 export const JIRA_CHANGED_EVENT = 'mier:jira-changed';
+export interface LinearWorkspace { id: string; name: string; url: string }
+export interface LinearStatus {
+  configured: boolean; connected: boolean; clientId: string; callbackPort: number; callbackUrl: string;
+  scopes: string[]; state: 'idle' | 'authorizing' | 'verifying' | 'failed'; error: string; workspace?: LinearWorkspace | null; account: string;
+}
+export interface LinearTickets {
+  workspace: LinearWorkspace; preferences: { teams: string[] };
+  tickets: { key: string; sources: string[]; issue?: TicketIssue; error: string }[]; hidden: string[]; truncated: boolean;
+}
+export const LINEAR_CHANGED_EVENT = 'mier:linear-changed';
 
 export interface GitHubBranch {
   ref: string;
@@ -462,12 +474,12 @@ async function invokeLSP<T>(method: string, request: unknown, signal?: AbortSign
   finally { signal?.removeEventListener("abort", abort); }
 }
 
-async function invokeJira<T>(method: string, request: unknown, signal?: AbortSignal): Promise<T> {
-  if (!hasNativeBackend()) throw new Error('Open M.I.E.R. in its desktop window to connect Jira.');
+async function invokeTickets<T>(provider: 'jira' | 'linear', method: string, request: unknown, signal?: AbortSignal): Promise<T> {
+  if (!hasNativeBackend()) throw new Error(`Open M.I.E.R. in its desktop window to connect ${provider === 'jira' ? 'Jira' : 'Linear'}.`);
   if (signal?.aborted) throw new DOMException('Request cancelled', 'AbortError');
   const { Call } = await import('@wailsio/runtime');
   if (signal?.aborted) throw new DOMException('Request cancelled', 'AbortError');
-  const promise = Call.ByName(`main.IntegrationService.${method}`, request);
+  const promise = Call.ByName(`main.${provider === 'jira' ? 'IntegrationService' : 'LinearService'}.${method}`, request);
   const abort = () => { void promise.cancel().catch(() => undefined); };
   signal?.addEventListener('abort', abort, { once: true });
   try { return await promise as T; } finally { signal?.removeEventListener('abort', abort); }
@@ -482,10 +494,22 @@ export const services = {
     disconnect: () => invoke<void>('main.IntegrationService.DisconnectJira'),
     defaultSite: (id: string) => invoke<void>('main.IntegrationService.SetJiraDefaultSite', id),
     saveRepository: (repository: RepositoryIdentity, preferences: JiraRepositoryPreferences) => invoke<void>('main.IntegrationService.SaveJiraRepositoryPreferences', repository, preferences),
-    tickets: (request: JiraPullRequest, signal?: AbortSignal) => invokeJira<JiraTickets>('GetJiraTickets', request, signal),
-    issue: (request: { repository: RepositoryIdentity; key: string; refresh?: boolean }, signal?: AbortSignal) => invokeJira<JiraIssue>('ReadJiraIssue', request, signal),
-    search: (request: { repository: RepositoryIdentity; query: string }, signal?: AbortSignal) => invokeJira<JiraIssue[]>('SearchJiraIssues', request, signal),
+    tickets: (request: JiraPullRequest, signal?: AbortSignal) => invokeTickets<JiraTickets>('jira', 'GetJiraTickets', request, signal),
+    issue: (request: { repository: RepositoryIdentity; key: string; refresh?: boolean }, signal?: AbortSignal) => invokeTickets<JiraIssue>('jira', 'ReadJiraIssue', request, signal),
+    search: (request: { repository: RepositoryIdentity; query: string }, signal?: AbortSignal) => invokeTickets<JiraIssue[]>('jira', 'SearchJiraIssues', request, signal),
     select: (pullRequest: JiraPullRequest, key: string, action: 'pin' | 'hide' | 'restore') => invoke<void>('main.IntegrationService.SelectJiraTicket', { pullRequest, key, action }),
+  },
+  linear: {
+    status: () => invoke<LinearStatus>('main.LinearService.GetLinearStatus'),
+    configure: (configuration: { clientId: string; callbackPort: number }) => invoke<void>('main.LinearService.ConfigureLinear', configuration),
+    authorize: () => invoke<string>('main.LinearService.BeginLinearConnection'),
+    cancelAuthorization: () => invoke<void>('main.LinearService.CancelLinearConnection'),
+    disconnect: () => invoke<void>('main.LinearService.DisconnectLinear'),
+    saveRepository: (repository: RepositoryIdentity, teams: string[]) => invoke<void>('main.LinearService.SaveLinearRepositoryPreferences', repository, { teams }),
+    tickets: (request: TicketPullRequest, signal?: AbortSignal) => invokeTickets<LinearTickets>('linear', 'GetLinearTickets', request, signal),
+    issue: (request: { repository: RepositoryIdentity; key: string; refresh?: boolean }, signal?: AbortSignal) => invokeTickets<TicketIssue>('linear', 'ReadLinearIssue', request, signal),
+    search: (request: { repository: RepositoryIdentity; query: string }, signal?: AbortSignal) => invokeTickets<TicketIssue[]>('linear', 'SearchLinearIssues', request, signal),
+    select: (pullRequest: TicketPullRequest, key: string, action: 'pin' | 'hide' | 'restore') => invoke<void>('main.LinearService.SelectLinearTicket', { pullRequest, key, action }),
   },
   editor: {
     preferredEditor: () => invoke<string>("main.EditorService.PreferredEditor"),

@@ -1,4 +1,10 @@
 .jira-integration { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: start; gap: 14px; padding: 17px 18px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+.settings-app-integrations { display: flex; flex-direction: column; gap: 12px; }
+.ticket-provider-options { display: flex; align-items: center; gap: 4px; }
+.ticket-provider-options button { display: inline-flex; align-items: center; gap: 5px; padding: 4px 7px; border: 1px solid transparent; border-radius: 4px; font-size: 12px; }
+.ticket-provider-options button[aria-pressed="true"] { color: var(--blue); background: var(--blue-soft); border-color: var(--blue); }
+.ticket-provider-options button img { flex-shrink: 0; }
+.jira-status-canceled { color: var(--muted); background: var(--hover); }
 .jira-integration-logo { display: block; width: 36px; height: 36px; margin-top: 1px; flex-shrink: 0; }
 .jira-integration-details { min-width: 0; }
 .jira-integration-heading { display: flex; align-items: center; gap: 8px; min-height: 19px; }

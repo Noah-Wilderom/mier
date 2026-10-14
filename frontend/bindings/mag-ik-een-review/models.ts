@@ -44,52 +44,16 @@ export interface JiraAppConfiguration {
     "callbackPort": number;
 }
 
-export interface JiraComment {
-    "id": string;
-    "author": string;
-    "createdAt": string;
-    "body": any;
-}
+export type JiraIssue = TicketIssue;
 
-export interface JiraIssue {
-    "id": string;
-    "key": string;
-    "summary": string;
-    "url": string;
-    "type": string;
-    "status": string;
-    "statusCategory": string;
-    "assignee": string;
-    "priority": string;
-    "labels": string[] | null;
-    "parentKey": string;
-    "description": any;
-    "acceptanceCriteria": any;
-    "comments": JiraComment[] | null;
-    "commentsError": string;
-    "updatedAt": string;
-}
+export type JiraIssueRequest = TicketIssueRequest;
 
-export interface JiraIssueRequest {
-    "repository": JiraRepository;
-    "key": string;
-    "refresh": boolean;
-}
+export type JiraPullRequest = TicketPullRequest;
 
-export interface JiraPullRequest {
-    "repository": JiraRepository;
-    "number": number;
-    "branch": string;
-    "title": string;
-    "body": string;
-    "refresh": boolean;
-}
-
-export interface JiraRepository {
-    "host": string;
-    "owner": string;
-    "repo": string;
-}
+/**
+ * Keep the existing Jira RPC contract while sharing the ticket reader model.
+ */
+export type JiraRepository = TicketRepository;
 
 export interface JiraRepositoryPreferences {
     "siteId": string;
@@ -97,10 +61,7 @@ export interface JiraRepositoryPreferences {
     "acceptanceField": string;
 }
 
-export interface JiraSearchRequest {
-    "repository": JiraRepository;
-    "query": string;
-}
+export type JiraSearchRequest = TicketSearchRequest;
 
 export interface JiraSite {
     "id": string;
@@ -121,18 +82,9 @@ export interface JiraStatus {
     "defaultSiteId": string;
 }
 
-export interface JiraTicket {
-    "key": string;
-    "sources": string[] | null;
-    "issue": JiraIssue | null;
-    "error": string;
-}
+export type JiraTicket = Ticket;
 
-export interface JiraTicketSelection {
-    "pullRequest": JiraPullRequest;
-    "key": string;
-    "action": string;
-}
+export type JiraTicketSelection = TicketSelection;
 
 export interface JiraTickets {
     "site": JiraSite;
@@ -147,6 +99,42 @@ export type LSPServerConfiguration = lspclient$0.ServerConfiguration;
 export type LSPServerStatus = lspclient$0.ServerStatus;
 
 export interface LSPToolsChangedEvent {
+}
+
+export interface LinearAppConfiguration {
+    "clientId": string;
+    "callbackPort": number;
+}
+
+export interface LinearRepositoryPreferences {
+    "teams": string[] | null;
+}
+
+export interface LinearStatus {
+    "configured": boolean;
+    "connected": boolean;
+    "clientId": string;
+    "callbackPort": number;
+    "callbackUrl": string;
+    "scopes": string[] | null;
+    "state": string;
+    "error": string;
+    "workspace": LinearWorkspace | null;
+    "account": string;
+}
+
+export interface LinearTickets {
+    "workspace": LinearWorkspace;
+    "preferences": LinearRepositoryPreferences;
+    "tickets": Ticket[] | null;
+    "hidden": string[] | null;
+    "truncated": boolean;
+}
+
+export interface LinearWorkspace {
+    "id": string;
+    "name": string;
+    "url": string;
 }
 
 export interface NotificationPreferences {
@@ -177,6 +165,75 @@ export interface PRNotificationEvent {
 export type ReadDefinitionRequest = lspclient$0.ReadDefinitionRequest;
 
 export type RepositorySnapshot = gitclient$0.RepositorySnapshot;
+
+export interface Ticket {
+    "key": string;
+    "sources": string[] | null;
+    "issue": TicketIssue | null;
+    "error": string;
+}
+
+export interface TicketComment {
+    "id": string;
+    "author": string;
+    "createdAt": string;
+    "body": any;
+}
+
+export interface TicketIssue {
+    "id": string;
+    "key": string;
+    "summary": string;
+    "url": string;
+    "type": string;
+    "status": string;
+    "statusCategory": string;
+    "assignee": string;
+    "priority": string;
+    "labels": string[] | null;
+    "parentKey": string;
+    "description": any;
+    "acceptanceCriteria": any;
+    "comments": TicketComment[] | null;
+    "commentsError": string;
+    "updatedAt": string;
+}
+
+export interface TicketIssueRequest {
+    "repository": TicketRepository;
+    "key": string;
+    "refresh": boolean;
+}
+
+export interface TicketPullRequest {
+    "repository": TicketRepository;
+    "number": number;
+    "branch": string;
+    "title": string;
+    "body": string;
+    "refresh": boolean;
+}
+
+/**
+ * Ticket content is shared by provider readers; provider authentication and
+ * repository preferences remain independent.
+ */
+export interface TicketRepository {
+    "host": string;
+    "owner": string;
+    "repo": string;
+}
+
+export interface TicketSearchRequest {
+    "repository": TicketRepository;
+    "query": string;
+}
+
+export interface TicketSelection {
+    "pullRequest": TicketPullRequest;
+    "key": string;
+    "action": string;
+}
 
 export interface WatchRequest {
     "path": string;

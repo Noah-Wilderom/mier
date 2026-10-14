@@ -8,7 +8,7 @@ Manage branches and local changes, compare commits, and review pull requests wit
 
 Install and update PHP, TypeScript/JavaScript, and Vue language servers from Settings for symbol information and go to definition.
 
-View related Jira Cloud tickets alongside a PR using [your own OAuth app](docs/JIRA.md).
+View related [Jira Cloud](docs/JIRA.md) and [Linear](docs/LINEAR.md) tickets alongside a PR using your own OAuth app.
 
 [Download the latest release](https://github.com/Noah-Wilderom/mier/releases/latest) · macOS, Windows, and Linux · Intel/AMD and ARM64
 

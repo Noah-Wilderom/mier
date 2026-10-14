@@ -78,6 +78,8 @@ PR analysis uses an isolated snapshot of the displayed commit (and the merge bas
 
 **Settings → Apps → Configure Jira** accepts your own Jira Cloud OAuth app credentials, guides callback/permission registration, and starts browser consent. Related tickets are discovered from PR branch/title/description references, with optional repository site/project mappings, manual search, and personal hide/restore. A reader displays descriptions, configured acceptance criteria, and recent comments while keeping the review open. Credentials and refresh tokens stay in the OS keychain. See [Jira setup](JIRA.md) for registration, storage, recovery, and live-account qualification limits.
 
+**Settings → Apps → Configure Linear** accepts your own Linear OAuth client ID and guides callback registration. Authorization uses PKCE and read access, with rotating tokens in the OS keychain and no client secret. The shared ticket row switches between Jira and Linear without remounting the editor or its draft. Linear supports PR reference discovery, team filters, search, personal hide/restore, Markdown descriptions, and recent comments. See [Linear setup](LINEAR.md).
+
 ## Live updates during a review
 
 The Go backend refreshes imported recent repositories and their PR inboxes every **15 seconds**, including the selected PR while it is watched. Conversation replies, review state, checks, and local Git status update without changing your selected review file. **Refresh now** in Settings requests an immediate update. Polls do not overlap; request timeouts and GitHub rate limits can delay a successful refresh, with failures shown in the workspace.

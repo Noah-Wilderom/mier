@@ -23,63 +23,15 @@ var jiraKeyInText = regexp.MustCompile(`(?i)[A-Z][A-Z0-9_]{0,63}-[1-9][0-9]{0,18
 var jiraProjectKey = regexp.MustCompile(`^[A-Z][A-Z0-9_]{0,63}$`)
 var jiraCustomField = regexp.MustCompile(`^customfield_[0-9]{1,12}$`)
 
-type JiraRepository struct {
-	Host  string `json:"host"`
-	Owner string `json:"owner"`
-	Repo  string `json:"repo"`
-}
-type JiraPullRequest struct {
-	Repository JiraRepository `json:"repository"`
-	Number     int            `json:"number"`
-	Branch     string         `json:"branch"`
-	Title      string         `json:"title"`
-	Body       string         `json:"body"`
-	Refresh    bool           `json:"refresh"`
-}
-type JiraIssueRequest struct {
-	Repository JiraRepository `json:"repository"`
-	Key        string         `json:"key"`
-	Refresh    bool           `json:"refresh"`
-}
-type JiraSearchRequest struct {
-	Repository JiraRepository `json:"repository"`
-	Query      string         `json:"query"`
-}
-type JiraTicketSelection struct {
-	PullRequest JiraPullRequest `json:"pullRequest"`
-	Key         string          `json:"key"`
-	Action      string          `json:"action"`
-}
-type JiraComment struct {
-	ID        string `json:"id"`
-	Author    string `json:"author"`
-	CreatedAt string `json:"createdAt"`
-	Body      any    `json:"body"`
-}
-type JiraIssue struct {
-	ID                 string        `json:"id"`
-	Key                string        `json:"key"`
-	Summary            string        `json:"summary"`
-	URL                string        `json:"url"`
-	Type               string        `json:"type"`
-	Status             string        `json:"status"`
-	StatusCategory     string        `json:"statusCategory"`
-	Assignee           string        `json:"assignee"`
-	Priority           string        `json:"priority"`
-	Labels             []string      `json:"labels"`
-	ParentKey          string        `json:"parentKey"`
-	Description        any           `json:"description"`
-	AcceptanceCriteria any           `json:"acceptanceCriteria"`
-	Comments           []JiraComment `json:"comments"`
-	CommentsError      string        `json:"commentsError"`
-	UpdatedAt          string        `json:"updatedAt"`
-}
-type JiraTicket struct {
-	Key     string     `json:"key"`
-	Sources []string   `json:"sources"`
-	Issue   *JiraIssue `json:"issue"`
-	Error   string     `json:"error"`
-}
+// Keep the existing Jira RPC contract while sharing the ticket reader model.
+type JiraRepository = TicketRepository
+type JiraPullRequest = TicketPullRequest
+type JiraIssueRequest = TicketIssueRequest
+type JiraSearchRequest = TicketSearchRequest
+type JiraTicketSelection = TicketSelection
+type JiraComment = TicketComment
+type JiraIssue = TicketIssue
+type JiraTicket = Ticket
 type JiraTickets struct {
 	Site        JiraSite                  `json:"site"`
 	Preferences JiraRepositoryPreferences `json:"preferences"`
@@ -100,7 +52,7 @@ type jiraConnection struct {
 func jiraRepositoryKey(repo JiraRepository) (string, error) {
 	host, err := githubclient.NormalizeHost(repo.Host)
 	if err != nil {
-		return "", errors.New("Choose a GitHub repository before linking Jira tickets")
+		return "", errors.New("Choose a GitHub repository before linking tickets")
 	}
 	valid := regexp.MustCompile(`^[A-Za-z0-9_.-]{1,100}$`)
 	if !valid.MatchString(repo.Owner) || !valid.MatchString(repo.Repo) || repo.Owner == "." || repo.Owner == ".." || repo.Repo == "." || repo.Repo == ".." {
@@ -114,7 +66,7 @@ func jiraPRKey(request JiraPullRequest) (string, error) {
 		return "", err
 	}
 	if request.Number < 1 {
-		return "", errors.New("Choose a pull request before linking Jira tickets")
+		return "", errors.New("Choose a pull request before linking tickets")
 	}
 	return key + "#" + strconv.Itoa(request.Number), nil
 }

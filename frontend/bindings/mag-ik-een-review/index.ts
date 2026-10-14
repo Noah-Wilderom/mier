@@ -6,6 +6,7 @@ import * as EditorService from "./editorservice.js";
 import * as GitHubService from "./githubservice.js";
 import * as IntegrationService from "./integrationservice.js";
 import * as LSPService from "./lspservice.js";
+import * as LinearService from "./linearservice.js";
 import * as PRNotificationService from "./prnotificationservice.js";
 import * as RepositoryService from "./repositoryservice.js";
 import * as WorkspaceService from "./workspaceservice.js";
@@ -16,6 +17,7 @@ export {
     GitHubService,
     IntegrationService,
     LSPService,
+    LinearService,
     PRNotificationService,
     RepositoryService,
     WorkspaceService,
@@ -31,7 +33,6 @@ export type {
     CodePositionRequest,
     DefinitionDocument,
     JiraAppConfiguration,
-    JiraComment,
     JiraIssue,
     JiraIssueRequest,
     JiraPullRequest,
@@ -46,10 +47,23 @@ export type {
     LSPServerConfiguration,
     LSPServerStatus,
     LSPToolsChangedEvent,
+    LinearAppConfiguration,
+    LinearRepositoryPreferences,
+    LinearStatus,
+    LinearTickets,
+    LinearWorkspace,
     NotificationPreferences,
     PRNotificationEvent,
     ReadDefinitionRequest,
     RepositorySnapshot,
+    Ticket,
+    TicketComment,
+    TicketIssue,
+    TicketIssueRequest,
+    TicketPullRequest,
+    TicketRepository,
+    TicketSearchRequest,
+    TicketSelection,
     WatchRequest,
     WorkspaceUpdate
 } from "./models.js";

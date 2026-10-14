@@ -24,7 +24,8 @@ The Go application owns filesystem access, Git, credentials, provider requests, 
 | Language intelligence | `lspservice.go`, `internal/lspclient/`, Git snapshot APIs | `CodeIntelligence.tsx`, `LanguageServerSettings.tsx` |
 | Notifications | `prnotificationservice.go`, `desktopnotificationservice.go` | `NotificationSettings.tsx`, `NotificationToasts.tsx` |
 | Editor launching | `editorservice.go` | `EditorActions.tsx` |
-| Jira Cloud tickets | `integrationservice.go`, `jira_oauth.go`, `jira_tickets.go` | `JiraIntegration.tsx`, `JiraTickets.tsx`, `JiraRichText.tsx`, `useJiraConnection.ts` |
+| Jira Cloud tickets | `integrationservice.go`, `jira_oauth.go`, `jira_tickets.go` | `JiraIntegration.tsx`, `ReviewTickets.tsx`, `JiraRichText.tsx`, `useJiraConnection.ts` |
+| Linear tickets | `linearservice.go`, `linear_oauth.go`, `linear_api.go`, `linear_tickets.go` | `LinearIntegration.tsx`, `ReviewTickets.tsx`, `useLinearConnection.ts` |
 
 ## Git and provider execution
 
@@ -58,7 +59,7 @@ Managed language tools live in the user configuration directory's `mag-ik-een-re
 
 ## Preferences and delivery
 
-OS configuration lives below the platform's user configuration directory in `mag-ik-een-review/`: `accounts.json`, `workspace.json`, `notifications.json`, `editor.json`, `language-servers.json`, and `jira.json`. Secrets live separately in the OS credential store. Configuration writers use atomic replacement and private file permissions where supported. LSP session data uses the OS user cache directory.
+OS configuration lives below the platform's user configuration directory in `mag-ik-een-review/`: `accounts.json`, `workspace.json`, `notifications.json`, `editor.json`, `language-servers.json`, `jira.json`, and `linear.json`. Secrets live separately in the OS credential store. Configuration writers use atomic replacement and private file permissions where supported. LSP session data uses the OS user cache directory.
 
 Frontend storage includes `mag-ik-een-review.appearance`, `mier.code-review.preferences.v1`, `mag-ik-een-review.review-drafts.v1`, `mier.commit-draft.v1:<root>`, and `mier.pull-request-draft.v1:<identity>`. Demo draft keys are separate. Do not merge demo state into live repository state or erase saved drafts when changing appearance or navigation.
 
@@ -71,6 +72,12 @@ The editor split button remembers successful editor launches; selecting a menu i
 `IntegrationService` stores locally supplied app credentials and account tokens in the OS keychain. `jira.json` holds only configuration, authorized site metadata, normalized repository mappings, and personal PR selections. App-owned OAuth attempts have random state, a loopback listener, a five-minute deadline, explicit cancellation, and shutdown cleanup. Only verified token/site discovery completes a connection; saving credentials alone does not. Rotating refreshes serialize and persist their replacement tokens, retaining an unsaved rotation in memory for keychain recovery. API requests use fixed Atlassian hosts, deny redirects, bound responses and contexts, and honor rate-limit cooldowns.
 
 Branch/title/body references and personal additions are deduplicated and filtered by repository projects, then fetched with four summary workers. Full ticket content loads on selection; summary and detail caches remain separate, bounded, and memory-only. Account/configuration epochs discard late responses. Each missing ticket has an independent error; comment failures can retain the description. React cancels obsolete requests, preserves cards during same-context refresh failures, and keeps the reader outside the PR tabs so navigation does not discard the review. Atlassian Document Format renders as safe React elements with bounded traversal and existing web-link validation. See [Jira setup](JIRA.md) for the chosen credentials model and live-account qualification limits.
+
+## Linear
+
+`LinearService` owns a separate OAuth connection and fixed-host GraphQL client. Its PKCE flow uses random state and an S256 challenge with a temporary loopback callback; only verified user/workspace discovery establishes the connection. Read access and rotating tokens require no desktop client secret. Tokens use the bounded OS keychain store; `linear.json` holds only nonsecret configuration and workspace-specific repository mappings and selections. Configuration changes create a new credential reference; refresh serialization, durable rotation, request cancellation, rate-limit cooldowns, and account epochs prevent obsolete account data from reaching the reader.
+
+`ticket_types.go` shares ticket content without sharing provider credentials. `ReviewTickets.tsx` adapts Jira and Linear into one resizable reader while leaving the editor mounted. Linear descriptions/comments use safe Markdown with attachments rendered as links; Jira retains its ADF renderer and acceptance-criteria mapping. See [Linear setup](LINEAR.md) for registration and live-account qualification.
 
 ## Scope and next seams
 

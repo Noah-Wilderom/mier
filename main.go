@@ -50,6 +50,7 @@ func main() {
 		Description: "A native Git and pull request workspace",
 		Services: []application.Service{
 			application.NewService(NewIntegrationService()),
+			application.NewService(NewLinearService()),
 			application.NewService(NewEditorService(repositories)),
 			application.NewService(NewLSPService(repositories)),
 			application.NewService(desktop),

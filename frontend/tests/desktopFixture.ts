@@ -74,6 +74,7 @@ export async function desktopFixture(page: Page) {
         case 'main.LSPService.Servers': case 'main.LSPService.CheckServerUpdates': result = []; break
         case 'main.LSPService.Warmup': result = null; break
         case 'main.IntegrationService.GetJiraStatus': result = { configured: false, connected: false, clientId: '', callbackPort: 43827, callbackUrl: 'http://localhost:43827/oauth/jira/callback', scopes: ['read:jira-work', 'offline_access'], state: 'idle', error: '', sites: [], defaultSiteId: '' }; break
+        case 'main.LinearService.GetLinearStatus': result = { configured: false, connected: false, clientId: '', callbackPort: 43828, callbackUrl: 'http://localhost:43828/oauth/linear/callback', scopes: ['read'], state: 'idle', error: '', workspace: null, account: '' }; break
         case 'main.GitHubService.ListPullRequestsPage': {
           const query = args[3], pageSize = query.pageSize || 25, start = Number(query.cursor || 0)
           const items = fixture.prs.filter(pr => {

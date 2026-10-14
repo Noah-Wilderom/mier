@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36" fill="none">
+  <rect width="36" height="36" rx="8" fill="#5E6AD2"/>
+  <mask id="linear-mark">
+    <circle cx="18" cy="18" r="11" fill="white"/>
+    <path d="M5 12 24 31M3 16 20 33M3 21 15 33M7 8 28 29" stroke="black" stroke-width="2"/>
+  </mask>
+  <circle cx="18" cy="18" r="11" fill="white" mask="url(#linear-mark)"/>
+</svg>
