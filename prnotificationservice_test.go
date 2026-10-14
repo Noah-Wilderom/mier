@@ -35,11 +35,12 @@ func notificationHarness(t *testing.T) (*PRNotificationService, *[]PRNotificatio
 	s := NewPRNotificationService(credentials, func(event PRNotificationEvent) { events = append(events, event) }, func() error { return nil })
 	s.configPath = filepath.Join(t.TempDir(), "notifications.json")
 	s.configError = nil
+	s.now = func() time.Time { return time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC) }
 	return s, &events, credentials
 }
 
 func notificationPR(number int, status string, reviewers ...string) githubclient.PullRequestSummary {
-	pr := githubclient.PullRequestSummary{Number: number, Status: status, Title: "Improve code review", URL: "https://github.com/team/repo/pull/1", UpdatedAt: "2026-10-13T10:00:00Z", Author: githubclient.User{Login: "elena"}}
+	pr := githubclient.PullRequestSummary{Number: number, Status: status, Title: "Improve code review", URL: "https://github.com/team/repo/pull/1", CreatedAt: "2026-10-13T09:00:00Z", UpdatedAt: "2026-10-13T10:00:00Z", Author: githubclient.User{Login: "elena"}}
 	for _, reviewer := range reviewers {
 		pr.Reviewers = append(pr.Reviewers, githubclient.User{Login: reviewer})
 	}
@@ -180,7 +181,10 @@ func TestPRNotificationsBaselineAndStatusTransitions(t *testing.T) {
 	if len(*events) != 0 {
 		t.Fatal("Initial import flooded notifications")
 	}
-	observeNotifications(t, s, notificationPR(1, "merged"), notificationPR(2, "closed"), notificationPR(3, "open"), notificationPR(4, "draft"), notificationPR(5, "closed"))
+	newDraft := notificationPR(4, "draft")
+	newDraft.CreatedAt, newDraft.UpdatedAt = "2026-10-13T12:01:00Z", "2026-10-13T12:01:00Z"
+	s.now = func() time.Time { return time.Date(2026, 10, 13, 12, 2, 0, 0, time.UTC) }
+	observeNotifications(t, s, notificationPR(1, "merged"), notificationPR(2, "closed"), notificationPR(3, "open"), newDraft, notificationPR(5, "closed"))
 	if got := notificationTypes(*events); !reflect.DeepEqual(got, []string{"merged", "closed", "opened", "opened"}) {
 		t.Fatalf("Wrong transition events: %v", got)
 	}
@@ -192,9 +196,66 @@ func TestPRNotificationsBaselineAndStatusTransitions(t *testing.T) {
 			t.Fatal("Unknown closer/merger was attributed to the PR author")
 		}
 	}
-	observeNotifications(t, s, notificationPR(1, "merged"), notificationPR(2, "closed"), notificationPR(3, "draft"), notificationPR(4, "open"))
+	newDraft.Status = "open"
+	observeNotifications(t, s, notificationPR(1, "merged"), notificationPR(2, "closed"), notificationPR(3, "draft"), newDraft)
 	if len(*events) != 4 {
 		t.Fatal("Identical poll or draft-ready transition was duplicated")
+	}
+}
+
+func TestPRNotificationsHistoricalWindowEntriesBecomeBaseline(t *testing.T) {
+	for _, createdAt := range []string{"2026-10-13T09:00:00Z", "2026-10-13T12:00:00Z", "", "invalid"} {
+		t.Run(createdAt, func(t *testing.T) {
+			s, events, _ := notificationHarness(t)
+			observeNotifications(t, s, notificationPR(1, "open"))
+			entry := notificationPR(2, "open", "noah")
+			entry.CreatedAt, entry.UpdatedAt = createdAt, "2026-10-13T12:01:00Z"
+			observeNotifications(t, s, entry)
+			if len(*events) != 0 {
+				t.Fatalf("Previously unseen history fabricated events: %+v", *events)
+			}
+			// Deltas omit unaffected rows, but explicit later transitions still emit.
+			entry.Status, entry.UpdatedAt = "closed", "2026-10-13T12:02:00Z"
+			observeNotifications(t, s, entry, notificationPR(1, "closed"))
+			if got := notificationTypes(*events); !reflect.DeepEqual(got, []string{"closed", "closed"}) {
+				t.Fatalf("Known PR transitions in a delta were missed: %v", got)
+			}
+		})
+	}
+}
+
+func TestPRNotificationsNewPullRequestsAfterBaselineEmit(t *testing.T) {
+	s, events, _ := notificationHarness(t)
+	observeNotifications(t, s)
+	pr := notificationPR(1, "draft", "noah")
+	pr.CreatedAt, pr.UpdatedAt = "2026-10-13T12:01:00Z", "2026-10-13T12:01:00Z"
+	s.now = func() time.Time { return time.Date(2026, 10, 13, 12, 2, 0, 0, time.UTC) }
+	observeNotifications(t, s, pr)
+	observeNotifications(t, s, pr)
+	if got := notificationTypes(*events); !reflect.DeepEqual(got, []string{"opened", "reviewRequested"}) {
+		t.Fatalf("New PR events were missed or duplicated: %v", got)
+	}
+	if (*events)[0].Actor != "elena" {
+		t.Fatalf("New PR opener was lost: %+v", (*events)[0])
+	}
+}
+
+func TestPRNotificationsCreationBaselineIsRepositorySpecific(t *testing.T) {
+	s, events, _ := notificationHarness(t)
+	observeNotifications(t, s)
+	s.now = func() time.Time { return time.Date(2026, 10, 13, 12, 5, 0, 0, time.UTC) }
+	if err := s.Observe(context.Background(), "github.com", "team", "other", nil); err != nil {
+		t.Fatal(err)
+	}
+	pr := notificationPR(1, "open")
+	pr.CreatedAt, pr.UpdatedAt = "2026-10-13T12:01:00Z", "2026-10-13T12:06:00Z"
+	s.now = func() time.Time { return time.Date(2026, 10, 13, 12, 6, 0, 0, time.UTC) }
+	observeNotifications(t, s, pr)
+	if err := s.Observe(context.Background(), "github.com", "team", "other", []githubclient.PullRequestSummary{pr}); err != nil {
+		t.Fatal(err)
+	}
+	if len(*events) != 1 || (*events)[0].Key != "github.com/team/repo" || (*events)[0].Type != "opened" {
+		t.Fatalf("Creation baseline leaked between repositories: %+v", *events)
 	}
 }
 

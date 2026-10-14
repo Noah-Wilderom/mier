@@ -51,6 +51,15 @@ func (s *GitHubService) ListPullRequests(ctx context.Context, host, owner, repo,
 	}
 	return client.ListPullRequests(ctx, owner, repo, state)
 }
+func (s *GitHubService) ListPullRequestsPage(ctx context.Context, host, owner, repo string, request githubclient.PullRequestListRequest) (githubclient.PullRequestPage, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	client, err := s.client(ctx, host)
+	if err != nil {
+		return githubclient.PullRequestPage{}, err
+	}
+	return client.ListPullRequestsPage(ctx, owner, repo, request)
+}
 func (s *GitHubService) GetPullRequest(ctx context.Context, host, owner, repo string, number int) (*githubclient.PullRequestDetail, error) {
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()

@@ -161,6 +161,26 @@ export interface PullRequestSummary {
   warnings: string[] | null;
 }
 
+export interface PullRequestPageQuery {
+  state: "open" | "all" | "merged" | "closed";
+  view: "inbox" | "mine" | "review-requested" | "assigned" | "drafts";
+  query: string;
+}
+
+export interface PullRequestPageRequest extends PullRequestPageQuery {
+  cursor: string;
+  pageSize: number;
+}
+
+export interface PullRequestPage {
+  items: PullRequestSummary[];
+  nextCursor: string;
+  hasNextPage: boolean;
+  totalCount: number;
+  openCount: number;
+  resultLimit?: number;
+}
+
 export interface GitHubComment {
   id: number;
   nodeId: string;
@@ -389,6 +409,7 @@ export interface WorkspaceUpdate {
   repo?: string;
   repository?: RepositorySnapshot;
   pullRequests?: PullRequestSummary[];
+  openPullRequestCount?: number;
   pullRequest?: PullRequestDetail;
   error?: string;
   updatedAt: string;
@@ -476,6 +497,7 @@ export const services = {
   github: {
     getCommitDiff: (host: string, owner: string, repo: string, sha: string) => invoke<{sha:string; files:GitHubChangedFile[]; warnings:string[]}>("main.GitHubService.GetCommitDiff", host, owner, repo, sha),
     listPullRequests: async (host: string, owner: string, repo: string, state: "open" | "closed" | "all" = "open") => (await invoke<PullRequestSummary[] | null>("main.GitHubService.ListPullRequests", host, owner, repo, state)) ?? [],
+    listPullRequestsPage: (host: string, owner: string, repo: string, request: PullRequestPageRequest) => invoke<PullRequestPage>("main.GitHubService.ListPullRequestsPage", host, owner, repo, request),
     getPullRequest: (host: string, owner: string, repo: string, number: number) => invoke<PullRequestDetail>("main.GitHubService.GetPullRequest", host, owner, repo, number),
     createPullRequest: (host: string, owner: string, repo: string, request: CreatePullRequestRequest) => invoke<PullRequestSummary>("main.GitHubService.CreatePullRequest", host, owner, repo, request),
     updatePullRequest: (host: string, owner: string, repo: string, number: number, request: UpdatePullRequestRequest) => invoke<PullRequestSummary>("main.GitHubService.UpdatePullRequest", host, owner, repo, number, request),

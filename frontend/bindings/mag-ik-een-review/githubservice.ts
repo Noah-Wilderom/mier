@@ -33,6 +33,10 @@ export function ListPullRequests(host: string, owner: string, repo: string, stat
     return $Call.ByID(1257301323, host, owner, repo, state);
 }
 
+export function ListPullRequestsPage(host: string, owner: string, repo: string, request: githubclient$0.PullRequestListRequest): $CancellablePromise<githubclient$0.PullRequestPage> {
+    return $Call.ByID(268554336, host, owner, repo, request);
+}
+
 export function MergePullRequest(host: string, owner: string, repo: string, $number: number, method: string, expectedHeadSHA: string): $CancellablePromise<githubclient$0.MergeResult> {
     return $Call.ByID(3829195270, host, owner, repo, $number, method, expectedHeadSHA);
 }

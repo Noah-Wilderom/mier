@@ -87,6 +87,7 @@ test('pending updates preserve the installed version after failure and can be re
   await expect(section.getByText('Installed 6.0.1', { exact: true })).toBeVisible()
   await section.getByRole('button', { name: 'Update TypeScript / JavaScript', exact: true }).click()
   await expect(section.getByRole('button', { name: 'Updating TypeScript / JavaScript', exact: true })).toBeDisabled()
+  await expect(section.getByText('Downloading the update…', { exact: true })).toBeVisible()
   item.managed.state = 'failed'
   item.managed.installError = 'Download failed'
   item.managed.progress = ''

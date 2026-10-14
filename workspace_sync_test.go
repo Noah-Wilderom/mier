@@ -29,7 +29,16 @@ func (f syncRepositoryFake) Snapshot(ctx context.Context, path string) (Reposito
 
 type syncGitHubFake struct {
 	list   func(context.Context, string, string, string, string) ([]githubclient.PullRequestSummary, error)
+	page   func(context.Context, string, string, string, githubclient.PullRequestListRequest) (githubclient.PullRequestPage, error)
 	detail func(context.Context, string, string, string, int) (*githubclient.PullRequestDetail, error)
+}
+
+func (f syncGitHubFake) ListPullRequestsPage(ctx context.Context, host, owner, repo string, request githubclient.PullRequestListRequest) (githubclient.PullRequestPage, error) {
+	if f.page != nil {
+		return f.page(ctx, host, owner, repo, request)
+	}
+	items, err := f.ListPullRequests(ctx, host, owner, repo, request.State)
+	return githubclient.PullRequestPage{Items: items}, err
 }
 
 func (f syncGitHubFake) ListPullRequests(ctx context.Context, host, owner, repo, state string) ([]githubclient.PullRequestSummary, error) {
@@ -79,6 +88,199 @@ func TestWorkspaceSyncDefaultsToFifteenSeconds(t *testing.T) {
 	s := NewWorkspaceSyncService(syncRepositoryFake{}, syncGitHubFake{}, nil)
 	if s.interval != 15*time.Second {
 		t.Fatalf("interval %s", s.interval)
+	}
+}
+
+func TestWorkspaceSyncInitialRefreshLoadsOnlyRecentPage(t *testing.T) {
+	var calls int
+	github := syncGitHubFake{page: func(ctx context.Context, _, _, _ string, request githubclient.PullRequestListRequest) (githubclient.PullRequestPage, error) {
+		calls++
+		if request.Cursor != "" || request.PageSize != 25 || request.State != "all" {
+			t.Fatalf("initial refresh requested history: %+v", request)
+		}
+		return githubclient.PullRequestPage{Items: []githubclient.PullRequestSummary{{Number: 12}}, HasNextPage: true, NextCursor: "older", OpenCount: 80}, ctx.Err()
+	}}
+	s, updates := syncHarness(t, syncRepositoryFake{}, github)
+	if err := s.StartWatch(context.Background(), syncRequest()); err != nil {
+		t.Fatal(err)
+	}
+	update := syncNext(t, updates)
+	if calls != 1 || update.PullRequests == nil || len(*update.PullRequests) != 1 || update.OpenPullRequestCount == nil || *update.OpenPullRequestCount != 80 {
+		t.Fatalf("initial refresh did not return exactly one page and global count: calls=%d update=%+v", calls, update)
+	}
+}
+
+func TestWorkspaceSyncDeltaStopsAtPreviousRefreshCheckpoint(t *testing.T) {
+	request := syncRequest()
+	var calls []string
+	var phase int
+	github := syncGitHubFake{page: func(ctx context.Context, _, _, _ string, query githubclient.PullRequestListRequest) (githubclient.PullRequestPage, error) {
+		calls = append(calls, query.Cursor)
+		if phase == 0 {
+			return githubclient.PullRequestPage{Items: []githubclient.PullRequestSummary{{Number: 1, UpdatedAt: time.Now().Add(-time.Hour).Format(time.RFC3339Nano)}}, HasNextPage: true, NextCursor: "history"}, ctx.Err()
+		}
+		if query.Cursor == "" {
+			return githubclient.PullRequestPage{Items: []githubclient.PullRequestSummary{{Number: 2, UpdatedAt: time.Now().Add(time.Second).Format(time.RFC3339Nano)}}, HasNextPage: true, NextCursor: "recent-changes"}, ctx.Err()
+		}
+		if query.Cursor != "recent-changes" {
+			t.Fatalf("refresh scanned unchanged history: %s", query.Cursor)
+		}
+		return githubclient.PullRequestPage{Items: []githubclient.PullRequestSummary{{Number: 1, UpdatedAt: time.Now().Add(-time.Hour).Format(time.RFC3339Nano)}}, HasNextPage: true, NextCursor: "history"}, ctx.Err()
+	}}
+	var observed [][]githubclient.PullRequestSummary
+	s := NewWorkspaceSyncService(syncRepositoryFake{}, github, nil)
+	s.observePRs = func(_ context.Context, _, _, _ string, items []githubclient.PullRequestSummary) error {
+		observed = append(observed, items)
+		return nil
+	}
+	watch := &workspaceWatch{request: request, ctx: context.Background()}
+	s.watches[request.Path] = watch
+	if err := s.poll(context.Background(), watch); err != nil {
+		t.Fatal(err)
+	}
+	phase = 1
+	if err := s.poll(context.Background(), watch); err != nil {
+		t.Fatal(err)
+	}
+	if len(calls) != 3 || calls[0] != "" || calls[1] != "" || calls[2] != "recent-changes" || len(observed) != 2 || len(observed[1]) != 2 {
+		t.Fatalf("refresh did not consume exactly the changed pages: calls=%v observed=%v", calls, observed)
+	}
+}
+
+func TestWorkspaceSyncIncompleteDeltaKeepsCheckpointAndNotificationBaseline(t *testing.T) {
+	request := syncRequest()
+	checkpoint := time.Now().Add(-time.Minute).UTC()
+	var fail = true
+	var observed int
+	github := syncGitHubFake{page: func(ctx context.Context, _, _, _ string, query githubclient.PullRequestListRequest) (githubclient.PullRequestPage, error) {
+		if query.Cursor == "" {
+			return githubclient.PullRequestPage{Items: []githubclient.PullRequestSummary{{Number: 2, UpdatedAt: time.Now().Format(time.RFC3339Nano)}}, HasNextPage: true, NextCursor: "changes"}, ctx.Err()
+		}
+		if fail {
+			return githubclient.PullRequestPage{}, errors.New("temporary page failure")
+		}
+		return githubclient.PullRequestPage{Items: []githubclient.PullRequestSummary{{Number: 1, UpdatedAt: checkpoint.Add(-time.Hour).Format(time.RFC3339Nano)}}}, ctx.Err()
+	}}
+	var update WorkspaceUpdate
+	s := NewWorkspaceSyncService(syncRepositoryFake{}, github, func(next WorkspaceUpdate) { update = next })
+	s.observePRs = func(_ context.Context, _, _, _ string, items []githubclient.PullRequestSummary) error {
+		observed++
+		if len(items) != 2 {
+			t.Fatalf("notifications received an incomplete delta: %v", items)
+		}
+		return nil
+	}
+	watch := &workspaceWatch{request: request, ctx: context.Background(), refreshedAt: checkpoint}
+	s.watches[request.Path] = watch
+	if err := s.poll(context.Background(), watch); err == nil {
+		t.Fatal("accepted incomplete delta")
+	}
+	if !watch.refreshedAt.Equal(checkpoint) || observed != 0 || update.PullRequests != nil {
+		t.Fatalf("failed page changed the checkpoint or exposed partial results: checkpoint=%s observed=%d update=%+v", watch.refreshedAt, observed, update)
+	}
+	fail = false
+	if err := s.poll(context.Background(), watch); err != nil {
+		t.Fatal(err)
+	}
+	if !watch.refreshedAt.After(checkpoint) || observed != 1 || update.PullRequests == nil || len(*update.PullRequests) != 2 {
+		t.Fatalf("retry did not complete the delta: checkpoint=%s observed=%d update=%+v", watch.refreshedAt, observed, update)
+	}
+}
+
+func TestWorkspaceSyncProviderRefreshUsesNinetySecondBudget(t *testing.T) {
+	var listBudget time.Duration
+	github := syncGitHubFake{list: func(ctx context.Context, _, _, _, _ string) ([]githubclient.PullRequestSummary, error) {
+		deadline, ok := ctx.Deadline()
+		if !ok {
+			t.Fatal("provider refresh has no deadline")
+		}
+		listBudget = time.Until(deadline)
+		return []githubclient.PullRequestSummary{}, ctx.Err()
+	}}
+	s := NewWorkspaceSyncService(syncRepositoryFake{}, github, nil)
+	if s.providerTimeout != 90*time.Second {
+		t.Fatalf("default provider timeout %s; want 90s", s.providerTimeout)
+	}
+	request := syncRequest()
+	watch := &workspaceWatch{request: request, ctx: context.Background()}
+	s.watches[request.Path] = watch
+	if err := s.poll(context.Background(), watch); err != nil {
+		t.Fatal(err)
+	}
+	if listBudget <= 12*time.Second || listBudget > 90*time.Second {
+		t.Fatalf("provider refresh budget %s; want more than 12s and at most 90s", listBudget)
+	}
+}
+
+func TestWorkspaceSyncLocalSnapshotDoesNotConsumeProviderBudget(t *testing.T) {
+	const providerTimeout = 25 * time.Millisecond
+	var snapshotFinished time.Time
+	var snapshots int
+	repo := syncRepositoryFake{snapshot: func(ctx context.Context, path string) (RepositorySnapshot, error) {
+		snapshots++
+		if snapshots == 1 {
+			timer := time.NewTimer(2 * providerTimeout)
+			defer timer.Stop()
+			select {
+			case <-timer.C:
+			case <-ctx.Done():
+				return RepositorySnapshot{}, ctx.Err()
+			}
+			snapshotFinished = time.Now()
+		}
+		return RepositorySnapshot{Root: path, CurrentBranch: "main"}, ctx.Err()
+	}}
+	github := syncGitHubFake{list: func(ctx context.Context, _, _, _, _ string) ([]githubclient.PullRequestSummary, error) {
+		entered := time.Now()
+		deadline, ok := ctx.Deadline()
+		if !ok || deadline.Before(snapshotFinished.Add(providerTimeout)) || deadline.After(entered.Add(providerTimeout)) {
+			t.Errorf("provider deadline %s did not start a fresh %s budget after local snapshot", deadline, providerTimeout)
+		}
+		return []githubclient.PullRequestSummary{}, ctx.Err()
+	}}
+	var update WorkspaceUpdate
+	s := NewWorkspaceSyncService(repo, github, func(next WorkspaceUpdate) { update = next })
+	s.providerTimeout = providerTimeout
+	request := syncRequest()
+	watch := &workspaceWatch{request: request, ctx: context.Background()}
+	s.watches[request.Path] = watch
+	if err := s.poll(context.Background(), watch); err != nil {
+		t.Fatal("local work exhausted the provider refresh budget:", err)
+	}
+	if snapshotFinished.IsZero() || update.Repository == nil || update.PullRequests == nil {
+		t.Fatalf("local snapshot and provider refresh did not both complete: %+v", update)
+	}
+}
+
+func TestWorkspaceSyncSelectedDetailHasBudgetAfterListTimeout(t *testing.T) {
+	const providerTimeout = 25 * time.Millisecond
+	var listFinished time.Time
+	github := syncGitHubFake{
+		list: func(ctx context.Context, _, _, _, _ string) ([]githubclient.PullRequestSummary, error) {
+			<-ctx.Done()
+			listFinished = time.Now()
+			return nil, ctx.Err()
+		},
+		detail: func(ctx context.Context, _, _, _ string, number int) (*githubclient.PullRequestDetail, error) {
+			entered := time.Now()
+			deadline, ok := ctx.Deadline()
+			if !ok || deadline.Before(listFinished.Add(providerTimeout)) || deadline.After(entered.Add(providerTimeout)) {
+				t.Errorf("selected detail deadline %s did not start a fresh %s budget after list timeout", deadline, providerTimeout)
+			}
+			return &githubclient.PullRequestDetail{PullRequest: githubclient.PullRequestSummary{Number: number}}, ctx.Err()
+		},
+	}
+	var update WorkspaceUpdate
+	s := NewWorkspaceSyncService(syncRepositoryFake{}, github, func(next WorkspaceUpdate) { update = next })
+	s.providerTimeout = providerTimeout
+	request := syncRequest()
+	watch := &workspaceWatch{request: request, selected: 42, ctx: context.Background()}
+	s.watches[request.Path] = watch
+	if err := s.poll(context.Background(), watch); err == nil || !strings.Contains(err.Error(), context.DeadlineExceeded.Error()) {
+		t.Fatalf("provider list timeout was not reported: %v", err)
+	}
+	if update.PullRequest == nil || update.PullRequest.PullRequest.Number != 42 || update.Repository == nil {
+		t.Fatalf("provider list timeout prevented selected detail or latest local snapshot: %+v", update)
 	}
 }
 

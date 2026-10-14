@@ -3,7 +3,8 @@
 
 /**
  * PRNotificationService keeps preferences separate from credentials and observes
- * successful complete PR snapshots. Native publishing is injected by the app.
+ * successful recent PR snapshots and delta batches. Native publishing is injected
+ * by the app.
  * @module
  */
 
@@ -24,8 +25,10 @@ export function GetPreferences(key: string): $CancellablePromise<$models.Notific
 }
 
 /**
- * Observe must only receive a successful complete provider snapshot. Missing PRs
- * remain in the baseline; list failures or partial/empty lists never imply closes.
+ * Observe accepts a successful initial recent snapshot or a complete delta batch.
+ * Missing PRs remain in the baseline and never imply closes. Previously unseen PRs
+ * created before observation began establish their own baseline: without an earlier
+ * state, an update cannot safely imply that they opened or requested a review.
  */
 export function Observe(host: string, owner: string, repo: string, prs: githubclient$0.PullRequestSummary[] | null): $CancellablePromise<void> {
     return $Call.ByID(2216052356, host, owner, repo, prs);

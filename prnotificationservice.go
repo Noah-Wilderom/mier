@@ -57,7 +57,8 @@ type notificationAccount struct {
 }
 
 // PRNotificationService keeps preferences separate from credentials and observes
-// successful complete PR snapshots. Native publishing is injected by the app.
+// successful recent PR snapshots and delta batches. Native publishing is injected
+// by the app.
 type PRNotificationService struct {
 	mu                sync.Mutex
 	permissionMu      sync.Mutex
@@ -70,6 +71,7 @@ type PRNotificationService struct {
 	loaded            bool
 	preferences       map[string]NotificationPreferences
 	observed          map[string]map[int]observedPullRequest
+	baselineAt        map[string]time.Time
 	accounts          map[string]notificationAccount
 	now               func() time.Time
 }
@@ -79,7 +81,8 @@ func NewPRNotificationService(credentials notificationAccountProvider, emit func
 	s := &PRNotificationService{
 		credentials: credentials, emit: emit, requestPermission: requestPermission,
 		preferences: map[string]NotificationPreferences{}, observed: map[string]map[int]observedPullRequest{},
-		accounts: map[string]notificationAccount{}, now: time.Now, configError: err,
+		baselineAt: map[string]time.Time{},
+		accounts:   map[string]notificationAccount{}, now: time.Now, configError: err,
 	}
 	if err == nil {
 		s.configPath = filepath.Join(directory, "mag-ik-een-review", "notifications.json")
@@ -271,8 +274,10 @@ func (s *PRNotificationService) viewer(ctx context.Context, host string) string 
 	return login
 }
 
-// Observe must only receive a successful complete provider snapshot. Missing PRs
-// remain in the baseline; list failures or partial/empty lists never imply closes.
+// Observe accepts a successful initial recent snapshot or a complete delta batch.
+// Missing PRs remain in the baseline and never imply closes. Previously unseen PRs
+// created before observation began establish their own baseline: without an earlier
+// state, an update cannot safely imply that they opened or requested a review.
 func (s *PRNotificationService) Observe(ctx context.Context, host, owner, repo string, prs []githubclient.PullRequestSummary) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -301,17 +306,21 @@ func (s *PRNotificationService) Observe(ctx context.Context, host, owner, repo s
 	}
 	prefs := s.preferencesLocked(key)
 	previous, baseline := s.observed[key]
+	observedAt := s.now()
 	if !baseline {
 		previous = map[int]observedPullRequest{}
 		s.observed[key] = previous
+		s.baselineAt[key] = observedAt
 	}
-	now := s.now().UTC().Format(time.RFC3339Nano)
+	now := observedAt.UTC().Format(time.RFC3339Nano)
 	events := []PRNotificationEvent{}
 	for _, pr := range prs {
 		if pr.Number <= 0 || (pr.Status != "open" && pr.Status != "draft" && pr.Status != "closed" && pr.Status != "merged") {
 			continue
 		}
 		old, known := previous[pr.Number]
+		createdAt, _ := time.Parse(time.RFC3339Nano, pr.CreatedAt)
+		newlyCreated := !createdAt.IsZero() && createdAt.After(s.baselineAt[key])
 		updatedAt, _ := time.Parse(time.RFC3339Nano, pr.UpdatedAt)
 		// Different local clones can poll the same remote concurrently. A slower
 		// response must not undo a newer baseline and emit a transition twice.
@@ -339,10 +348,10 @@ func (s *PRNotificationService) Observe(ctx context.Context, host, owner, repo s
 			})
 		}
 		if pr.Status == "open" || pr.Status == "draft" {
-			if !known || (old.status != "open" && old.status != "draft") {
+			if (!known && newlyCreated) || (known && old.status != "open" && old.status != "draft") {
 				appendEvent("opened", prefs.Opened)
 			}
-			if viewer != "" && next.requested[viewer] && !old.requested[viewer] {
+			if (known || newlyCreated) && viewer != "" && next.requested[viewer] && !old.requested[viewer] {
 				appendEvent("reviewRequested", prefs.ReviewRequested)
 			}
 		} else if known && old.status != pr.Status {

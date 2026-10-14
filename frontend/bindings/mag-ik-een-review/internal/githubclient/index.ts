@@ -12,6 +12,8 @@ export type {
     CreateRequest,
     MergeResult,
     PullRequestDetail,
+    PullRequestListRequest,
+    PullRequestPage,
     PullRequestSummary,
     Review,
     ReviewCommentRequest,

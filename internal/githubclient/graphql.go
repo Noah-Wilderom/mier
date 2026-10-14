@@ -10,35 +10,49 @@ import (
 	"strings"
 )
 
-func (c *Client) graph(ctx context.Context, query string, variables map[string]any, output any) error {
-	var envelope struct {
-		Data   json.RawMessage `json:"data"`
-		Errors []struct {
-			Message    string `json:"message"`
-			Type       string `json:"type"`
-			Extensions struct {
-				Code string `json:"code"`
-			} `json:"extensions"`
-		} `json:"errors"`
-	}
+type graphQueryError struct {
+	Message    string `json:"message"`
+	Type       string `json:"type"`
+	Path       []any  `json:"path"`
+	Extensions struct {
+		Code string `json:"code"`
+	} `json:"extensions"`
+}
+
+type graphEnvelope struct {
+	Data   json.RawMessage   `json:"data"`
+	Errors []graphQueryError `json:"errors"`
+}
+
+func (c *Client) graphResponse(ctx context.Context, query string, variables map[string]any) (graphEnvelope, error) {
+	var envelope graphEnvelope
 	_, err := c.request(ctx, http.MethodPost, "@graphql", map[string]any{"query": query, "variables": variables}, &envelope)
+	return envelope, err
+}
+
+func (c *Client) graphFailure(failure graphQueryError) error {
+	message := failure.Message
+	if c.token != "" {
+		message = strings.ReplaceAll(message, c.token, "[redacted]")
+	}
+	kind := strings.ToUpper(failure.Type + " " + failure.Extensions.Code)
+	lower := strings.ToLower(message)
+	if strings.Contains(kind, "UNDEFINEDFIELD") || strings.Contains(kind, "GRAPHQL_VALIDATION_FAILED") || strings.Contains(lower, "doesn't exist on type") || strings.Contains(lower, "cannot query field") {
+		return fmt.Errorf("GitHub GraphQL schema validation: %s. The application query is incompatible with this GitHub schema", message)
+	}
+	if strings.Contains(kind, "FORBIDDEN") || strings.Contains(kind, "NOT_FOUND") || strings.Contains(lower, "not accessible") || strings.Contains(lower, "permission") {
+		return fmt.Errorf("GitHub GraphQL: %s. Verify repository access and Pull requests permission", message)
+	}
+	return fmt.Errorf("GitHub GraphQL: %s", message)
+}
+
+func (c *Client) graph(ctx context.Context, query string, variables map[string]any, output any) error {
+	envelope, err := c.graphResponse(ctx, query, variables)
 	if err != nil {
 		return err
 	}
 	if len(envelope.Errors) > 0 {
-		message := envelope.Errors[0].Message
-		if c.token != "" {
-			message = strings.ReplaceAll(message, c.token, "[redacted]")
-		}
-		kind := strings.ToUpper(envelope.Errors[0].Type + " " + envelope.Errors[0].Extensions.Code)
-		lower := strings.ToLower(message)
-		if strings.Contains(kind, "UNDEFINEDFIELD") || strings.Contains(kind, "GRAPHQL_VALIDATION_FAILED") || strings.Contains(lower, "doesn't exist on type") || strings.Contains(lower, "cannot query field") {
-			return fmt.Errorf("GitHub GraphQL schema validation: %s. The application query is incompatible with this GitHub schema", message)
-		}
-		if strings.Contains(kind, "FORBIDDEN") || strings.Contains(kind, "NOT_FOUND") || strings.Contains(lower, "not accessible") || strings.Contains(lower, "permission") {
-			return fmt.Errorf("GitHub GraphQL: %s. Verify repository access and Pull requests permission", message)
-		}
-		return fmt.Errorf("GitHub GraphQL: %s", message)
+		return c.graphFailure(envelope.Errors[0])
 	}
 	if len(envelope.Data) == 0 || string(envelope.Data) == "null" {
 		return errors.New("GitHub GraphQL returned no data")

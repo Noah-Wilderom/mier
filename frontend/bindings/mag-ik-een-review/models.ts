@@ -88,6 +88,7 @@ export interface WorkspaceUpdate {
     "repo": string;
     "repository"?: RepositorySnapshot | null;
     "pullRequests"?: githubclient$0.PullRequestSummary[] | null;
+    "openPullRequestCount"?: number | null;
     "pullRequest"?: githubclient$0.PullRequestDetail | null;
     "error"?: string;
     "repositoryUpdatedAt"?: string;

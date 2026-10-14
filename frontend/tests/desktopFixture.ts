@@ -41,7 +41,7 @@ export function detail(sha = headSHA): PullRequestDetail {
 type Handler = (args: any[]) => unknown | Promise<unknown>
 export async function desktopFixture(page: Page) {
   const fixture = {
-    page, selected: root, repositories: new Map([[root, repository()]]), prs: [summary()], currentDetail: detail(),
+    page, selected: root, repositories: new Map([[root, repository()]]), prs: [summary()], currentDetail: detail(), listed: new Map<number, PullRequestSummary>(),
     calls: [] as { name: string; args: any[] }[], handlers: new Map<string, Handler>(), unexpected: [] as string[], pageErrors: [] as string[], recent: [] as string[],
     async emit(update: Partial<WorkspaceUpdate> = {}) {
       const repo = fixture.repositories.get(fixture.selected)!
@@ -72,7 +72,21 @@ export async function desktopFixture(page: Page) {
         case 'main.EditorService.PreferredEditor': result = 'vscode'; break
         case 'main.PRNotificationService.GetPreferences': result = { toastsEnabled: true, desktopEnabled: false, opened: true, closed: true, merged: true, reviewRequested: true }; break
         case 'main.LSPService.Servers': case 'main.LSPService.CheckServerUpdates': result = []; break
-        case 'main.GitHubService.GetPullRequest': result = fixture.currentDetail; break
+        case 'main.GitHubService.ListPullRequestsPage': {
+          const query = args[3], pageSize = query.pageSize || 25, start = Number(query.cursor || 0)
+          const items = fixture.prs.filter(pr => {
+            if (query.state === 'open' && !['open', 'draft'].includes(pr.status)) return false
+            if (query.state === 'closed' && pr.status !== 'closed') return false
+            if (query.state === 'merged' && pr.status !== 'merged') return false
+            if (query.view === 'mine' && pr.author.login !== 'reviewer') return false
+            if (query.view === 'review-requested' && !pr.reviewers?.some(user => user.login === 'reviewer')) return false
+            if (query.view === 'assigned' && !pr.assignees?.some(user => user.login === 'reviewer')) return false
+            if (query.view === 'drafts' && !pr.draft) return false
+            return !query.query || `${pr.title} ${pr.number}`.toLowerCase().includes(query.query.toLowerCase())
+          })
+          result = { items: items.slice(start, start + pageSize), nextCursor: start + pageSize < items.length ? String(start + pageSize) : '', hasNextPage: start + pageSize < items.length, totalCount: items.length, openCount: fixture.prs.filter(pr => ['open', 'draft'].includes(pr.status)).length }; break
+        }
+        case 'main.GitHubService.GetPullRequest': result = { ...fixture.currentDetail, pullRequest: args[3] === fixture.currentDetail.pullRequest.number ? fixture.currentDetail.pullRequest : fixture.listed.get(args[3]) ?? fixture.prs.find(pr => pr.number === args[3]) ?? summary(headSHA, args[3]) }; break
         case 'main.RepositoryService.Diff': result = diff(args[1]); break
         case 'main.RepositoryService.Compare': case 'main.RepositoryService.CommitDiff': result = [diff()]; break
         case 'main.GitHubService.GetCommitDiff': result = { sha: args[3], files: [{ path: 'src/feature.ts', status: 'modified', additions: 1, deletions: 1, patch: diff().rawPatch }], warnings: [] }; break
@@ -91,6 +105,7 @@ export async function desktopFixture(page: Page) {
         case 'main.RepositoryService.Fetch': case 'main.RepositoryService.Pull': case 'main.RepositoryService.Push': result = null; break
         default: fixture.unexpected.push(name); throw new Error(`Unexpected fixture RPC: ${name}`)
       }
+      if (name === 'main.GitHubService.ListPullRequestsPage') for (const pr of (result as { items: PullRequestSummary[] }).items ?? []) fixture.listed.set(pr.number, pr)
       await route.fulfill({ json: result ?? null })
     } catch (error) {
       await route.fulfill({ status: 500, json: { kind: 'RuntimeError', message: error instanceof Error ? error.message : String(error) } })

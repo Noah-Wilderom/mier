@@ -41,6 +41,8 @@ gh auth login --hostname github.your-company.com
 
 In **Settings → GitHub accounts**, enter the matching host and choose **Use GitHub CLI login**. Enterprise Cloud data-residency hosts such as `your-company.ghe.com` are also supported. Authentication is checked against the selected host before it is used.
 
+If account connection fails, run `gh auth status --hostname github.com` (or your Enterprise hostname) to check the CLI login. A token lookup timeout is reported separately from a missing login. Inbox pages have a 30-second request timeout and selected PR details have a separate 90-second timeout; background refreshes never overlap for the same local repository.
+
 Alternatively, choose **Use a saved token**, enter an access token, and select **Validate and save token**. Validated tokens are stored per host in the operating system credential store: macOS Keychain, Windows Credential Manager, or a Linux Secret Service keyring. An app-saved token takes precedence over the CLI login for that host. Removing it does not log out GitHub CLI; a valid CLI login can become active again. Tokens are not returned through frontend service responses or saved in the application's account metadata. If the OS keyring is unavailable, use an existing CLI login or unlock the keyring; the app does not fall back to plaintext token storage.
 
 Repository access and token permissions determine which operations GitHub permits. Read access supports browsing; submitting reviews, editing PR metadata, and merging require the corresponding write access. Organization SSO and repository protection continue to apply. The same account can authenticate HTTPS Git clone/fetch/pull/push for that host. SSH remotes continue to use your existing SSH configuration.
@@ -51,7 +53,7 @@ Repository access and token permissions determine which operations GitHub permit
 - View staged and unstaged diffs, stage or unstage selected files, and commit staged changes.
 - Use the repository toolbar to create, switch, rename, or delete merged local branches, choose a remote, fetch, pull, and push. Pull uses fast-forward-only behavior; push sets upstream tracking and does not force-push. Delete confirmation never force-deletes unmerged work.
 - Compare committed branch changes in a read-only dialog and inspect individual history or PR commits without checking them out. Root commits compare against an empty tree; merge commits compare against the first parent.
-- Browse, search, and filter real open, draft, closed, and merged pull requests. Inspect Conversation, Changes, Commits, and Checks.
+- Browse, search, and filter real open, draft, closed, and merged pull requests. The inbox requests 25 matching PRs at a time; choose **Load more** to fetch the next page. Filters and searches run on GitHub, and counts describe the full matching result rather than only the loaded rows. Inspect Conversation, Changes, Commits, and Checks.
 - Use separate inboxes for all PRs, your PRs, requested reviews, PRs assigned to you, and drafts. Comment authors show profile pictures, an Author badge when appropriate, and a Bot badge for bot accounts.
 - Review split or unified diffs, filter files, mark files viewed, and expand code review to the full window. Selected files, viewed progress, and pending comments remain in place when expanding or returning to the inbox.
 - Read Markdown descriptions and comments with headings, lists, code fences, tables, task lists, and emoji shortcodes. External web links open in the browser; raw HTML is disabled.
@@ -72,7 +74,7 @@ PR analysis uses an isolated snapshot of the displayed commit (and the merge bas
 
 ## Notifications and apps
 
-**Settings → Notifications** configures each GitHub repository independently. Pull request opened, closed, merged, and review requested events default on. In-app toasts default on; desktop notifications default off and request OS permission when enabled. The first imported snapshot establishes a baseline without notifying about historical activity. Subsequent successful background refreshes detect transitions.
+**Settings → Notifications** configures each GitHub repository independently. Pull request opened, closed, merged, and review requested events default on. In-app toasts default on; desktop notifications default off and request OS permission when enabled. The first recent page establishes a silent baseline. Subsequent background refreshes read recently updated PRs back to the previous successful refresh, without scanning unchanged history. An old PR appearing in that window establishes its baseline; it does not trigger an opened or review-requested notification based solely on its existing state. Missing rows never imply a close.
 
 **Settings → Apps** marks Jira as **Coming soon**. Installation stays disabled until account connection and issue linking are implemented; backend calls also return an explicit unavailable error.
 

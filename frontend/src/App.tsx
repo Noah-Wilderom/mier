@@ -213,6 +213,10 @@ export default function App() {
   const isPRView = ["inbox", "mine", "requested", "assigned", "drafts"].includes(
     destination,
   );
+  useEffect(() => {
+    if (!isPRView) return;
+    live.setPullRequestQuery({ state: filter, view: destination === "requested" ? "review-requested" : destination as "inbox" | "mine" | "assigned" | "drafts", query });
+  }, [isPRView, destination, filter, query, live.setPullRequestQuery]);
   const openPRs = prs.filter((p) => ["open", "draft"].includes(p.status));
   const reviewRequested = openPRs.filter(
     (p) =>
@@ -232,7 +236,16 @@ export default function App() {
     if (destination === "drafts" && p.status !== "draft") return false;
     return true;
   });
-  const visiblePRs = scopedPRs.filter((p) => {
+  const visiblePRs = live.enabled ? live.inboxPullRequests.filter(p => {
+    if (filter === "open" && !["open", "draft"].includes(p.status)) return false;
+    if (filter === "closed" && p.status !== "closed") return false;
+    if (filter === "merged" && p.status !== "merged") return false;
+    if (destination === "mine" && p.author !== currentUser) return false;
+    if (destination === "requested" && !p.reviewers.includes(currentUser)) return false;
+    if (destination === "assigned" && !p.assignees.includes(currentUser)) return false;
+    if (destination === "drafts" && p.status !== "draft") return false;
+    return true;
+  }) : scopedPRs.filter((p) => {
     if (filter === "open" && !["open", "draft"].includes(p.status))
       return false;
     if (filter === "closed" && p.status !== "closed") return false;
@@ -241,6 +254,9 @@ export default function App() {
       .toLowerCase()
       .includes(query.toLowerCase());
   });
+  const openFilterCount = live.enabled
+    ? destination === "inbox" && !query.trim() ? live.openPullRequestCount : filter === "open" ? live.pullRequestTotal : null
+    : scopedPRs.filter(p=>["open","draft"].includes(p.status)).length;
   const updatePR = useCallback(
     (next: PullRequest) => {
       const previous = prs.find((item) => item.number === next.number);
@@ -312,13 +328,14 @@ export default function App() {
     return () => media.removeEventListener("change", apply);
   }, [theme]);
   useEffect(() => {
+    if (live.enabled && live.prs.some(pr => pr.number === selected && pr.provider?.detailLoaded)) return;
     if (
       !visiblePRs.some((p) => p.number === selected) &&
       visiblePRs.length &&
       !creating
     )
       setSelected(visiblePRs[0].number);
-  }, [visiblePRs.map((p) => p.number).join(","), selected, creating]);
+  }, [visiblePRs.map((p) => p.number).join(","), selected, creating, live.enabled]);
   useEffect(() => {
     const command = (action: string, value?: string) => {
       if (action === "navigate")
@@ -583,14 +600,14 @@ export default function App() {
                 "requested",
                 "check-circle",
                 "Review requested",
-                reviewRequested.length,
+                live.enabled ? undefined : reviewRequested.length,
               ],
-              ["assigned", "user", "Assigned to you", openPRs.filter(pr=>pr.assignees.includes(currentUser)).length],
+              ["assigned", "user", "Assigned to you", live.enabled ? undefined : openPRs.filter(pr=>pr.assignees.includes(currentUser)).length],
               [
                 "drafts",
                 "file",
                 "Drafts",
-                openPRs.filter((p) => p.status === "draft").length,
+                live.enabled ? undefined : openPRs.filter((p) => p.status === "draft").length,
               ],
             ] as const
           ).map(([id, icon, label, count]) => (
@@ -773,10 +790,10 @@ export default function App() {
                   onClick={() => setFilter(f)}
                 >
                   {f[0].toUpperCase() + f.slice(1)}
-                  {f === "open" && (
+                  {f === "open" && (openFilterCount !== null || (live.enabled && live.loadingPullRequests)) && (
                     <Count>
                       {
-                        live.enabled&&live.loadingPullRequests&&!prs.length ? <span className="skeleton skeleton-count" aria-label="Loading open pull request count"/> : scopedPRs.filter(p=>["open","draft"].includes(p.status)).length
+                        openFilterCount === null ? <span className="skeleton skeleton-count" aria-label="Loading open pull request count"/> : openFilterCount
                       }
                     </Count>
                   )}
@@ -801,9 +818,9 @@ export default function App() {
                   : destination === "drafts"
                     ? "Work in progress"
                     : "Pull requests"}
-                <span>{live.enabled&&live.loadingPullRequests&&!prs.length?<span className="skeleton skeleton-count" aria-label="Loading pull request count"/>:visiblePRs.length}</span>
+                <span>{live.enabled&&live.loadingPullRequests&&!visiblePRs.length?<span className="skeleton skeleton-count" aria-label="Loading pull request count"/>:live.enabled&&live.pullRequestTotal!==null&&live.pullRequestTotal>visiblePRs.length?`${visiblePRs.length} of ${live.pullRequestTotal}`:visiblePRs.length}</span>
               </div>
-              {live.enabled&&live.loadingPullRequests&&!prs.length ? <InboxSkeleton/> : visiblePRs.length ? (
+              {live.enabled&&live.loadingPullRequests&&!visiblePRs.length ? <InboxSkeleton/> : visiblePRs.length ? (
                 visiblePRs.map((item) => (
                   <button
                     key={item.number}
@@ -866,7 +883,7 @@ export default function App() {
                     </div>
                   </button>
                 ))
-              ) : (
+              ) : live.enabled && live.pullRequestPageError ? null : (
                 <div className="empty-state">
                   <Icon name="search" size={24} />
                   <strong>No pull requests found</strong>
@@ -882,6 +899,20 @@ export default function App() {
                   </button>
                 </div>
               )}
+              {live.enabled && live.pullRequestPageError && (
+                <div className="inbox-page-error" role="alert">
+                  <span>{live.pullRequestPageError}</span>
+                  <button className="btn" aria-label={visiblePRs.length ? "Retry loading more pull requests" : "Retry loading pull requests"} onClick={() => void live.retryPullRequests()}>Retry</button>
+                </div>
+              )}
+              {live.enabled && live.hasMorePullRequests && !live.pullRequestPageError && (
+                <div className="inbox-pagination">
+                  <button className="btn" aria-label="Load more pull requests" disabled={live.loadingMorePullRequests} onClick={() => void live.loadMorePullRequests()}>{live.loadingMorePullRequests ? "Loading…" : "Load more"}</button>
+                </div>
+              )}
+              {live.enabled && live.pullRequestResultLimit > 0 && (
+                <p className="inbox-result-limit">GitHub returns up to {live.pullRequestResultLimit.toLocaleString()} matching results. Narrow your search to find older pull requests.</p>
+              )}
             </div>
             <div className="inbox-tip">
               <Icon name="keyboard" size={14} />
@@ -893,7 +924,7 @@ export default function App() {
         )}
         {live.enabled && !live.repository && destination !== "settings" && <RepositoryWelcome live={live} onOpen={()=>void live.openRepository().catch(()=>{})} onDemo={live.useDemo}/>}
         {isPRView && (!live.enabled || !!live.repository) &&
-          (creating ? (live.enabled ? <LiveCreatePullRequest key={JSON.stringify([live.repository?.root,live.identity])} live={live} onCancel={()=>setCreating(false)} onCreated={number=>{setSelected(number);setCreating(false);setTab('conversation');setFilter('open')}}/> :
+          (creating ? (live.enabled ? <LiveCreatePullRequest key={JSON.stringify([live.repository?.root,live.identity])} live={live} onCancel={()=>setCreating(false)} onCreated={number=>{setSelected(number);setCreating(false);setTab('conversation');setFilter('open');setQuery('');setDestination('inbox')}}/> :
             <CreatePullRequest
               prs={prs}
               onCancel={() => setCreating(false)}
@@ -908,7 +939,7 @@ export default function App() {
                 notify(`Created sample pull request #${next.number}.`);
               }}
             />
-          ) : pr && visiblePRs.length ? (
+          ) : pr && (live.enabled || visiblePRs.length) ? (
             <section
               className="detail-pane"
               aria-label={`Pull request ${pr.number}`}

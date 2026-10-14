@@ -101,6 +101,32 @@ export interface PullRequestDetail {
     "warnings": string[] | null;
 }
 
+/**
+ * PullRequestListRequest describes one page, including its server-side filters.
+ * Cursors are opaque and belong to the exact state, view, and query that produced them.
+ */
+export interface PullRequestListRequest {
+    "state": string;
+    "view": string;
+    "query": string;
+    "cursor": string;
+    "pageSize": number;
+}
+
+export interface PullRequestPage {
+    "items": PullRequestSummary[] | null;
+    "nextCursor": string;
+    "hasNextPage": boolean;
+    "totalCount": number;
+    "openCount": number;
+
+    /**
+     * ResultLimit is zero for repository connections. GitHub search exposes at
+     * most 1,000 matching results, even when TotalCount is higher.
+     */
+    "resultLimit": number;
+}
+
 export interface PullRequestSummary {
     "number": number;
     "nodeId": string;

@@ -102,6 +102,9 @@ func runGitHubCLI(ctx context.Context, args ...string) ([]byte, error) {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
+		if errors.Is(err, exec.ErrNotFound) {
+			return nil, exec.ErrNotFound
+		}
 		return nil, errors.New("GitHub CLI is not authenticated for this host")
 	}
 	return output.Bytes(), nil
@@ -118,6 +121,15 @@ func (s *CredentialService) resolveToken(ctx context.Context, input string) (str
 	data, err := s.cli(ctx, "auth", "token", "--hostname", host)
 	if err == nil && strings.TrimSpace(string(data)) != "" {
 		return host, strings.TrimSpace(string(data)), "gh", nil
+	}
+	if errors.Is(err, context.Canceled) {
+		return host, "", "", context.Canceled
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return host, "", "", fmt.Errorf("GitHub CLI token lookup timed out. Retry connecting your account: %w", context.DeadlineExceeded)
+	}
+	if errors.Is(err, exec.ErrNotFound) {
+		return host, "", "", errors.New("GitHub CLI is not available to M.I.E.R. Install gh or save a token in Accounts")
 	}
 	return host, "", "", fmt.Errorf("Sign in with gh auth login --hostname %s, or save a token in Accounts", host)
 }

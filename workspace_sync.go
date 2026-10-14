@@ -18,50 +18,53 @@ type WatchRequest struct {
 	Repo  string `json:"repo"`
 }
 type WorkspaceUpdate struct {
-	Path                string                             `json:"path"`
-	Host                string                             `json:"host"`
-	Owner               string                             `json:"owner"`
-	Repo                string                             `json:"repo"`
-	Repository          *RepositorySnapshot                `json:"repository,omitempty"`
-	PullRequests        *[]githubclient.PullRequestSummary `json:"pullRequests,omitempty"`
-	PullRequest         *githubclient.PullRequestDetail    `json:"pullRequest,omitempty"`
-	Error               string                             `json:"error,omitempty"`
-	RepositoryUpdatedAt string                             `json:"repositoryUpdatedAt,omitempty"`
-	UpdatedAt           string                             `json:"updatedAt"`
+	Path                 string                             `json:"path"`
+	Host                 string                             `json:"host"`
+	Owner                string                             `json:"owner"`
+	Repo                 string                             `json:"repo"`
+	Repository           *RepositorySnapshot                `json:"repository,omitempty"`
+	PullRequests         *[]githubclient.PullRequestSummary `json:"pullRequests,omitempty"`
+	OpenPullRequestCount *int                               `json:"openPullRequestCount,omitempty"`
+	PullRequest          *githubclient.PullRequestDetail    `json:"pullRequest,omitempty"`
+	Error                string                             `json:"error,omitempty"`
+	RepositoryUpdatedAt  string                             `json:"repositoryUpdatedAt,omitempty"`
+	UpdatedAt            string                             `json:"updatedAt"`
 }
 type repositoryReader interface {
 	Snapshot(context.Context, string) (RepositorySnapshot, error)
 }
 type pullRequestReader interface {
-	ListPullRequests(context.Context, string, string, string, string) ([]githubclient.PullRequestSummary, error)
+	ListPullRequestsPage(context.Context, string, string, string, githubclient.PullRequestListRequest) (githubclient.PullRequestPage, error)
 	GetPullRequest(context.Context, string, string, string, int) (*githubclient.PullRequestDetail, error)
 }
 type workspaceWatch struct {
-	request  WatchRequest
-	selected int
-	cancel   context.CancelFunc
-	signal   chan struct{}
-	polling  sync.Mutex
-	ctx      context.Context
-	pending  atomic.Bool
+	request     WatchRequest
+	selected    int
+	cancel      context.CancelFunc
+	signal      chan struct{}
+	polling     sync.Mutex
+	ctx         context.Context
+	pending     atomic.Bool
+	refreshedAt time.Time
 }
 
 // WorkspaceSyncService runs one cancellation-aware, non-overlapping poller per repository.
 // Code review snapshots are retained by the frontend until the reviewer accepts a new head.
 type WorkspaceSyncService struct {
-	repositories repositoryReader
-	github       pullRequestReader
-	emit         func(WorkspaceUpdate)
-	mu           sync.Mutex
-	watches      map[string]*workspaceWatch
-	ctx          context.Context
-	interval     time.Duration
-	workers      sync.WaitGroup
-	observePRs   func(context.Context, string, string, string, []githubclient.PullRequestSummary) error
+	repositories    repositoryReader
+	github          pullRequestReader
+	emit            func(WorkspaceUpdate)
+	mu              sync.Mutex
+	watches         map[string]*workspaceWatch
+	ctx             context.Context
+	interval        time.Duration
+	providerTimeout time.Duration
+	workers         sync.WaitGroup
+	observePRs      func(context.Context, string, string, string, []githubclient.PullRequestSummary) error
 }
 
 func NewWorkspaceSyncService(repositories repositoryReader, github pullRequestReader, emit func(WorkspaceUpdate)) *WorkspaceSyncService {
-	return &WorkspaceSyncService{repositories: repositories, github: github, emit: emit, watches: map[string]*workspaceWatch{}, ctx: context.Background(), interval: 15 * time.Second}
+	return &WorkspaceSyncService{repositories: repositories, github: github, emit: emit, watches: map[string]*workspaceWatch{}, ctx: context.Background(), interval: 15 * time.Second, providerTimeout: 90 * time.Second}
 }
 func (s *WorkspaceSyncService) ServiceStartup(ctx context.Context, _ application.ServiceOptions) error {
 	s.mu.Lock()
@@ -165,11 +168,12 @@ func (s *WorkspaceSyncService) poll(ctx context.Context, watch *workspaceWatch) 
 	s.mu.Lock()
 	request, selected := watch.request, watch.selected
 	s.mu.Unlock()
-	ctx, cancel := context.WithTimeout(ctx, 12*time.Second)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	stopCancel := context.AfterFunc(watch.ctx, cancel)
 	defer stopCancel()
-	update := WorkspaceUpdate{Path: request.Path, Host: request.Host, Owner: request.Owner, Repo: request.Repo, UpdatedAt: time.Now().UTC().Format(time.RFC3339Nano)}
+	pollStarted := time.Now().UTC()
+	update := WorkspaceUpdate{Path: request.Path, Host: request.Host, Owner: request.Owner, Repo: request.Repo, UpdatedAt: pollStarted.Format(time.RFC3339Nano)}
 	snapshot, err := s.repositories.Snapshot(ctx, request.Path)
 	if err == nil {
 		update.RepositoryUpdatedAt = time.Now().UTC().Format(time.RFC3339Nano)
@@ -178,9 +182,14 @@ func (s *WorkspaceSyncService) poll(ctx context.Context, watch *workspaceWatch) 
 		update.Error = err.Error()
 	}
 	if request.Host != "" && request.Owner != "" && request.Repo != "" {
-		prs, prErr := s.github.ListPullRequests(ctx, request.Host, request.Owner, request.Repo, "all")
+		// First refresh reads one recent page. Later refreshes read back only to
+		// the previous successful checkpoint, so notifications see every change.
+		listCtx, listCancel := context.WithTimeout(ctx, s.providerTimeout)
+		page, prErr := s.recentPullRequests(listCtx, request, watch.refreshedAt)
+		listCancel()
 		if prErr == nil {
-			update.PullRequests = &prs
+			update.PullRequests = &page.Items
+			update.OpenPullRequestCount = &page.OpenCount
 		} else {
 			if update.Error != "" {
 				update.Error += "; "
@@ -188,7 +197,9 @@ func (s *WorkspaceSyncService) poll(ctx context.Context, watch *workspaceWatch) 
 			update.Error += prErr.Error()
 		}
 		if selected > 0 {
-			detail, detailErr := s.github.GetPullRequest(ctx, request.Host, request.Owner, request.Repo, selected)
+			detailCtx, detailCancel := context.WithTimeout(ctx, s.providerTimeout)
+			detail, detailErr := s.github.GetPullRequest(detailCtx, request.Host, request.Owner, request.Repo, selected)
+			detailCancel()
 			if detailErr == nil {
 				update.PullRequest = detail
 			} else {
@@ -216,12 +227,20 @@ func (s *WorkspaceSyncService) poll(ctx context.Context, watch *workspaceWatch) 
 	s.mu.Lock()
 	active := s.watches[request.Path] == watch
 	s.mu.Unlock()
-	if active && ctx.Err() == nil && update.PullRequests != nil && s.observePRs != nil {
-		if err := s.observePRs(ctx, request.Host, request.Owner, request.Repo, *update.PullRequests); err != nil {
+	if active && ctx.Err() == nil && update.PullRequests != nil {
+		var observeErr error
+		if s.observePRs != nil {
+			observeErr = s.observePRs(ctx, request.Host, request.Owner, request.Repo, *update.PullRequests)
+		}
+		if observeErr != nil {
 			if update.Error != "" {
 				update.Error += "; "
 			}
-			update.Error += "Notifications: " + err.Error()
+			update.Error += "Notifications: " + observeErr.Error()
+		} else if ctx.Err() == nil {
+			// GitHub timestamps have second precision. Overlap the boundary so
+			// an update during this request cannot fall between checkpoints.
+			watch.refreshedAt = pollStarted.Add(-time.Second).Truncate(time.Second)
 		}
 	}
 	if active && ctx.Err() != context.Canceled && s.emit != nil {
@@ -231,4 +250,34 @@ func (s *WorkspaceSyncService) poll(ctx context.Context, watch *workspaceWatch) 
 		return errors.New(update.Error)
 	}
 	return nil
+}
+
+func (s *WorkspaceSyncService) recentPullRequests(ctx context.Context, request WatchRequest, since time.Time) (githubclient.PullRequestPage, error) {
+	query := githubclient.PullRequestListRequest{State: "all", View: "inbox", PageSize: 25}
+	result, err := s.github.ListPullRequestsPage(ctx, request.Host, request.Owner, request.Repo, query)
+	if err != nil || since.IsZero() {
+		return result, err
+	}
+	page := result
+	cursors := map[string]bool{}
+	for page.HasNextPage {
+		if len(page.Items) == 0 {
+			return githubclient.PullRequestPage{}, errors.New("GitHub returned an empty PR page with a continuation cursor")
+		}
+		oldest, parseErr := time.Parse(time.RFC3339Nano, page.Items[len(page.Items)-1].UpdatedAt)
+		if parseErr == nil && oldest.Before(since) {
+			break
+		}
+		if page.NextCursor == "" || cursors[page.NextCursor] || len(cursors) >= 1000 {
+			return githubclient.PullRequestPage{}, errors.New("GitHub returned an invalid PR refresh cursor")
+		}
+		query.Cursor = page.NextCursor
+		cursors[query.Cursor] = true
+		page, err = s.github.ListPullRequestsPage(ctx, request.Host, request.Owner, request.Repo, query)
+		if err != nil {
+			return githubclient.PullRequestPage{}, err
+		}
+		result.Items = append(result.Items, page.Items...)
+	}
+	return result, nil
 }

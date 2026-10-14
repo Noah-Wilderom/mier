@@ -731,6 +731,30 @@ kbd {
 .inbox-tip kbd {
   font-size: 8px;
 }
+
+.inbox-pagination,
+.inbox-page-error {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+.inbox-page-error {
+  align-items: flex-start;
+  flex-direction: column;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.inbox-result-limit {
+  margin: 0;
+  padding: 12px 20px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
 .detail-pane {
   display: flex;
   flex-direction: column;

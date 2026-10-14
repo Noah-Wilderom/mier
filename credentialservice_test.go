@@ -7,11 +7,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/zalando/go-keyring"
 	"mag-ik-een-review/internal/githubclient"
@@ -167,5 +169,46 @@ func TestAccountsDiscoverCLIHostsWithoutReturningTokens(t *testing.T) {
 	data, _ := json.Marshal(accounts)
 	if strings.Contains(string(data), "token") {
 		t.Fatal("leaked CLI account token")
+	}
+}
+
+func TestResolveTokenPreservesCLICancellation(t *testing.T) {
+	for _, deadline := range []bool{false, true} {
+		name := "canceled"
+		if deadline {
+			name = "deadline exceeded"
+		}
+		t.Run(name, func(t *testing.T) {
+			service := fakeCredentials(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			if deadline {
+				cancel()
+				ctx, cancel = context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+			}
+			cancel()
+			service.cli = func(ctx context.Context, _ ...string) ([]byte, error) {
+				return nil, ctx.Err()
+			}
+			_, _, _, err := service.resolveToken(ctx, "github.com")
+			if !errors.Is(err, ctx.Err()) {
+				t.Fatalf("lookup reported %v instead of %v", err, ctx.Err())
+			}
+		})
+	}
+}
+
+func TestMissingGitHubCLIReportsExecutableProblem(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	service := fakeCredentials(t)
+	service.cli = runGitHubCLI
+	status, err := service.AccountStatus(context.Background(), "github.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Authenticated || status.CLIInstalled || !strings.Contains(status.Error, "not available") || strings.Contains(status.Error, "gh auth login") {
+		t.Fatalf("missing executable reported as a login problem: %+v", status)
+	}
+	if _, err := runGitHubCLI(context.Background(), "auth", "token", "--hostname", "github.com"); !errors.Is(err, exec.ErrNotFound) {
+		t.Fatalf("executable lookup error was discarded: %v", err)
 	}
 }
