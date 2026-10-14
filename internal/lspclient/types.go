@@ -1,6 +1,9 @@
 package lspclient
 
-import "context"
+import (
+	"context"
+	"net/http"
+)
 
 type ServerConfiguration struct {
 	Command           string   `json:"command"`
@@ -18,6 +21,20 @@ type ServerStatus struct {
 	SetupURL      string              `json:"setupUrl"`
 	Error         string              `json:"error"`
 	Configuration ServerConfiguration `json:"configuration"`
+	Managed       ToolStatus          `json:"managed"`
+}
+type ToolStatus struct {
+	InstalledVersion  string `json:"installedVersion"`
+	LatestVersion     string `json:"latestVersion"`
+	Ready             bool   `json:"ready"`
+	UpdateAvailable   bool   `json:"updateAvailable"`
+	DependencyUpdate  bool   `json:"dependencyUpdate"`
+	State             string `json:"state"`
+	Progress          string `json:"progress"`
+	InstallError      string `json:"installError"`
+	CheckError        string `json:"checkError"`
+	PrerequisiteError string `json:"prerequisiteError"`
+	CheckedAt         string `json:"checkedAt"`
 }
 type Position struct {
 	Line      int `json:"line"`
@@ -78,6 +95,9 @@ type Options struct {
 	Archive        func(context.Context, CodePositionRequest) (ArchiveResult, error)
 	ConfigPath     string
 	CacheDirectory string
+	ToolsDirectory string
+	ToolHTTPClient *http.Client
+	OnToolsChanged func()
 }
 type ArchiveResult struct {
 	Revision string

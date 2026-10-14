@@ -7,6 +7,7 @@ M.I.E.R.'s current product scope is a desktop Git and GitHub review workspace, i
 - Real Git operations with repository locks, timeouts, literal argument vectors, fast-forward pulls, and pushes without force. Branch deletion requires merged work and explicit confirmation.
 - Branch/network controls, committed comparisons, per-commit inspection, staged/unstaged review, and GitHub review/lifecycle workflows. Unavailable patches and unsupported Jira integration remain explicit.
 - Per-repository review, commit, and PR creation drafts; stale-response protection; duplicate-action guards; useful failure/retry states; render recovery; isolated language-server source snapshots.
+- Managed PHP/TypeScript/Vue server installation and updates, version checks, cancellation/retry, verified downloads, and preservation of the working installation on failure.
 - Retained frontend, Git, provider, sync, and Chromium/WebKit RPC regression tests. CI builds Linux, macOS, and Windows and inspects Linux packages.
 - Six architecture/OS release targets, Windows setup EXEs, macOS DMGs, Linux DEB/RPM/Arch/AppImage packages, checksums, and verified Ed25519 updater archives. Package-manager installations use their package manager for updates.
 
@@ -25,4 +26,4 @@ Installers initially remain unsigned, as requested. Developer ID signing/notariz
 
 GitHub is the supported review provider. Known GitLab/Bitbucket remotes can still be used for local Git; their APIs are not routed through GitHub. Custom hosts are treated as possible GitHub Enterprise hosts. Conflict editing, rebase/cherry-pick/stash UI, Jira account connection, and additional provider integrations remain future work.
 
-Local comparisons cap at 2000 files; GitHub commit files cap at 3000, and missing or limited patches are identified in the view. Language tools are installed/configured explicitly outside the app; analysis uses immutable source snapshots and read-only definition grants. Platform OS permission services require a usable desktop session.
+Local comparisons cap at 2000 files; GitHub commit files cap at 3000, and missing or limited patches are identified in the view. Language servers can be installed and updated from Settings, with PHP/Node/npm prerequisites installed separately; analysis uses immutable source snapshots and read-only definition grants. Platform OS permission services require a usable desktop session.

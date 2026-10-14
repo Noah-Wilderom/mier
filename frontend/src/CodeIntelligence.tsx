@@ -212,7 +212,8 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
     setAvailabilityError('')
     check()
     window.addEventListener(LSP_CONFIGURATION_CHANGED_EVENT, check)
-    return () => {cancelled = true;window.removeEventListener(LSP_CONFIGURATION_CHANGED_EVENT, check)}
+    const unsubscribe = services.lsp.onChanged(check)
+    return () => {cancelled = true;window.removeEventListener(LSP_CONFIGURATION_CHANGED_EVENT, check);unsubscribe()}
   }, [root, active])
 
   useEffect(() => {

@@ -76,4 +76,19 @@ export interface ServerStatus {
     "setupUrl": string;
     "error": string;
     "configuration": ServerConfiguration;
+    "managed": ToolStatus;
+}
+
+export interface ToolStatus {
+    "installedVersion": string;
+    "latestVersion": string;
+    "ready": boolean;
+    "updateAvailable": boolean;
+    "dependencyUpdate": boolean;
+    "state": string;
+    "progress": string;
+    "installError": string;
+    "checkError": string;
+    "prerequisiteError": string;
+    "checkedAt": string;
 }

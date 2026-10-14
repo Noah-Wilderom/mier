@@ -42,6 +42,9 @@ export type LSPServerConfiguration = lspclient$0.ServerConfiguration;
 
 export type LSPServerStatus = lspclient$0.ServerStatus;
 
+export interface LSPToolsChangedEvent {
+}
+
 export interface NotificationPreferences {
     "toastsEnabled": boolean;
     "desktopEnabled": boolean;

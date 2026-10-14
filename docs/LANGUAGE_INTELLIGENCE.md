@@ -1,4 +1,4 @@
-# Language intelligence handoff
+# Language intelligence
 
 M.I.E.R. provides real language-server hover and read-only definition navigation for PHP, TypeScript, JavaScript, and Vue. It analyzes the source revision shown in the diff, rather than silently using the current checkout. This document covers setup, behavior, implementation boundaries, and validation. General application setup belongs in the [README](../README.md); the source research and experiments are recorded in [RESEARCH_LSP.md](RESEARCH_LSP.md).
 
@@ -21,15 +21,29 @@ Completion, diagnostics, rename, references, code actions, inlay hints, source e
 
 ## Install and configure servers
 
-M.I.E.R. does not install language servers or project dependencies. Install tools separately using their primary documentation: [Phpactor installation](https://phpactor.readthedocs.io/en/master/usage/standalone.html), [TypeScript language server](https://github.com/typescript-language-server/typescript-language-server), and the [Vue server's versioned instructions](https://github.com/vuejs/language-tools/blob/v3.3.13/packages/language-server/README.md).
+Open **Settings → Code review → Language intelligence** in the desktop app. Each server has an **Install** button, installed/latest version labels, and an **Update available** state with an **Update** button. Servers can be installed before opening a repository. **Check for updates** refreshes both prerequisites and upstream versions; entering Settings uses update metadata cached for up to six hours.
 
-The verified combination is Phpactor **2026.10.07.0**, PHP **8.5.10**, TypeScript **5.9.3**, `typescript-language-server` **6.0.2**, and Vue server/plugin **3.3.13**. These are tested versions, not an assertion that every installed version works. The TypeScript server's [6.0.2 package manifest](https://github.com/typescript-language-server/typescript-language-server/blob/v6.0.2/package.json) requires Node **22.22.2 or newer**. Phpactor's [installation documentation](https://phpactor.readthedocs.io/en/master/usage/standalone.html) currently requires PHP **8.2 or newer**.
+Installation progress survives navigation because the backend owns the operation. **Cancel**, **Retry install**, **Retry update**, and **Reinstall** cover cancellation, failed downloads, and missing installation files. Updates install into a new directory and verify it before switching the active manifest. A failed update leaves the previous installation active. Successful activation restarts analysis sessions and broadcasts `lsp:changed`, so code navigation refreshes even when Settings is closed.
 
-Open a repository, then use **Settings → Code review → Language intelligence**. Each language shows the detected executable, argument list, source of detection, SDK/plugin requirements, and any actionable missing-tool error. Available means that the executable and required files were found; startup or analysis can still fail and will report its actual error. Missing tools suppress automatic hover requests; explicit navigation can show the setup error.
+| Managed server | Prerequisites | Installed components |
+| --- | --- | --- |
+| Phpactor | PHP 8.2+ with mbstring, tokenizer, and posix | Latest stable official PHAR, checked against GitHub's published SHA-256 digest and file size, then launched for a version check. |
+| TypeScript / JavaScript | Node.js 22.22.2+ and npm | Latest stable `typescript-language-server` and the tested TypeScript 5.9.3 SDK. |
+| Vue | Node.js 22.22.2+ and npm | Latest stable Vue server, exactly matching `@vue/typescript-plugin`, its own latest TypeScript language-server companion, and the tested SDK. |
+
+The app detects runtimes from PATH, common Homebrew locations, and installed mise versions, and records the actual runtime executable rather than a shell shim. Node's npm CLI is run directly, including on Windows. Missing prerequisites disable managed installation and show what to install; M.I.E.R. does not install system PHP/Node packages. Native Windows PHP does not provide the POSIX extension required by current Phpactor releases. See [PHP's POSIX documentation](https://www.php.net/manual/en/book.posix.php).
+
+Tools live under the OS configuration directory's `mag-ik-een-review/language-tools`, independently of repositories and global npm packages. npm installs use exact server versions, engine checks, their own config/cache, and disabled lifecycle scripts. npm verifies package integrity; Phpactor downloads require the official HTTPS URL and published digest. The managed TypeScript SDK is pinned to the version exercised by M.I.E.R.'s real-server tests; server/plugin updates do not silently migrate SDK versions. Prior successful installation directories are retained, and interrupted staging directories are removed.
+
+Update checks preserve the last known version and pending-update badge when the network is unavailable, while showing a check error. Update installation still verifies the latest provider metadata before downloading. Vue also reports a dependency update when its TypeScript companion changes without a new Vue server version. There are no automatic package installations or updates.
+
+Explicit executable/argument/SDK/plugin configuration continues to take priority. Installing a managed copy preserves custom settings; **Use installed version** explicitly switches back to M.I.E.R.'s installation. Each language shows its detected source and any setup error. Available means that the executable and required files were found; startup or analysis can still fail and reports its actual error.
+
+The verified combination is Phpactor **2026.10.07.0**, PHP **8.3.6**, TypeScript **5.9.3**, `typescript-language-server` **6.0.2**, and Vue server/plugin **3.3.13**. The TypeScript server's [6.0.2 package manifest](https://github.com/typescript-language-server/typescript-language-server/blob/v6.0.2/package.json) defines its Node requirement. Manual installations remain supported: [Phpactor installation](https://phpactor.readthedocs.io/en/master/usage/standalone.html), [TypeScript server](https://github.com/typescript-language-server/typescript-language-server), and [Vue's versioned instructions](https://github.com/vuejs/language-tools/blob/v3.3.13/packages/language-server/README.md).
 
 ### Automatic detection
 
-Detection checks an explicitly configured executable first, then project installations, then the process `PATH`.
+Detection checks an explicitly configured executable first, then M.I.E.R.'s managed installation, project installations, and the process `PATH`. A managed Vue installation uses its own bundled TypeScript companion, independently of the separately configured TypeScript entry.
 
 | Language | Project installation | PATH executable | Automatic arguments |
 | --- | --- | --- | --- |
@@ -53,7 +67,7 @@ For tools installed under `/absolute/path/to/mier-lsp-tools`, these entries matc
 | TypeScript / JavaScript | `node` | `/absolute/path/to/mier-lsp-tools/node_modules/typescript-language-server/lib/cli.mjs`<br>`--stdio` | SDK: `/absolute/path/to/mier-lsp-tools/node_modules/typescript/lib` |
 | Vue | `node` | `/absolute/path/to/mier-lsp-tools/node_modules/@vue/language-server/bin/vue-language-server.js`<br>`--stdio` | Same SDK; plugin: `/absolute/path/to/mier-lsp-tools/node_modules/@vue/typescript-plugin` |
 
-Configure the TypeScript entry as well as Vue. The Vue session starts a peer with the plugin loaded and brokers Vue's custom TypeScript requests. The Vue plugin field applies to the Vue entry; the peer configuration is assembled by the backend.
+For manually installed tools, configure the TypeScript entry as well as Vue. The Vue session starts a peer with the plugin loaded and brokers Vue's custom TypeScript requests. Managed Vue installs already include that peer. The Vue plugin field applies to the Vue entry; the peer configuration is assembled by the backend.
 
 SDK and plugin directories must be absolute. PHP does not accept those fields. On Windows, `.cmd` and `.bat` wrappers are rejected; use `node.exe` or `php.exe` with the absolute server script/PHAR as an argument. Windows/macOS behavior has code paths, but the real-tool validation reported here ran on Linux.
 
@@ -111,6 +125,8 @@ For PHP, an initial authentic result appears immediately. If the same symbol and
 
 Sessions are owned by the app, not one hover request. Configuration changes and normal application shutdown close them; failed initialization closes its process. Vue reuse requires both the Vue server and TypeScript peer to remain alive. Process shutdown and RPC writes are bounded, with child cleanup implemented for Unix and Windows.
 
+Only one managed installation runs at a time, with a five-minute deadline. Cancellation or application shutdown terminates its npm/PHP process tree. Package installation never runs against the selected repository's package manifest or lockfile.
+
 ## Validation
 
 Run from the repository root:
@@ -128,6 +144,17 @@ npx tsc --noEmit
 ```
 
 The Go suites cover exact tree capture, merge-base selection, index/working separation, sparse/hidden edits, UTF-16 boundaries, stale lines, definition confinement and frozen grants, Vue peer/broker behavior, RPC cancellation, and shutdown. See the [research ledger](RESEARCH_LSP.md#retained-regressions-and-validation) for specific tests and the additional browser experiments.
+
+Managed-tool tests cover version persistence, pending dependency updates, corrupt Phpactor downloads, failed updates retaining the active version, cancellation, duplicate suppression, custom configuration, offline metadata, and installation isolation. Chromium/WebKit regression tests cover the Settings controls and background activation events.
+
+To exercise the real download/install path against the official providers:
+
+```sh
+MIER_LSP_INSTALL_SMOKE=1 go test -race ./internal/lspclient \
+  -run '^TestRealManagedToolInstallation$' -count=1 -timeout 10m -v
+```
+
+This opt-in test requires PHP/Node/npm and installs outside the repository. To retain its managed manifest and installations for inspection, set `MIER_LSP_INSTALL_TOOLS` to a separate absolute tools directory.
 
 ### Optional real-server smoke
 
@@ -160,6 +187,7 @@ At this handoff, all five real-server tests passed with the race detector, inclu
 | [lspservice.go](../lspservice.go) | Native service lifecycle and Git snapshot routing. |
 | [types.go](../internal/lspclient/types.go) | Normalized server status, position, hover, definition, and read contracts. |
 | [config.go](../internal/lspclient/config.go) | Supported languages, detection, configuration validation/persistence. |
+| [tools_catalog.go](../internal/lspclient/tools_catalog.go), [tools_install.go](../internal/lspclient/tools_install.go) | Managed versions, runtime prerequisites, upstream checks, verified installation, cancellation, and activation. |
 | [manager.go](../internal/lspclient/manager.go) | Cached revisions, sessions, leases, actual requests, and grants. |
 | [session.go](../internal/lspclient/session.go) | Initialization, versioned documents, content normalization, Vue peer broker. |
 | [rpc.go](../internal/lspclient/rpc.go) | Bounded stdio JSON-RPC, response correlation, cancellation, process lifetime. |
@@ -167,8 +195,8 @@ At this handoff, all five real-server tests passed with the race detector, inclu
 | [archive.go](../internal/gitclient/archive.go), [exact_tree.go](../internal/gitclient/exact_tree.go), [workspace_archive.go](../internal/gitclient/workspace_archive.go) | Commit/merge-base snapshots and mutable source capture. |
 | [services.ts](../frontend/src/services.ts) | Browser-safe native calls; LSP-specific abort forwarding. |
 | [CodeIntelligence.tsx](../frontend/src/CodeIntelligence.tsx) | DOM positions, availability, hover, cancellation, read-only definition navigation. |
-| [LanguageServerSettings.tsx](../frontend/src/LanguageServerSettings.tsx) | Real status and explicit configuration UI. |
+| [LanguageServerSettings.tsx](../frontend/src/LanguageServerSettings.tsx) | Installation/update state, progress, retries, and explicit configuration UI. |
 
-The native `main.LSPService` exposes `Servers(root)`, `ConfigureServer(language, configuration)`, `Hover(positionRequest)`, `Definition(positionRequest)`, and `ReadDefinition({root, revision, target})`. Positions are zero-based UTF-16. A position request has root, revision, path or granted URI, optional comparison head and PR identity, line, character, and displayed line text. Hover/definition responses identify the actual captured revision; readers must keep that revision with their opaque target. Wails omits the first Go `context.Context` parameter from frontend arguments.
+The native `main.LSPService` exposes `Servers(root)`, `CheckServerUpdates(root, force)`, `InstallServer(language)`, `CancelServerInstall(language)`, `ConfigureServer(language, configuration)`, `Hover(positionRequest)`, `Definition(positionRequest)`, and `ReadDefinition({root, revision, target})`. An empty root checks global setup without scanning a repository. Positions are zero-based UTF-16. A position request has root, revision, path or granted URI, optional comparison head and PR identity, line, character, and displayed line text. Hover/definition responses identify the actual captured revision; readers must keep that revision with their opaque target. Wails omits the first Go `context.Context` parameter from frontend arguments.
 
 Future language/framework support can add detection/routing, setup fields, server-specific initialization/configuration, and tested dependency-resolution rules without changing the revision/grant boundary. Keep Vue's custom broker as a server adapter rather than a generic-LSP assumption. Currently `workspace/configuration` returns empty configuration objects; diagnostics are not normalized or sent to the UI. Add capability-specific contracts and real fixtures before advertising completion, diagnostics, framework stubs, or additional navigation features.

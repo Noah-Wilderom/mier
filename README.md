@@ -6,6 +6,8 @@
 
 Manage branches and local changes, compare commits, and review pull requests with inline comments, syntax highlighting, and light or dark appearance.
 
+Install and update PHP, TypeScript/JavaScript, and Vue language servers from Settings for symbol information and go to definition.
+
 [Download the latest release](https://github.com/Noah-Wilderom/mier/releases/latest) · macOS, Windows, and Linux · Intel/AMD and ARM64
 
 [Linux and Omarchy installation](docs/LINUX.md) — DEB, RPM, Arch packages, and AppImage.

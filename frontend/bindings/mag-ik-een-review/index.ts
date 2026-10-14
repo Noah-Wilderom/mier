@@ -32,6 +32,7 @@ export type {
     DefinitionDocument,
     LSPServerConfiguration,
     LSPServerStatus,
+    LSPToolsChangedEvent,
     NotificationPreferences,
     PRNotificationEvent,
     ReadDefinitionRequest,

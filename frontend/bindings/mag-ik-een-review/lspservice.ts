@@ -9,6 +9,14 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 // @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
+export function CancelServerInstall(language: string): $CancellablePromise<void> {
+    return $Call.ByID(3640043458, language);
+}
+
+export function CheckServerUpdates(root: string, force: boolean): $CancellablePromise<$models.LSPServerStatus[] | null> {
+    return $Call.ByID(3302685325, root, force);
+}
+
 export function ConfigureServer(language: string, configuration: $models.LSPServerConfiguration): $CancellablePromise<void> {
     return $Call.ByID(3308611253, language, configuration);
 }
@@ -19,6 +27,10 @@ export function Definition(request: $models.CodePositionRequest): $CancellablePr
 
 export function Hover(request: $models.CodePositionRequest): $CancellablePromise<$models.CodeHover> {
     return $Call.ByID(1347530412, request);
+}
+
+export function InstallServer(language: string): $CancellablePromise<void> {
+    return $Call.ByID(2599877886, language);
 }
 
 export function ReadDefinition(request: $models.ReadDefinitionRequest): $CancellablePromise<$models.DefinitionDocument> {

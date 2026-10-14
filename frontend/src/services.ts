@@ -90,6 +90,20 @@ export interface LSPServerStatus {
   setupUrl: string;
   error: string;
   configuration: LSPServerConfiguration;
+  managed: LSPToolStatus;
+}
+export interface LSPToolStatus {
+  installedVersion: string;
+  latestVersion: string;
+  ready: boolean;
+  updateAvailable: boolean;
+  dependencyUpdate: boolean;
+  state: "idle" | "installing" | "updating" | "cancelling" | "failed" | "cancelled";
+  progress: string;
+  installError: string;
+  checkError: string;
+  prerequisiteError: string;
+  checkedAt: string;
 }
 export const LSP_CONFIGURATION_CHANGED_EVENT = "mier:lsp-configuration-changed";
 
@@ -421,6 +435,18 @@ export const services = {
     definition: async (request: CodePositionRequest, signal?: AbortSignal) => (await invokeLSP<LSPDefinitionTarget[] | null>("main.LSPService.Definition", request, signal)) ?? [],
     readDefinition: (request: {root:string; revision:string; target:string}, signal?: AbortSignal) => invokeLSP<LSPDefinitionDocument>("main.LSPService.ReadDefinition", request, signal),
     configureServer: (language: string, configuration: LSPServerConfiguration) => invoke<void>("main.LSPService.ConfigureServer", language, configuration),
+    checkServerUpdates: async (root: string, force = false) => (await invoke<LSPServerStatus[] | null>("main.LSPService.CheckServerUpdates", root, force)) ?? [],
+    installServer: (language: string) => invoke<void>("main.LSPService.InstallServer", language),
+    cancelServerInstall: (language: string) => invoke<void>("main.LSPService.CancelServerInstall", language),
+    onChanged: (callback: () => void) => {
+      let closed = false, unsubscribe: (() => void) | undefined;
+      if (hasNativeBackend()) {
+        void import("@wailsio/runtime").then(({ Events }) => {
+          if (!closed) unsubscribe = Events.On("lsp:changed", callback);
+        }).catch(issue => { if (!closed) console.error("Unable to subscribe to language tool updates", issue); });
+      }
+      return () => { closed = true; unsubscribe?.(); };
+    },
   },
   notifications: {
     getPreferences: (key: string) => invoke<NotificationPreferences>("main.PRNotificationService.GetPreferences", key),

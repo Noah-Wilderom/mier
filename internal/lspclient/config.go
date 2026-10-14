@@ -237,16 +237,29 @@ func findDependency(paths []string, filename string) string {
 	}
 	return ""
 }
-func detectServer(root, language string, configuration ServerConfiguration) ServerStatus {
+func detectServer(root, language string, configuration ServerConfiguration, managed ...ServerConfiguration) ServerStatus {
 	status := ServerStatus{Language: language, Name: languageNames[language], SetupURL: setupURLs[language], Configuration: configuration, Args: []string{}}
 	status.Configuration.Args = append([]string{}, configuration.Args...)
-	directories := projectDirectories(root)
+	directories := []string{}
+	if root != "" {
+		directories = projectDirectories(root)
+	}
 	defaults := map[string][]string{"php": {"language-server"}, "typescript": {"--stdio"}, "vue": {"--stdio"}}
 	programs := map[string]string{"php": "phpactor", "typescript": "typescript-language-server", "vue": "vue-language-server"}
 	if configuration.Command != "" {
 		status.Command = configuration.Command
 		status.Args = append([]string{}, configuration.Args...)
 		status.Source = "configured"
+	} else if len(managed) > 0 && managed[0].Command != "" {
+		status.Command = managed[0].Command
+		status.Args = append([]string{}, managed[0].Args...)
+		status.Source = "managed"
+		if configuration.TypeScriptSDKPath == "" {
+			configuration.TypeScriptSDKPath = managed[0].TypeScriptSDKPath
+		}
+		if configuration.VuePluginPath == "" {
+			configuration.VuePluginPath = managed[0].VuePluginPath
+		}
 	} else {
 		status.Args = append([]string{}, defaults[language]...)
 		for _, directory := range directories {
@@ -279,7 +292,7 @@ func detectServer(root, language string, configuration ServerConfiguration) Serv
 		}
 	}
 	if status.Command == "" {
-		status.Error = fmt.Sprintf("%s is not installed. Install it separately or configure its executable and arguments", status.Name)
+		status.Error = fmt.Sprintf("%s is not installed. Install it in Settings or configure an existing executable", status.Name)
 		return status
 	}
 	executable, err := resolveProgram(status.Command)

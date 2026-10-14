@@ -10,5 +10,6 @@ export type {
     Range,
     ReadDefinitionRequest,
     ServerConfiguration,
-    ServerStatus
+    ServerStatus,
+    ToolStatus
 } from "./models.js";

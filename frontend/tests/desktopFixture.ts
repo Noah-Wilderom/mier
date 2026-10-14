@@ -71,7 +71,7 @@ export async function desktopFixture(page: Page) {
         case 'main.CredentialService.AccountStatus': result = { host: args[0], login: 'reviewer', authenticated: true, source: 'gh', name: 'Reviewer', avatarUrl: '', url: 'https://github.com/reviewer', error: '' }; break
         case 'main.EditorService.PreferredEditor': result = 'vscode'; break
         case 'main.PRNotificationService.GetPreferences': result = { toastsEnabled: true, desktopEnabled: false, opened: true, closed: true, merged: true, reviewRequested: true }; break
-        case 'main.LSPService.Servers': result = []; break
+        case 'main.LSPService.Servers': case 'main.LSPService.CheckServerUpdates': result = []; break
         case 'main.GitHubService.GetPullRequest': result = fixture.currentDetail; break
         case 'main.RepositoryService.Diff': result = diff(args[1]); break
         case 'main.RepositoryService.Compare': case 'main.RepositoryService.CommitDiff': result = [diff()]; break

@@ -12,6 +12,7 @@ import type * as main$0 from "../../../../../mag-ik-een-review/models.js";
 declare module "@wailsio/runtime" {
     namespace Events {
         interface CustomEvents {
+            "lsp:changed": main$0.LSPToolsChangedEvent;
             "notifications:pr": main$0.PRNotificationEvent;
             "workspace:updated": main$0.WorkspaceUpdate;
         }

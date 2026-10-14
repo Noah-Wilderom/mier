@@ -1,12 +1,12 @@
 # Implementation architecture
 
-This describes M.I.E.R. as implemented on 2026-10-13. Product scope and intent are in [PRODUCT.md](../PRODUCT.md); run/build instructions are in [README.md](../README.md). The initial reference image and current visual decisions are in [DESIGN.md](../DESIGN.md).
+This describes M.I.E.R. as implemented on 2026-10-14. Product scope and intent are in [PRODUCT.md](../PRODUCT.md); run/build instructions are in [README.md](../README.md). The initial reference image and current visual decisions are in [DESIGN.md](../DESIGN.md).
 
 ## Boundaries and runtime
 
 The Go application owns filesystem access, Git, credentials, provider requests, background polling, native editor launches, notifications, and language-server processes. React renders structured data and invokes typed service adapters; browser demo actions use separate sample state. Running Vite alone does not access repositories or GitHub.
 
-`main.go` registers services and the `workspace:updated` / `notifications:pr` Wails events, embeds `frontend/dist`, and creates the native window and menu. The project pins Go Wails and CLI `v3.0.0-alpha2.117` and npm runtime `3.0.0-beta.29`. The active application service namespace is `main.*`. Do not derive binding names from the module slug or upgrade one runtime independently without checking transport and generated bindings.
+`main.go` registers services and the `workspace:updated`, `notifications:pr`, and `lsp:changed` Wails events, embeds `frontend/dist`, and creates the native window and menu. The project pins Go Wails and CLI `v3.0.0-alpha2.117` and npm runtime `3.0.0-beta.29`. The active application service namespace is `main.*`. Do not derive binding names from the module slug or upgrade one runtime independently without checking transport and generated bindings.
 
 `frontend/src/services.ts` is the typed RPC boundary, including cancellation for LSP calls. `native.ts` owns native commands, browser opening, full screen, and the runtime handshake. Native availability requires an actual Wails OS environment. Importing the runtime in a normal browser does not create a live backend.
 
@@ -53,6 +53,8 @@ Shiki provides grammar highlighting shared by PR diffs, local diffs, definition 
 The LSP manager creates private revision snapshots and owns stdio JSON-RPC processes. PR sides use exact Git blobs and merge-base comparisons; staged and unstaged views use immutable content digests of index/working snapshots. Packaging attributes must not alter source content. Workspace package links resolve inside the selected snapshot; installed dependency source is isolated there. Definitions receive opaque grants tied to source revision and frozen content rather than accepting arbitrary frontend file paths.
 
 UTF-16 positions, exact line-text validation, canceled requests, bounded caches, process cleanup, and read-only edit-request handling protect review continuity. Vue has a TypeScript companion process with its plugin and broker; empty Vue script-semantic results fall back to that companion. PHP can initially return partial information while indexing, so the UI preserves the first result and performs one canceled-safe warmup refresh. See [language intelligence](LANGUAGE_INTELLIGENCE.md) and [LSP research](RESEARCH_LSP.md).
+
+Managed language tools live in the user configuration directory's `mag-ik-een-review/language-tools/`. The installer resolves stable versions from official providers, checks PHP/Node/npm prerequisites, verifies the Phpactor digest and npm package versions, and installs into a new directory before atomically changing `installed.json`. Server updates keep the tested TypeScript SDK and matching Vue plugin/companion. Installation uses literal process arguments, isolated npm config/cache, and disabled lifecycle scripts. A failed or cancelled operation retains the active installation. Successful activation closes existing analysis sessions and emits `lsp:changed`; Settings polls progress while an operation runs, and code views refresh availability from the event. Custom configuration takes priority over managed tools.
 
 ## Preferences and delivery
 

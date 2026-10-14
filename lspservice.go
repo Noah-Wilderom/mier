@@ -15,10 +15,11 @@ type CodeHover = lspclient.Hover
 type CodeDefinitionTarget = lspclient.DefinitionTarget
 type ReadDefinitionRequest = lspclient.ReadDefinitionRequest
 type DefinitionDocument = lspclient.DefinitionDocument
+type LSPToolsChangedEvent struct{}
 type LSPService struct{ manager *lspclient.Manager }
 
 func NewLSPService(repositories *RepositoryService) *LSPService {
-	return &LSPService{manager: lspclient.New(lspclient.Options{Archive: func(ctx context.Context, request lspclient.CodePositionRequest) (lspclient.ArchiveResult, error) {
+	return &LSPService{manager: lspclient.New(lspclient.Options{OnToolsChanged: notifyLSPToolsChanged, Archive: func(ctx context.Context, request lspclient.CodePositionRequest) (lspclient.ArchiveResult, error) {
 		if repositories == nil {
 			return lspclient.ArchiveResult{}, errors.New("Open a Git repository before using code intelligence")
 		}
@@ -44,7 +45,25 @@ func (s *LSPService) Servers(ctx context.Context, root string) ([]LSPServerStatu
 	return s.manager.Servers(ctx, root)
 }
 func (s *LSPService) ConfigureServer(ctx context.Context, language string, configuration LSPServerConfiguration) error {
-	return s.manager.Configure(ctx, language, configuration)
+	if err := s.manager.Configure(ctx, language, configuration); err != nil {
+		return err
+	}
+	notifyLSPToolsChanged()
+	return nil
+}
+func notifyLSPToolsChanged() {
+	if app := application.Get(); app != nil {
+		app.Event.Emit("lsp:changed", LSPToolsChangedEvent{})
+	}
+}
+func (s *LSPService) CheckServerUpdates(ctx context.Context, root string, force bool) ([]LSPServerStatus, error) {
+	return s.manager.CheckServerUpdates(ctx, root, force)
+}
+func (s *LSPService) InstallServer(ctx context.Context, language string) error {
+	return s.manager.InstallServer(ctx, language)
+}
+func (s *LSPService) CancelServerInstall(language string) error {
+	return s.manager.CancelServerInstall(language)
 }
 func (s *LSPService) Hover(ctx context.Context, request CodePositionRequest) (CodeHover, error) {
 	return s.manager.Hover(ctx, request)

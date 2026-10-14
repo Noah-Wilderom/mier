@@ -17,6 +17,7 @@ var assets embed.FS
 func init() {
 	application.RegisterEvent[WorkspaceUpdate]("workspace:updated")
 	application.RegisterEvent[PRNotificationEvent]("notifications:pr")
+	application.RegisterEvent[LSPToolsChangedEvent]("lsp:changed")
 }
 
 type nativeCommand struct {

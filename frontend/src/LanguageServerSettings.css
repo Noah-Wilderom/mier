@@ -9,9 +9,21 @@
 .language-server-summary { display: flex; align-items: center; gap: 10px; }
 .language-server-summary > svg { color: var(--muted); flex-shrink: 0; }
 .language-server-summary > div { display: flex; flex: 1; flex-direction: column; gap: 6px; min-width: 0; }
-.language-server-summary strong { font-size: 13px; font-weight: 500; }
+.language-server-summary h4 { margin: 0; font-size: 13px; font-weight: 500; }
 .language-server-summary > div > span { display: flex; align-items: center; gap: 5px; font-size: 12px; }
 .language-server-summary > .btn { min-height: 28px; padding: 4px 8px; font-size: 12px; flex-shrink: 0; }
+.language-server-summary > .language-server-actions { display: flex; flex: 0 0 auto; flex-direction: row; gap: 7px; }
+.language-server-actions .btn { min-height: 28px; padding: 4px 9px; font-size: 12px; gap: 5px; }
+.language-server-installation { margin: 11px 0 0 28px; display: flex; flex-wrap: wrap; align-items: center; gap: 7px 12px; font-size: 12px; }
+.language-server-version { color: var(--muted); }
+.language-server-update-badge { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; color: var(--amber); background: var(--panel); }
+.language-server-current { color: var(--green); }
+.language-server-progress { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; color: var(--muted); }
+.language-server-progress .btn-ghost { flex-shrink: 0; font-size: 12px; }
+.language-server-installation > .language-server-availability-error, .language-server-installation > .language-server-error { margin: 2px 0 0; flex-basis: 100%; }
+.language-server-use-installed { font-size: 12px; min-height: 27px; padding: 4px 8px; }
+.language-server-settings .is-spinning { animation: language-server-spin 1s linear infinite; }
+@keyframes language-server-spin { to { transform: rotate(360deg); } }
 .language-server-command { display: block; margin: 10px 0 0 28px; font-family: var(--mono); font-size: 12px; color: var(--muted); overflow-wrap: anywhere; line-height: 1.6; }
 .language-server-availability-error { margin: 10px 0 0 28px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .language-server-docs { margin: 7px 0 0 28px; font-size: 12px; }
@@ -31,5 +43,5 @@
 .language-server-skeleton > div { display: flex; align-items: center; justify-content: space-between; min-height: 75px; gap: 15px; border-top: 1px solid var(--border); }
 .language-server-skeleton .skeleton:first-child { display: block; height: 27px; width: 55%; }
 .language-server-skeleton .skeleton:last-child { display: block; height: 27px; width: 72px; }
-@media (max-width: 600px) { .language-server-form { margin-left: 0; padding: 12px; } .language-server-form-actions { flex-wrap: wrap; } .language-server-form-actions > span { flex-basis: 100%; } .language-server-settings-heading { gap: 7px; } }
-@media (prefers-reduced-motion: reduce) { .language-server-skeleton .skeleton { animation: none; } }
+@media (max-width: 600px) { .language-server-form { margin-left: 0; padding: 12px; } .language-server-form-actions { flex-wrap: wrap; } .language-server-form-actions > span { flex-basis: 100%; } .language-server-settings-heading { gap: 7px; } .language-server-summary { flex-wrap: wrap; } .language-server-summary > .language-server-actions { margin-left: 28px; } }
+@media (prefers-reduced-motion: reduce) { .language-server-skeleton .skeleton, .language-server-settings .is-spinning { animation: none; } }

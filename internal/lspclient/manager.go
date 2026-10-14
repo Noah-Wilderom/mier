@@ -36,6 +36,7 @@ type Manager struct {
 	grants         map[string]definitionGrant
 	grantOrder     []string
 	grantBytes     int
+	tools          *toolInstaller
 }
 
 func New(options Options) *Manager {
@@ -58,6 +59,27 @@ func New(options Options) *Manager {
 	ctx, cancel := context.WithCancel(context.Background())
 	m := &Manager{options: options, ctx: ctx, cancel: cancel, gate: make(chan struct{}, 1), configuration: configuration, configErr: err, workspaces: map[string]*workspace{}, aliases: map[string]string{}, grants: map[string]definitionGrant{}}
 	m.gate <- struct{}{}
+	if options.ToolsDirectory == "" && options.ConfigPath != "" {
+		options.ToolsDirectory = filepath.Join(filepath.Dir(options.ConfigPath), "language-tools")
+	}
+	m.tools = newToolInstaller(ctx, options.ToolsDirectory, options.ToolHTTPClient, func(ctx context.Context, commit func() error) error {
+		release, err := m.lock(ctx)
+		if err != nil {
+			return err
+		}
+		defer release()
+		if err = ctx.Err(); err != nil {
+			return err
+		}
+		if err = commit(); err != nil {
+			return err
+		}
+		m.restartSessions()
+		if m.options.OnToolsChanged != nil {
+			m.options.OnToolsChanged()
+		}
+		return nil
+	})
 	return m
 }
 func (m *Manager) lock(ctx context.Context) (func(), error) {
@@ -92,10 +114,14 @@ func canonicalRoot(root string) (string, error) {
 	return resolved, nil
 }
 func (m *Manager) Servers(ctx context.Context, root string) ([]ServerStatus, error) {
-	root, err := canonicalRoot(root)
-	if err != nil {
-		return nil, err
+	var err error
+	if root != "" {
+		root, err = canonicalRoot(root)
+		if err != nil {
+			return nil, err
+		}
 	}
+	tools := m.tools.statuses(ctx)
 	release, err := m.lock(ctx)
 	if err != nil {
 		return nil, err
@@ -106,14 +132,18 @@ func (m *Manager) Servers(ctx context.Context, root string) ([]ServerStatus, err
 	}
 	result := []ServerStatus{}
 	for _, language := range []string{"php", "typescript", "vue"} {
-		status := detectServer(root, language, m.configuration[language])
+		status := m.detectServer(root, language)
+		status.Managed = tools[language]
 		if language == "vue" && status.Available {
-			peer := detectServer(root, "typescript", m.configuration["typescript"])
+			peer := m.vuePeer(root, status)
 			if !peer.Available {
 				status.Available = false
 				status.Error = "Vue requires a TypeScript language server (version 4.4 or newer): " + peer.Error
 			}
 		}
+		// Settings edit the saved configuration, not auto-detected SDK paths.
+		status.Configuration = m.configuration[language]
+		status.Configuration.Args = append([]string{}, status.Configuration.Args...)
 		result = append(result, status)
 	}
 	return result, nil
@@ -147,13 +177,46 @@ func (m *Manager) Configure(ctx context.Context, language string, configuration 
 	}
 	m.configuration = next
 	m.configErr = nil
+	m.restartSessions()
+	return nil
+}
+func (m *Manager) restartSessions() {
 	for _, w := range m.workspaces {
 		for key, session := range w.sessions {
 			_ = session.close()
 			delete(w.sessions, key)
 		}
 	}
-	return nil
+}
+func (m *Manager) detectServer(root, language string) ServerStatus {
+	managed, ready := m.tools.configuration(language)
+	if !ready {
+		managed = ServerConfiguration{}
+	}
+	return detectServer(root, language, m.configuration[language], managed)
+}
+func (m *Manager) vuePeer(root string, vue ServerStatus) ServerStatus {
+	if vue.Source == "managed" {
+		if managed, ready := m.tools.configuration("vue-typescript"); ready {
+			return detectServer(root, "typescript", ServerConfiguration{}, managed)
+		}
+	}
+	return m.detectServer(root, "typescript")
+}
+func (m *Manager) CheckServerUpdates(ctx context.Context, root string, force bool) ([]ServerStatus, error) {
+	ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
+	stop := context.AfterFunc(m.ctx, cancel)
+	defer func() { stop(); cancel() }()
+	if err := m.tools.checkUpdates(ctx, force); err != nil {
+		return nil, err
+	}
+	return m.Servers(ctx, root)
+}
+func (m *Manager) InstallServer(ctx context.Context, language string) error {
+	return m.tools.start(ctx, language)
+}
+func (m *Manager) CancelServerInstall(language string) error {
+	return m.tools.cancel(language)
 }
 func (m *Manager) requestContext(ctx context.Context) (context.Context, func()) {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
@@ -275,13 +338,13 @@ func (m *Manager) ensureSession(ctx context.Context, w *workspace, language stri
 		_ = existing.close()
 		delete(w.sessions, language)
 	}
-	status := detectServer(w.root, language, m.configuration[language])
+	status := m.detectServer(w.root, language)
 	if !status.Available {
 		return nil, fmt.Errorf("%s. Setup: %s", status.Error, status.SetupURL)
 	}
 	var peer *session
 	if language == "vue" {
-		peerStatus := detectServer(w.root, "typescript", m.configuration["typescript"])
+		peerStatus := m.vuePeer(w.root, status)
 		if !peerStatus.Available {
 			return nil, fmt.Errorf("Vue requires TypeScript language-server 4.4 or newer: %s", peerStatus.Error)
 		}
@@ -498,6 +561,7 @@ func (m *Manager) ReadDefinition(ctx context.Context, request ReadDefinitionRequ
 }
 func (m *Manager) Close() error {
 	m.cancel()
+	m.tools.close()
 	<-m.gate
 	defer func() { m.gate <- struct{}{} }()
 	if m.closed {
