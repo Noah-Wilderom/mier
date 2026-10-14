@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import { Icon } from './Icon'
-import { Markdown } from './Markdown'
+import { SymbolInformation } from './SymbolInformation'
+import { hoverSymbolSpan } from './hoverSymbol'
 import { hasNativeBackend, LSP_CONFIGURATION_CHANGED_EVENT, services, type CodePositionRequest, type LSPDefinitionDocument, type LSPDefinitionTarget, type LSPHover, type LSPServerStatus } from './services'
 import { codeReviewStyleVariables, effectiveCodeTheme, getCodeAppearance, getCodeReviewPreferences, subscribeCodeAppearance, subscribeCodeReviewPreferences } from './codeReviewPreferences'
 import { highlightCodeLines, syntaxTokenStyle, type HighlightedCode } from './syntaxHighlighter'
@@ -99,6 +100,9 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
   const [notice, setNotice] = useState('')
   const [serverStatuses, setServerStatuses] = useState<LSPServerStatus[]>()
   const [availabilityError, setAvailabilityError] = useState('')
+  const [preparing, setPreparing] = useState(false)
+  const [preparationError, setPreparationError] = useState('')
+  const [preparationAttempt, setPreparationAttempt] = useState(0)
   const [highlighted, setHighlighted] = useState<{ document: LSPDefinitionDocument; theme: string; code: HighlightedCode }>()
   const preferences = useSyncExternalStore(subscribeCodeReviewPreferences, getCodeReviewPreferences)
   const appearance = useSyncExternalStore(subscribeCodeAppearance, getCodeAppearance)
@@ -253,6 +257,67 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
     return { root, revision, path: position.path, host, owner, repo, pullRequest, line: position.line, character: position.character, lineText: position.lineText, ...(compare ? { comparisonHead: headSha } : {}) }
   }
 
+  // Prepare only the selected file's preferred side. Starting another revision
+  // here would compete with the file the reviewer is about to inspect.
+  useEffect(() => {
+    const element = container.current
+    if (!element || !active || !serverStatuses) return
+    let controller: AbortController | undefined
+    let key = ''
+    let stale = false
+    const prepare = () => {
+      if (reader) return
+      const code = element.querySelector<HTMLElement>('.code-intelligence-review [data-code-path][data-code-side="new"]')
+        ?? element.querySelector<HTMLElement>('.code-intelligence-review [data-code-path][data-code-side="old"]')
+      if (!code) return
+      const position = codeLocation(code, code, 0)
+      if (!position || !serverStatuses.some(server => server.language === languageFor(position) && server.available)) return
+      const request = requestFor(position)
+      if (!request) return
+      const next = `${context}\0${request.revision}\0${request.path}`
+      if (next === key) return
+      key = next
+      controller?.abort()
+      const pending = new AbortController()
+      controller = pending
+      setPreparing(true)
+      setPreparationError('')
+      void services.lsp.warmup(request, pending.signal).then(() => {
+        if (!stale && !pending.signal.aborted) setPreparing(false)
+      }).catch(issue => {
+        if (!stale && !pending.signal.aborted) {
+          setPreparing(false)
+          setPreparationError(issue instanceof Error ? issue.message : 'Code analysis could not be prepared.')
+        }
+      })
+    }
+    setPreparing(false)
+    setPreparationError('')
+    prepare()
+    const observer = new MutationObserver(prepare)
+    observer.observe(element, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-code-path'] })
+    return () => { stale = true; controller?.abort(); observer.disconnect() }
+  }, [context, active, serverStatuses, !!reader, preparationAttempt])
+
+  useEffect(() => {
+    if (!hover || !hoverPanel.current) return
+    const panel = hoverPanel.current
+    const fit = () => {
+      const { width, height } = panel.getBoundingClientRect()
+      setHover(current => {
+        if (!current) return current
+        const x = Math.max(10, Math.min(current.x, window.innerWidth - width - 10))
+        const y = Math.max(10, Math.min(current.y, window.innerHeight - height - 10))
+        return x === current.x && y === current.y ? current : { ...current, x, y }
+      })
+    }
+    fit()
+    const observer = new ResizeObserver(fit)
+    observer.observe(panel)
+    window.addEventListener('resize', fit)
+    return () => { observer.disconnect(); window.removeEventListener('resize', fit) }
+  }, [!!hover])
+
   const openTarget = async (target: LSPDefinitionTarget) => {
     if (!active) return
     const sequence = ++navigationSequence.current
@@ -385,7 +450,9 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
     hoverEligible.current = true
     const previous = hoverPosition.current
     locationRef.current = position
-    if (previous?.path === position.path && previous.line === position.line && previous.side === position.side && previous.character === position.character) return
+    const previousSpan = previous && hoverSymbolSpan(previous.lineText, previous.character)
+    const span = hoverSymbolSpan(position.lineText, position.character)
+    if (previous?.path === position.path && previous.line === position.line && previous.side === position.side && previous.revision === position.revision && previous.lineText === position.lineText && (previous.character === position.character || (span && previousSpan && span[0] === previousSpan[0] && span[1] === previousSpan[1]))) return
     hoverPosition.current = position
     setLocation(position)
     clearTimeout(hoverTimer.current)
@@ -394,7 +461,7 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
     const sequence = ++hoverSequence.current
     hoverAbort.current?.abort()
     const expectedContext = context
-    const x = Math.max(10, Math.min(event.clientX + 12, window.innerWidth - Math.min(470, window.innerWidth - 20) - 10))
+    const x = Math.max(10, Math.min(event.clientX + 12, window.innerWidth - Math.min(560, window.innerWidth - 20) - 10))
     const y = Math.max(10, Math.min(event.clientY + 22, window.innerHeight - 320))
     setHover(undefined)
     hoverTimer.current = setTimeout(async () => {
@@ -408,20 +475,24 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
         if (!mounted.current || sequence !== hoverSequence.current || currentContext.current !== expectedContext) return
         const resolvedSnapshot = !!request.comparisonHead || request.revision === 'working' || request.revision === 'index'
         if (!completeRevision.test(result.revision) || (!resolvedSnapshot && result.revision !== request.revision)) throw new Error('The hover response belongs to another revision.')
-        setHover(result.contents ? { location: position, x, y, loading: false, result } : undefined)
-        // Phpactor may return a short authentic result while its initial index warms.
-        // Keep it visible and refresh once while the same symbol remains active.
-        if (result.language === 'php') hoverRefreshTimer.current = setTimeout(async () => {
+        setHover(current => result.contents ? { location: position, x: current?.x ?? x, y: current?.y ?? y, loading: false, result } : undefined)
+        // Phpactor can answer before its initial index has reached this symbol.
+        // Keep the authentic result visible and retry within a bounded window.
+        const refreshDelays = [500, 1_000, 2_000, 4_000]
+        const refreshRequest = { ...request, revision: result.revision, comparisonHead: undefined }
+        const refresh = (attempt: number) => { hoverRefreshTimer.current = setTimeout(async () => {
           if (!mounted.current || !hoverEligible.current || sequence !== hoverSequence.current || currentContext.current !== expectedContext) return
           const refreshController = new AbortController()
           hoverAbort.current = refreshController
           try {
-            const refreshed = await services.lsp.hover(request, refreshController.signal)
+            const refreshed = await services.lsp.hover(refreshRequest, refreshController.signal)
             if (!mounted.current || !hoverEligible.current || sequence !== hoverSequence.current || currentContext.current !== expectedContext || refreshController.signal.aborted) return
-            if (!completeRevision.test(refreshed.revision) || (!resolvedSnapshot && refreshed.revision !== request.revision)) return
-            if (refreshed.contents) setHover({ location: position, x, y, loading: false, result: refreshed })
+            if (refreshed.revision !== result.revision) return
+            if (refreshed.contents) setHover(current => ({ location: position, x: current?.x ?? x, y: current?.y ?? y, loading: false, result: refreshed }))
           } catch { /* Retain the last valid symbol result if the warmup refresh fails. */ }
-        }, 1_000)
+          if (attempt + 1 < refreshDelays.length && mounted.current && hoverEligible.current && sequence === hoverSequence.current && currentContext.current === expectedContext) refresh(attempt + 1)
+        }, refreshDelays[attempt]) }
+        if (result.language === 'php') refresh(0)
       } catch (issue) {
         if (!controller.signal.aborted && mounted.current && sequence === hoverSequence.current && currentContext.current === expectedContext) setHover({ location: position, x, y, loading: false, error: issue instanceof Error ? issue.message : 'Symbol information could not be loaded.' })
       }
@@ -445,7 +516,7 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
     }
   }}>
     <div className="code-intelligence-toolbar">
-      <span className="code-intelligence-hint" title={availabilityError || undefined}><Icon name="code" size={14} />{!active ? 'Language intelligence is available in the desktop app' : availabilityError ? 'Language server availability could not be checked' : !serverStatuses ? 'Checking language servers…' : availableServers ? 'Hover symbols · Ctrl/Cmd click or F12 for definition' : 'Language servers need setup'}{active && !availableServers && onOpenSettings && <button type="button" className="btn-ghost" onClick={onOpenSettings}>Set up</button>}</span>
+      <span className="code-intelligence-hint" title={availabilityError || preparationError || undefined} role={preparing ? 'status' : undefined}><Icon name="code" size={14} />{!active ? 'Language intelligence is available in the desktop app' : availabilityError ? 'Language server availability could not be checked' : !serverStatuses ? 'Checking language servers…' : preparationError ? 'Code analysis could not be prepared' : preparing ? 'Preparing code analysis…' : availableServers ? 'Hover symbols · Ctrl/Cmd click or F12 for definition' : 'Language servers need setup'}{active && !availableServers && onOpenSettings && <button type="button" className="btn-ghost" onClick={onOpenSettings}>Set up</button>}{preparationError && <button type="button" className="btn-ghost" onClick={() => setPreparationAttempt(value => value + 1)}>Retry</button>}</span>
       <button type="button" className="btn-ghost code-definition-button" disabled={!active || !location || busy} onClick={() => void goToDefinition(container.current ? codeLocationFromSelection(container.current) ?? locationRef.current : locationRef.current)}><Icon name="external" size={13} />{busy ? 'Loading definition…' : 'Go to definition'}</button>
     </div>
     {(error || notice) && <div className={`code-intelligence-message ${error ? 'is-error' : ''}`} role={error ? 'alert' : 'status'}><span>{error || notice}</span>{error && onOpenSettings && <button className="btn-ghost" type="button" onClick={onOpenSettings}>Language server settings</button>}<button className="icon-button" type="button" aria-label="Dismiss code navigation message" onClick={() => {setError('');setNotice('')}}><Icon name="close" size={13} /></button></div>}
@@ -457,6 +528,10 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
       </div>
     </section>}
     {!!targets.length && <div className="code-intelligence-targets" role="dialog" aria-label="Choose a definition"><div><strong>Definitions</strong><button className="icon-button" type="button" aria-label="Close definition choices" onClick={() => setTargets([])}><Icon name="close" size={14} /></button></div><ul>{targets.map(target => <li key={target.id || `${target.uri}:${target.range.start.line}:${target.range.start.character}`}><button type="button" disabled={busy} onClick={() => void openTarget(target)}><Icon name="file" size={16} /><span><strong>{target.path}:{target.range.start.line + 1}</strong><span>{target.external ? 'Dependency file' : 'Repository file'} · {target.language}</span></span><Icon name="chevron-right" size={14} /></button></li>)}</ul></div>}
-    {hover && <div ref={hoverPanel} className="code-intelligence-hover" role="dialog" aria-label="Symbol information" style={{ left: hover.x, top: hover.y }} onKeyDown={event => {if (event.key === 'Escape') {event.preventDefault();event.stopPropagation();clearHover()}}}><div className="code-hover-heading"><span>{hover.result?.language ?? 'Symbol information'}</span><button className="icon-button" type="button" aria-label="Close symbol information" onClick={clearHover}><Icon name="close" size={13} /></button></div>{hover.loading ? <div className="code-hover-loading" role="status"><span className="sr-only">Loading symbol information…</span><span className="skeleton" aria-hidden="true" /><span className="skeleton" aria-hidden="true" /></div> : hover.error ? <p className="code-hover-error" role="alert">{hover.error}{onOpenSettings && <button className="btn-ghost" type="button" onClick={onOpenSettings}>Language server settings</button>}</p> : hover.result && (hover.result.kind === 'plaintext' ? <div className="code-hover-plaintext">{hover.result.contents}</div> : <Markdown>{hover.result.contents}</Markdown>)}<button className="btn-ghost code-hover-definition" type="button" disabled={hover.loading || busy || !!hover.error} onClick={() => void goToDefinition(hover.location)}>Go to definition<kbd>F12</kbd></button></div>}
+    {hover && <div ref={hoverPanel} className="code-intelligence-hover" role="dialog" aria-label="Symbol information" style={{ left: hover.x, top: hover.y, ...codeReviewStyleVariables(preferences) }} onPointerEnter={() => {clearTimeout(hideTimer.current);hideTimer.current = undefined;hoverEligible.current = true}} onKeyDown={event => {if (event.key === 'Escape') {event.preventDefault();event.stopPropagation();clearHover()}}}>
+      <div className="code-hover-heading"><div><span className="code-hover-language">{({ php: 'PHP', typescript: 'TypeScript', javascript: 'JavaScript', vue: 'Vue' } as Record<string, string>)[hover.result?.language || languageFor(hover.location) || ''] || 'Symbol'}</span><span className="code-hover-location" title={reader?.document.path || hover.location.path}>{(reader?.document.path || hover.location.path).split('/').pop()}:{hover.location.line + 1}</span></div><button className="icon-button" type="button" aria-label="Close symbol information" onClick={clearHover}><Icon name="close" size={13} /></button></div>
+      {hover.loading ? <div className="code-hover-loading" role="status"><span>{preparing ? 'Preparing code analysis…' : 'Loading symbol information…'}</span><span className="skeleton" aria-hidden="true" /><span className="skeleton" aria-hidden="true" /></div> : hover.error ? <p className="code-hover-error" role="alert">{hover.error}{onOpenSettings && <button className="btn-ghost" type="button" onClick={onOpenSettings}>Language server settings</button>}</p> : hover.result && <SymbolInformation contents={hover.result.contents} kind={hover.result.kind} language={hover.result.language} theme={codeTheme} />}
+      <button className="btn-ghost code-hover-definition" type="button" disabled={hover.loading || busy || !!hover.error} onClick={() => void goToDefinition(hover.location)}><span><Icon name="external" size={13} />Go to definition</span><kbd>F12</kbd></button>
+    </div>}
   </div>
 }

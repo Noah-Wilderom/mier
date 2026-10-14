@@ -20,16 +20,27 @@
 .code-definition-line-number { color: var(--muted); text-align: right; padding-right: 14px; user-select: none; font-variant-numeric: tabular-nums; }
 .code-definition-row > code { font-family: inherit; font-size: inherit; padding-right: 24px; white-space: pre; tab-size: 4; }
 .code-intelligence [data-code-path] { cursor: text; }
-.code-intelligence-hover { position: fixed; z-index: 90; width: min(470px, calc(100vw - 20px)); max-height: min(420px, calc(100vh - 20px)); overflow: auto; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); box-shadow: 0 8px 28px rgb(0 0 0 / 15%); }
-.code-hover-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 11px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+.code-intelligence-hover { position: fixed; z-index: 90; width: min(560px, calc(100vw - 20px)); max-height: min(460px, calc(100vh - 20px)); overflow: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); box-shadow: 0 8px 28px rgb(0 0 0 / 18%); }
+.code-hover-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 11px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 12px; background: var(--surface); position: sticky; top: 0; z-index: 1; }
+.code-hover-heading > div { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.code-hover-language { font-size: 11px; font-weight: 600; color: var(--text); }
+.code-hover-location { font-family: var(--mono); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .code-intelligence-hover > .markdown-body { padding: 9px 12px 11px; font-size: 12px; }
+.code-hover-documentation { line-height: 1.6; }
+.code-hover-documentation :is(h1,h2,h3,h4) { font-size: 13px; line-height: 1.5; margin: 4px 0 8px; }
+.code-hover-documentation > :first-child { margin-top: 0; }
+.code-hover-documentation > :last-child { margin-bottom: 0; }
+.code-hover-documentation .code-hover-signature { padding: 11px 12px; margin: 8px 0 10px; border: 1px solid var(--border); border-radius: 5px; color: var(--signature-foreground, var(--text)); background: var(--signature-background, var(--panel)); font-family: var(--mono); font-size: var(--review-code-font-size, 13px); line-height: 1.65; overflow: auto; max-height: 240px; white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 4; }
+.code-hover-signature > code { font: inherit; color: inherit; white-space: inherit; background: none; padding: 0; }
 .code-hover-plaintext { padding: 9px 12px 11px; font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 .code-hover-loading { padding: 13px 12px; }
+.code-hover-loading > :first-child { display: block; font-size: 12px; color: var(--muted); margin-bottom: 12px; }
 .code-hover-loading .skeleton { display: block; height: 12px; margin-bottom: 9px; width: 90%; }
 .code-hover-loading .skeleton:last-child { width: 65%; margin-bottom: 0; }
 .code-hover-error { padding: 10px 12px; margin: 0; font-size: 12px; line-height: 1.5; color: var(--red); overflow-wrap: anywhere; }
 .code-hover-error .btn-ghost { display: block; margin-top: 7px; font-size: 12px; }
-.code-hover-definition { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 8px 12px; border: 0; border-top: 1px solid var(--border); border-radius: 0; font-size: 12px; }
+.code-hover-definition { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 8px 12px; border: 0; border-top: 1px solid var(--border); border-radius: 0; font-size: 12px; position: sticky; bottom: 0; background: var(--surface); }
+.code-hover-definition > span { display: flex; align-items: center; gap: 7px; }
 .code-hover-definition > kbd { color: var(--muted); font-family: inherit; font-size: 12px; }
 .code-intelligence-targets { position: absolute; top: 38px; right: 12px; z-index: 50; width: min(460px, calc(100% - 24px)); border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); box-shadow: 0 8px 28px rgb(0 0 0 / 15%); }
 .code-intelligence-targets > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }

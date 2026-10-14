@@ -72,6 +72,7 @@ export async function desktopFixture(page: Page) {
         case 'main.EditorService.PreferredEditor': result = 'vscode'; break
         case 'main.PRNotificationService.GetPreferences': result = { toastsEnabled: true, desktopEnabled: false, opened: true, closed: true, merged: true, reviewRequested: true }; break
         case 'main.LSPService.Servers': case 'main.LSPService.CheckServerUpdates': result = []; break
+        case 'main.LSPService.Warmup': result = null; break
         case 'main.GitHubService.ListPullRequestsPage': {
           const query = args[3], pageSize = query.pageSize || 25, start = Number(query.cursor || 0)
           const items = fixture.prs.filter(pr => {

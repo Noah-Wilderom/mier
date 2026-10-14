@@ -40,3 +40,7 @@ export function ReadDefinition(request: $models.ReadDefinitionRequest): $Cancell
 export function Servers(root: string): $CancellablePromise<$models.LSPServerStatus[] | null> {
     return $Call.ByID(3616121914, root);
 }
+
+export function Warmup(request: $models.CodePositionRequest): $CancellablePromise<void> {
+    return $Call.ByID(2894802898, request);
+}

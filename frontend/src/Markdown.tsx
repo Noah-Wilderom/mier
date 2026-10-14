@@ -51,6 +51,6 @@ const components: Components = {
   },
 }
 
-export const Markdown = memo(function Markdown({ children, className = '' }: { children: string; className?: string }) {
-  return <div className={`markdown-body ${className}`.trim()}><ReactMarkdown skipHtml remarkPlugins={[remarkGfm, remarkGemoji]} components={components} urlTransform={url => markdownURL(url) || ''}>{children}</ReactMarkdown></div>
+export const Markdown = memo(function Markdown({ children, className = '', codeBlock }: { children: string; className?: string; codeBlock?: Components['pre'] }) {
+  return <div className={`markdown-body ${className}`.trim()}><ReactMarkdown skipHtml remarkPlugins={[remarkGfm, remarkGemoji]} components={codeBlock ? { ...components, pre: codeBlock } : components} urlTransform={url => markdownURL(url) || ''}>{children}</ReactMarkdown></div>
 })

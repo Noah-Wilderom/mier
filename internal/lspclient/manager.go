@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -37,6 +38,8 @@ type Manager struct {
 	grantOrder     []string
 	grantBytes     int
 	tools          *toolInstaller
+	warmupMu       sync.Mutex
+	warmups        map[string]*warmupJob
 }
 
 func New(options Options) *Manager {
@@ -59,6 +62,7 @@ func New(options Options) *Manager {
 	ctx, cancel := context.WithCancel(context.Background())
 	m := &Manager{options: options, ctx: ctx, cancel: cancel, gate: make(chan struct{}, 1), configuration: configuration, configErr: err, workspaces: map[string]*workspace{}, aliases: map[string]string{}, grants: map[string]definitionGrant{}}
 	m.gate <- struct{}{}
+	m.warmups = map[string]*warmupJob{}
 	if options.ToolsDirectory == "" && options.ConfigPath != "" {
 		options.ToolsDirectory = filepath.Join(filepath.Dir(options.ConfigPath), "language-tools")
 	}
@@ -357,7 +361,7 @@ func (m *Manager) ensureSession(ctx context.Context, w *workspace, language stri
 		peer = w.sessions["vue-typescript"]
 		if peer == nil || !peer.rpc.Alive() {
 			var err error
-			peer, err = startSession(m.ctx, ctx, w, peerStatus, nil)
+			peer, err = startSession(m.ctx, m.ctx, w, peerStatus, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -378,7 +382,9 @@ func (m *Manager) ensureSession(ctx context.Context, w *workspace, language stri
 			return nil, err
 		}
 	}
-	s, err := startSession(m.ctx, ctx, w, status, peer)
+	// Initialization belongs to the app, rather than whichever pointer request
+	// happened to arrive first. startSession retains its bounded deadline.
+	s, err := startSession(m.ctx, m.ctx, w, status, peer)
 	if err != nil {
 		return nil, err
 	}
@@ -415,6 +421,11 @@ func (m *Manager) evictWorkspace() error {
 func (m *Manager) Hover(ctx context.Context, request CodePositionRequest) (Hover, error) {
 	ctx, cancel := m.requestContext(ctx)
 	defer cancel()
+	if immutableSHA.MatchString(request.Revision) && !strings.HasPrefix(request.Path, "mier-lsp://definition/") {
+		if err := m.Warmup(ctx, request); err != nil {
+			return Hover{}, err
+		}
+	}
 	w, s, path, text, language, done, err := m.prepare(ctx, request)
 	if err != nil {
 		return Hover{}, err
@@ -458,6 +469,11 @@ func (m *Manager) Hover(ctx context.Context, request CodePositionRequest) (Hover
 func (m *Manager) Definition(ctx context.Context, request CodePositionRequest) ([]DefinitionTarget, error) {
 	ctx, cancel := m.requestContext(ctx)
 	defer cancel()
+	if immutableSHA.MatchString(request.Revision) && !strings.HasPrefix(request.Path, "mier-lsp://definition/") {
+		if err := m.Warmup(ctx, request); err != nil {
+			return nil, err
+		}
+	}
 	w, s, path, text, language, done, err := m.prepare(ctx, request)
 	if err != nil {
 		return nil, err

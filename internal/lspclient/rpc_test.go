@@ -38,6 +38,7 @@ func TestLSPRPCChild(t *testing.T) {
 		}
 	}
 	var hoverID json.RawMessage
+	var initializationOptions json.RawMessage
 	for {
 		body, err := readFrame(reader)
 		if err != nil {
@@ -58,6 +59,11 @@ func TestLSPRPCChild(t *testing.T) {
 		}
 		switch message.Method {
 		case "initialize":
+			var params struct {
+				InitializationOptions json.RawMessage `json:"initializationOptions"`
+			}
+			_ = json.Unmarshal(message.Params, &params)
+			initializationOptions = params.InitializationOptions
 			initializationID = message.ID
 			methods := []string{"workspace/configuration", "workspace/workspaceFolders", "client/registerCapability", "window/workDoneProgress/create", "workspace/applyEdit"}
 			waiting = len(methods)
@@ -124,6 +130,8 @@ func TestLSPRPCChild(t *testing.T) {
 			cancelled++
 		case "test/cancellations":
 			reply(cancelled)
+		case "test/initializationOptions":
+			reply(initializationOptions)
 		case "test/echo":
 			var value struct {
 				Value int `json:"value"`

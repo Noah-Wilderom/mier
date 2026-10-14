@@ -129,6 +129,50 @@ func TestRealPHPHoverAndDefinition(t *testing.T) {
 	}
 }
 
+func TestRealPHPColdAndWarmHoverTiming(t *testing.T) {
+	m, root, sha := realLSPFixture(t)
+	phar := filepath.Join(os.Getenv("MIER_LSP_SMOKE_TOOLS"), "phpactor.phar")
+	if _, err := os.Stat(phar); err != nil {
+		t.Skip("Download the official Phpactor PHAR for PHP timing checks")
+	}
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	if err := m.Configure(context.Background(), "php", lspclient.ServerConfiguration{Command: "php", Args: []string{phar, "language-server"}}); err != nil {
+		t.Fatal(err)
+	}
+	line := "$message = $greeter->greet('PHP');"
+	request := lspclient.CodePositionRequest{Root: root, Revision: sha, Path: "src/use.php", Line: 3, Character: strings.Index(line, "greet(") + 2, LineText: &line}
+	preparing := time.Now()
+	if err := m.Warmup(context.Background(), request); err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("visible-file preparation: %s", time.Since(preparing).Round(time.Millisecond))
+	started := time.Now()
+	hover, err := m.Hover(context.Background(), request)
+	t.Logf("first hover after preparation: %s; complete signature: %v", time.Since(started).Round(time.Millisecond), strings.Contains(hover.Contents, "string"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(12 * time.Second)
+	for !strings.Contains(hover.Contents, "string") && time.Now().Before(deadline) {
+		time.Sleep(100 * time.Millisecond)
+		hover, err = m.Hover(context.Background(), request)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Logf("complete signature after visible-file preparation: %s", time.Since(started).Round(time.Millisecond))
+	if !strings.Contains(hover.Contents, "string") {
+		t.Fatal("PHP signature did not become available")
+	}
+	started = time.Now()
+	hover, err = m.Hover(context.Background(), request)
+	t.Logf("warm hover: %s", time.Since(started).Round(time.Millisecond))
+	if err != nil || !strings.Contains(hover.Contents, "string") {
+		t.Fatalf("Warm hover: %+v %v", hover, err)
+	}
+}
+
 func TestRealPHPReviewFetchesMissingCommitThroughSCPRemote(t *testing.T) {
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(t.TempDir(), "gitconfig"))

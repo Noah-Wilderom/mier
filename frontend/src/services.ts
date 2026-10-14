@@ -452,6 +452,7 @@ export const services = {
   },
   lsp: {
     servers: async (root: string) => (await invoke<LSPServerStatus[] | null>("main.LSPService.Servers", root)) ?? [],
+    warmup: (request: CodePositionRequest, signal?: AbortSignal) => invokeLSP<void>("main.LSPService.Warmup", request, signal),
     hover: (request: CodePositionRequest, signal?: AbortSignal) => invokeLSP<LSPHover>("main.LSPService.Hover", request, signal),
     definition: async (request: CodePositionRequest, signal?: AbortSignal) => (await invokeLSP<LSPDefinitionTarget[] | null>("main.LSPService.Definition", request, signal)) ?? [],
     readDefinition: (request: {root:string; revision:string; target:string}, signal?: AbortSignal) => invokeLSP<LSPDefinitionDocument>("main.LSPService.ReadDefinition", request, signal),

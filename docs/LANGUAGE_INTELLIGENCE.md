@@ -13,7 +13,8 @@ M.I.E.R. provides real language-server hover and read-only definition navigation
 | Local changes | Working-tree and index source layers, including an unborn repository's new files. |
 | Navigation | Ctrl/Cmd-click, F12, the `g` then `d` shortcut (case insensitive), and the visible Go to definition action. Multiple targets get a chooser. |
 | Definition reader | Full source, line numbers, current code font/theme, recursive navigation, a Dependency file label where appropriate, and Back to review. The review remains mounted so file selection, scroll, and drafts survive. |
-| Hover | Actual server Markdown or literal plaintext; no invented fallback descriptions. PHP gets one delayed refresh while the same symbol remains active to accommodate initial indexing. |
+| Hover | Actual server Markdown or literal plaintext, highlighted signatures using the selected code theme/font, a source location, and a definition action. PHP gets bounded delayed refreshes while the same symbol remains active to accommodate initial indexing. |
+| Preparation | Opening a supported review file starts source capture and language-server initialization before the first hover. Preparation failures can be retried. |
 
 The feature runs in the native desktop app through Wails. The standalone browser prototype does not provide fake language-server responses. Syntax highlighting is independent of language-server installation; see [frontend research](RESEARCH_FRONTEND.md).
 
@@ -111,9 +112,15 @@ Outside-scope targets, traversal, Git metadata, unsupported URI schemes, invalid
 
 ## Cancellation, warmup, and resource limits
 
-Hover waits 450 ms after pointer positioning. Changing symbols, dismissing the popup, switching context, navigating, or unmounting aborts pending work. Abort signals cancel the actual Wails promise, reaching the Go request context and LSP `$/cancelRequest`; frontend generation guards also discard late results if a server ignores cancellation.
+Opening a supported review file prepares its preferred new side (or old side when no new side exists). This captures the displayed revision, starts its server, and opens the document. Only the selected side is prepared, so a second revision does not compete with the source about to be inspected. Concurrent preparation of the same file is shared; cancelling a caller stops its wait without interrupting app-owned preparation. Up to four preparation jobs can be active, each bounded by the request deadline. Initialization retains its separate 20-second limit, and application shutdown cancels preparation.
 
-For PHP, an initial authentic result appears immediately. If the same symbol and view remain active, the frontend refreshes it once after about one second. The previous result remains visible during that refresh and is retained if the refresh fails. Dismissal cancels the timer/request so a late response cannot reopen the popup. Other languages do not get this indexing refresh.
+Hover waits 450 ms after pointer positioning. Moving within the same identifier keeps its pending request. Changing symbols, dismissing the popup, switching context, navigating, or unmounting aborts pending symbol work. Abort signals cancel the actual Wails promise, reaching the Go request context and LSP `$/cancelRequest`; frontend generation guards also discard late results if a server ignores cancellation. The popup keeps its viewport placement when delayed results arrive and renders plaintext literally; Markdown retains the application's safe link and HTML handling.
+
+For PHP, the first authentic result appears as soon as the server returns it. If the same symbol and view remain active, up to four refreshes follow after delays of 500 ms, 1 s, 2 s, and 4 s. They reuse the revision resolved by the first response, avoiding another mutable source capture. The previous result remains visible and is retained if a refresh fails. Dismissal cancels the timer/request so a late response cannot reopen the popup. Other languages do not get this indexing refresh.
+
+Phpactor is initialized with unused on-open/update/save diagnostics and document highlighting disabled. M.I.E.R. exposes hover and definitions, so those additional computations have no corresponding UI. These options follow [Phpactor's performance guidance](https://phpactor.readthedocs.io/en/master/tips/performance.html) and [configuration reference](https://phpactor.readthedocs.io/en/master/reference/configuration.html).
+
+Preparation finishing means the document is open, not that every dependency has been indexed. First-time Git capture, dependency copying, process startup, and server indexing still cost time. Preparing when the file opens moves that work ahead of pointer interaction; it does not promise instant cold analysis of a large project. The retained real-PHP timing test logs preparation, first/full hover, and warmed hover separately, without using a machine-dependent timing threshold.
 
 | Resource | Current limit |
 | --- | --- |
@@ -124,6 +131,7 @@ For PHP, an initial authentic result appears immediately. If the same symbol and
 | Frozen definition grants | 64 grants and 32 MiB aggregate text; eviction requires reopening a definition. |
 | Hover content | 64 KiB, then truncation. |
 | LSP request / initialization | 60 seconds / 20 seconds. |
+| Concurrent preparation | Four active jobs; duplicate file/revision requests share a job. |
 | Vue broker request | 15 seconds. |
 | JSON-RPC frame | 8 MiB; malformed/oversized frames are rejected. |
 
@@ -182,7 +190,7 @@ node_modules/@vue/typescript-plugin/             3.3.13
 
 The npm packages can be installed outside a project with `npm install --prefix /absolute/path/to/mier-lsp-tools --no-save typescript@5.9.3 typescript-language-server@6.0.2 @vue/language-server@3.3.13 @vue/typescript-plugin@3.3.13`. Obtain the PHAR from [Phpactor's official installation instructions](https://phpactor.readthedocs.io/en/master/usage/standalone.html); the `latest` download is mutable, so record its reported version when reproducing. No PHAR means the PHP smoke skips while TypeScript/Vue can still run.
 
-The real-server suite includes a dirty monorepo dependency-link regression, PHP hover/definition navigation after fetching a PR commit absent from the local clone through an SCP-style remote, and navigation into an installed PHP dependency with over 128 MiB of vendor PHP source. The large-vendor test verifies a frozen dependency definition and unchanged tracked source/Git state. These fixtures do not establish complete Laravel/Symfony support or cross-platform server compatibility.
+The real-server suite includes a dirty monorepo dependency-link regression, PHP hover/definition navigation after fetching a PR commit absent from the local clone through an SCP-style remote, navigation into an installed PHP dependency with over 128 MiB of vendor PHP source, and a cold/prepared/warm PHP timing check. The large-vendor test verifies a frozen dependency definition and unchanged tracked source/Git state. These fixtures do not establish complete Laravel/Symfony support or cross-platform server compatibility.
 
 ## Implementation map and extension seam
 
@@ -193,14 +201,16 @@ The real-server suite includes a dirty monorepo dependency-link regression, PHP 
 | [config.go](../internal/lspclient/config.go) | Supported languages, detection, configuration validation/persistence. |
 | [tools_catalog.go](../internal/lspclient/tools_catalog.go), [tools_install.go](../internal/lspclient/tools_install.go) | Managed versions, runtime prerequisites, upstream checks, verified installation, cancellation, and activation. |
 | [manager.go](../internal/lspclient/manager.go) | Cached revisions, sessions, leases, actual requests, and grants. |
+| [warmup.go](../internal/lspclient/warmup.go) | Shared, app-owned document preparation independent of pointer cancellation. |
 | [session.go](../internal/lspclient/session.go) | Initialization, versioned documents, content normalization, Vue peer broker. |
 | [rpc.go](../internal/lspclient/rpc.go) | Bounded stdio JSON-RPC, response correlation, cancellation, process lifetime. |
 | [workspace.go](../internal/lspclient/workspace.go), [dependencies.go](../internal/lspclient/dependencies.go) | Private source extraction, permitted file scopes, positions, dependency copies/rebasing. |
 | [archive.go](../internal/gitclient/archive.go), [exact_tree.go](../internal/gitclient/exact_tree.go), [workspace_archive.go](../internal/gitclient/workspace_archive.go) | Commit/merge-base snapshots and mutable source capture. |
 | [services.ts](../frontend/src/services.ts) | Browser-safe native calls; LSP-specific abort forwarding. |
 | [CodeIntelligence.tsx](../frontend/src/CodeIntelligence.tsx) | DOM positions, availability, hover, cancellation, read-only definition navigation. |
+| [SymbolInformation.tsx](../frontend/src/SymbolInformation.tsx) | Safe symbol documentation and syntax-highlighted signatures. |
 | [LanguageServerSettings.tsx](../frontend/src/LanguageServerSettings.tsx) | Installation/update state, progress, retries, and explicit configuration UI. |
 
-The native `main.LSPService` exposes `Servers(root)`, `CheckServerUpdates(root, force)`, `InstallServer(language)`, `CancelServerInstall(language)`, `ConfigureServer(language, configuration)`, `Hover(positionRequest)`, `Definition(positionRequest)`, and `ReadDefinition({root, revision, target})`. An empty root checks global setup without scanning a repository. Positions are zero-based UTF-16. A position request has root, revision, path or granted URI, optional comparison head and PR identity, line, character, and displayed line text. Hover/definition responses identify the actual captured revision; readers must keep that revision with their opaque target. Wails omits the first Go `context.Context` parameter from frontend arguments.
+The native `main.LSPService` exposes `Servers(root)`, `CheckServerUpdates(root, force)`, `InstallServer(language)`, `CancelServerInstall(language)`, `ConfigureServer(language, configuration)`, `Warmup(positionRequest)`, `Hover(positionRequest)`, `Definition(positionRequest)`, and `ReadDefinition({root, revision, target})`. An empty root checks global setup without scanning a repository. Positions are zero-based UTF-16. A position request has root, revision, path or granted URI, optional comparison head and PR identity, line, character, and displayed line text. Hover/definition responses identify the actual captured revision; readers must keep that revision with their opaque target. Wails omits the first Go `context.Context` parameter from frontend arguments.
 
 Future language/framework support can add detection/routing, setup fields, server-specific initialization/configuration, and tested dependency-resolution rules without changing the revision/grant boundary. Keep Vue's custom broker as a server adapter rather than a generic-LSP assumption. Currently `workspace/configuration` returns empty configuration objects; diagnostics are not normalized or sent to the UI. Add capability-specific contracts and real fixtures before advertising completion, diagnostics, framework stubs, or additional navigation features.

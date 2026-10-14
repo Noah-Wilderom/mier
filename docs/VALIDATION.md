@@ -1,6 +1,6 @@
 # Validation record
 
-Workspace, managed language tools, SSH remote handling, and large PHP dependency capture verified through **2026-10-14**. The earlier documentation handoff is preserved in [the historical record](validation/handoff-2026-10-13.md); its temporary QA paths and Jira simulation are historical, not the current test suite.
+Workspace, managed language tools, SSH remote handling, large PHP dependency capture, and symbol preparation/rendering verified through **2026-10-14**. The earlier documentation handoff is preserved in [the historical record](validation/handoff-2026-10-13.md); its temporary QA paths and Jira simulation are historical, not the current test suite.
 
 ## Environment
 
@@ -25,19 +25,19 @@ The managed installer also downloaded and verified all three current servers int
 
 | Check | Result |
 | --- | --- |
-| `npm --prefix frontend test` | 46 passed, zero failed or skipped |
-| `npm --prefix frontend run test:ui -- --project=chromium` | 26 passed; includes TypeScript checking of the harness |
-| `npm --prefix frontend run test:ui -- --project=webkit` | 26 passed; final browser validation ran each engine separately after the native build finished |
+| `npm --prefix frontend test` | 48 passed, zero failed or skipped |
+| `npm --prefix frontend run test:ui -- --project=chromium` | 30 passed; includes TypeScript checking of the harness |
+| `npm --prefix frontend run test:ui -- --project=webkit` | 30 passed; each browser engine ran separately |
 | Modal focus regression after the final focus change | Both browser projects passed |
 | `npm --prefix frontend run build` | TypeScript and production frontend build passed |
 | `go test -race ./...` | All ordinary package tests passed |
 | `go vet ./...` | Passed |
-| `MIER_LSP_SMOKE_TOOLS="$(cat /tmp/mier-managed-lsp-protocol-root)" go test -race -timeout 3m -run '^TestReal' -count=1 -v .` | All seven actual PHP/TypeScript/Vue tests passed, including PHP navigation after fetching a missing PR commit and into installed vendor dependencies above the former 128 MiB cap |
+| `MIER_LSP_SMOKE_TOOLS="$(cat /tmp/mier-managed-lsp-protocol-root)" go test -race -timeout 3m -run '^TestReal' -count=1 -v .` | All eight actual PHP/TypeScript/Vue tests passed, including cold/warm PHP timing and navigation after fetching a missing PR commit or into vendor source above the former 128 MiB cap |
 | `MIER_LSP_INSTALL_SMOKE=1 MIER_LSP_INSTALL_TOOLS=/tmp/mier-managed-lsp-installation go test -race ./internal/lspclient -run '^TestRealManagedToolInstallation$' -count=1 -timeout 10m -v` | Official Phpactor, TypeScript, and Vue downloads installed, verified, and activated; no repository/global package installation |
 | Five real-server tests rerun against the newly managed packages | All five passed with the race detector |
 | `node --test scripts/release.test.mjs` | 10 passed |
 | `actionlint .github/workflows/test.yml .github/workflows/release.yml` | Passed |
-| `wails3 build` | Binding generation and Linux production build passed; 9 bound RPC services, 61 methods, 52 models, 3 events |
+| `wails3 build` | Binding generation and Linux production build passed; 9 bound RPC services, 62 methods, 52 models, 3 events |
 
 Go embeds `frontend/dist`, so frontend builds and Go checks were sequenced with the Wails watcher stopped. The native app was launched from the production binary, rather than Vite's standalone demo.
 
@@ -56,6 +56,7 @@ Go embeds `frontend/dist`, so frontend builds and Go checks were sequenced with 
 - Account removal using the confirmed account's hostname, invalid appearance recovery, and Jira's unavailable state.
 - Managed language-server installs before repository selection, persisted progress after navigation, duplicate suppression, cancellation/retry, failed updates preserving the installed version, pending-update badges, prerequisite blocking, repair, offline checks, custom executable selection, and background activation refreshing code navigation.
 - Inbox pagination, overlapping pages, preservation of the selected review revision, full-result filters/counts, empty filtered results, error recovery, duplicate suppression, stale responses after filter/repository changes, and account lookup failures surviving local refreshes.
+- Symbol preparation before pointer interaction, highlighted PHP signatures, source locations, read-only definitions, stable requests while moving within an identifier, delayed PHP refreshes beyond one second, literal plaintext, preserved placement after viewport resizing, preparation retry, and abandoned-view/dismissal guards.
 
 New backend tests cover dirty/unborn branch creation, protected merged-only deletion, rename/tracking preservation, provider-specific PR checkout, root/merge commit diffs without checkout/index mutation, immutable GitHub commit validation and pagination, and canonical path/dependency metadata handling across OS aliases. Existing Git, provider, sync, notification, editor, highlighting, and review-draft tests remain in the suite.
 
@@ -67,6 +68,8 @@ Actual language-server checks exercised PHP cross-file signatures/definitions, s
 
 Large dependency regressions first reproduced **Capture vendor source: Installed dependency source exceeds the 128 MiB analysis limit** with 130 MiB of PHP source. PHP now captures its vendor source/configuration independently of JS/Vue's node modules, with a 1 GiB dependency budget per captured revision/family. Tests cover switching and reusing both families for one commit, freezing large dependency copies, retaining/rebasing Composer metadata above the ordinary 4 MiB file limit, budget rejection before copying, and cancellation removing a partial file. The real Phpactor regression uses a Composer-compatible autoloader, resolves an installed method's signature/definition with 130 MiB of vendor PHP source, and reads the frozen grant after the original dependency changes, while preserving dirty tracked code and Git state.
 
+Preparation regressions verify that cancelling a waiter preserves the shared initial capture, a later hover uses that capture, failures can retry, application shutdown cancels pending work, and PHP initialization disables diagnostics/highlighting that this client does not consume. The retained real-PHP timing test separates preparation, first/full signature, and warmed requests; it asserts correctness without a machine-dependent latency threshold. Earlier isolated timing measured 3.254 seconds for a partial cold hover, 5.649 seconds for a full signature, and 2 milliseconds for a warm hover. These are small-fixture measurements, not a latency guarantee for a large application. Cold capture/indexing still costs time; the application now begins it when the review file opens.
+
 ## Native and CI evidence
 
 The Linux production binary opened through the native folder dialog in a disposable Git repository. Its comparison dialog displayed the committed branch change while the working file remained dirty. Creating and selecting a new branch from the UI preserved that dirty work. Native staging and commit actions then produced a clean working tree; history displayed the committed change. [The native comparison screenshot](validation/native-comparison.png) records the actual GTK/WebKit window.
@@ -76,6 +79,8 @@ The managed-tool desktop check used a real installed TypeScript language server 
 The SSH fix was also checked in the production desktop binary through T3/noVNC, with a disposable PHP repository and isolated application configuration. Clicking **Fetch** contacted `git@github.com:Noah-Wilderom/mier.git` through the existing SSH setup and created `origin/master` at `250f169`. No application GitHub account was connected in that profile. Native [PHP hover](validation/native-ssh-php-hover.png) displayed the actual method signature, and [Go to definition](validation/native-ssh-php-definition.png) opened `src/Greeter.php` in the read-only reader. The working change remained intact. The separate real-server regression validates the missing PR commit path end to end; no remote repository was written during these checks.
 
 The large-vendor fix was checked in another isolated native profile with **130 MiB of PHP vendor source**. Hover completed, and Go to definition opened [the installed method](validation/native-large-vendor-definition.png) with a Dependency file label. The captured cache contained all 67 vendor files (130 MiB), with no node modules copied, and the original tracked working change remained intact. This is a size-limit and dependency-navigation fixture, rather than a benchmark of a full Symfony/Laravel project.
+
+The same isolated 130 MiB fixture verified proactive [document preparation](validation/native-hover-preparation.png) in the rebuilt desktop binary: opening Changes started source capture and Phpactor before any symbol hover. After that background preparation, the first hover displayed the full typed method within a 900 ms observation window, including the deliberate 450 ms pointer delay. [Light](validation/native-formatted-hover-light.png) and [dark](validation/native-formatted-hover-dark.png) checks showed the actual highlighted signature, filename/line, and definition action. Clicking that action opened [the installed source](validation/native-formatted-definition.png) read-only, and the original working change remained intact. The separate isolated race-enabled timing run recorded 188 ms to open the document, 3.763 seconds for an immediate first partial hover, 7.069 seconds for a full signature after preparation, and 2 ms for a subsequent hover. Immediate cold requests can still wait for indexing; background preparation gives it time to finish before interaction.
 
 The final feature commit `de9bf12` passed [CI run 38487224237](https://github.com/Noah-Wilderom/mier/actions/runs/38487224237) on **2026-10-14**: the retained browser regression job and native Linux, macOS, and Windows tests/builds all succeeded. Linux built and inspected DEB/RPM/Arch/AppImage packages. Canonical source scope and Composer metadata fixes had also passed [the preceding cross-platform run](https://github.com/Noah-Wilderom/mier/actions/runs/38482044287).
 

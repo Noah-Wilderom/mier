@@ -68,6 +68,9 @@ func (s *LSPService) CancelServerInstall(language string) error {
 func (s *LSPService) Hover(ctx context.Context, request CodePositionRequest) (CodeHover, error) {
 	return s.manager.Hover(ctx, request)
 }
+func (s *LSPService) Warmup(ctx context.Context, request CodePositionRequest) error {
+	return s.manager.Warmup(ctx, request)
+}
 func (s *LSPService) Definition(ctx context.Context, request CodePositionRequest) ([]CodeDefinitionTarget, error) {
 	return s.manager.Definition(ctx, request)
 }

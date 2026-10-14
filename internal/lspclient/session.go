@@ -75,6 +75,17 @@ func startSession(ctx, requestCtx context.Context, w *workspace, status ServerSt
 	}
 	s.rpc = rpc
 	initialization := map[string]any{}
+	if status.Language == "php" {
+		// This client exposes symbol inspection, not diagnostic squiggles or
+		// document highlights. Phpactor otherwise computes them on didOpen,
+		// competing with the first hover on large files.
+		initialization = map[string]any{
+			"language_server.diagnostics_on_open":   false,
+			"language_server.diagnostics_on_update": false,
+			"language_server.diagnostics_on_save":   false,
+			"language_server_highlight.enabled":     false,
+		}
+	}
 	if status.Language == "typescript" {
 		initialization = map[string]any{"hostInfo": "M.I.E.R.", "disableAutomaticTypingAcquisition": true, "tsserver": map[string]any{"path": status.Configuration.TypeScriptSDKPath, "logVerbosity": "off", "useSyntaxServer": "never"}}
 		if status.Configuration.VuePluginPath != "" {
