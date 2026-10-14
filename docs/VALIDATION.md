@@ -58,7 +58,7 @@ Actual language-server checks exercised PHP cross-file signatures/definitions, s
 
 The Linux production binary opened through the native folder dialog in a disposable Git repository. Its comparison dialog displayed the committed branch change while the working file remained dirty. Creating and selecting a new branch from the UI preserved that dirty work. Native staging and commit actions then produced a clean working tree; history displayed the committed change. [The native comparison screenshot](validation/native-comparison.png) records the actual GTK/WebKit window.
 
-[Cross-platform CI run 38482044287](https://github.com/Noah-Wilderom/mier/actions/runs/38482044287) passed on Linux, macOS, and Windows after canonical source scopes and Composer metadata rebasing were fixed. Those runners also built the native application; Linux built and inspected DEB/RPM/Arch/AppImage packages. That run predates the remaining workspace feature commit; its subsequent workflow includes the retained browser job as well.
+The final feature commit `de9bf12` passed [CI run 38487224237](https://github.com/Noah-Wilderom/mier/actions/runs/38487224237) on **2026-10-14**: the retained browser regression job and native Linux, macOS, and Windows tests/builds all succeeded. Linux built and inspected DEB/RPM/Arch/AppImage packages. Canonical source scope and Composer metadata fixes had also passed [the preceding cross-platform run](https://github.com/Noah-Wilderom/mier/actions/runs/38482044287).
 
 ## Limits
 
