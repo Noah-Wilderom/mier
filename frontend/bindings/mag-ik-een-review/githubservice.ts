@@ -21,12 +21,32 @@ export function CreatePullRequest(host: string, owner: string, repo: string, inp
     return $Call.ByID(1541012802, host, owner, repo, input);
 }
 
+export function DispatchWorkflow(host: string, owner: string, repo: string, input: githubclient$0.WorkflowDispatchRequest): $CancellablePromise<void> {
+    return $Call.ByID(790088297, host, owner, repo, input);
+}
+
+export function GetCheckWorkflowJob(host: string, owner: string, repo: string, id: number): $CancellablePromise<githubclient$0.WorkflowJob | null> {
+    return $Call.ByID(190804278, host, owner, repo, id);
+}
+
 export function GetCommitDiff(host: string, owner: string, repo: string, sha: string): $CancellablePromise<githubclient$0.CommitDiff | null> {
     return $Call.ByID(2420156920, host, owner, repo, sha);
 }
 
 export function GetPullRequest(host: string, owner: string, repo: string, $number: number): $CancellablePromise<githubclient$0.PullRequestDetail | null> {
     return $Call.ByID(2856222730, host, owner, repo, $number);
+}
+
+export function GetWorkflowDispatch(host: string, owner: string, repo: string, id: number, reference: string): $CancellablePromise<githubclient$0.WorkflowDispatch> {
+    return $Call.ByID(3781403989, host, owner, repo, id, reference);
+}
+
+export function GetWorkflowJobLog(host: string, owner: string, repo: string, id: number): $CancellablePromise<githubclient$0.WorkflowJobLog> {
+    return $Call.ByID(1217119084, host, owner, repo, id);
+}
+
+export function GetWorkflowRun(host: string, owner: string, repo: string, id: number, attempt: number): $CancellablePromise<githubclient$0.WorkflowRunDetail> {
+    return $Call.ByID(681893304, host, owner, repo, id, attempt);
 }
 
 export function ListPullRequests(host: string, owner: string, repo: string, state: string): $CancellablePromise<githubclient$0.PullRequestSummary[] | null> {
@@ -37,8 +57,20 @@ export function ListPullRequestsPage(host: string, owner: string, repo: string, 
     return $Call.ByID(268554336, host, owner, repo, request);
 }
 
+export function ListWorkflowRuns(host: string, owner: string, repo: string, input: githubclient$0.WorkflowRunsRequest): $CancellablePromise<githubclient$0.WorkflowRunsPage> {
+    return $Call.ByID(2255738273, host, owner, repo, input);
+}
+
+export function ListWorkflows(host: string, owner: string, repo: string): $CancellablePromise<githubclient$0.Workflow[] | null> {
+    return $Call.ByID(3840744020, host, owner, repo);
+}
+
 export function MergePullRequest(host: string, owner: string, repo: string, $number: number, method: string, expectedHeadSHA: string): $CancellablePromise<githubclient$0.MergeResult> {
     return $Call.ByID(3829195270, host, owner, repo, $number, method, expectedHeadSHA);
+}
+
+export function MutateWorkflowRun(host: string, owner: string, repo: string, input: githubclient$0.WorkflowMutation): $CancellablePromise<void> {
+    return $Call.ByID(570442726, host, owner, repo, input);
 }
 
 export function RemoveReviewers(host: string, owner: string, repo: string, $number: number, reviewers: string[] | null): $CancellablePromise<void> {

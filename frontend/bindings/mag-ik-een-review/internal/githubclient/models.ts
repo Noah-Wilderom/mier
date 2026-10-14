@@ -25,6 +25,8 @@ export interface CheckRun {
     "startedAt": string;
     "completedAt": string;
     "detailsUrl": string;
+    "app": {"slug": string};
+    "checkSuite": {"id": number};
     "output": {"title": string, "summary": string, "text": string};
 }
 
@@ -207,4 +209,115 @@ export interface User {
     "name": string;
     "avatarUrl": string;
     "url": string;
+}
+
+export interface Workflow {
+    "id": number;
+    "name": string;
+    "path": string;
+    "state": string;
+    "url": string;
+}
+
+export interface WorkflowDispatch {
+    "workflow": Workflow;
+    "ref": string;
+    "enabled": boolean;
+    "inputs": WorkflowInput[] | null;
+}
+
+export interface WorkflowDispatchRequest {
+    "workflowId": number;
+    "ref": string;
+    "inputs": { [_ in string]?: string } | null;
+}
+
+export interface WorkflowInput {
+    "name": string;
+    "description": string;
+    "type": string;
+    "required": boolean;
+    "default": string;
+    "options": string[] | null;
+}
+
+export interface WorkflowJob {
+    "id": number;
+    "runId": number;
+    "runAttempt": number;
+    "name": string;
+    "status": string;
+    "conclusion": string;
+    "startedAt": string;
+    "completedAt": string;
+    "url": string;
+    "checkRunUrl": string;
+    "runnerName": string;
+    "steps": WorkflowStep[] | null;
+}
+
+export interface WorkflowJobLog {
+    "job": WorkflowJob;
+
+    /**
+     * available, pending, unavailable
+     */
+    "state": string;
+    "message": string;
+    "text": string;
+    "truncated": boolean;
+    "tail": boolean;
+}
+
+export interface WorkflowMutation {
+    "runId": number;
+    "expectedAttempt": number;
+    "jobId": number;
+    "action": string;
+}
+
+export interface WorkflowRun {
+    "id": number;
+    "workflowId": number;
+    "name": string;
+    "displayTitle": string;
+    "runNumber": number;
+    "runAttempt": number;
+    "headBranch": string;
+    "headSha": string;
+    "event": string;
+    "status": string;
+    "conclusion": string;
+    "createdAt": string;
+    "updatedAt": string;
+    "runStartedAt": string;
+    "url": string;
+    "actor": User;
+}
+
+export interface WorkflowRunDetail {
+    "run": WorkflowRun;
+    "jobs": WorkflowJob[] | null;
+}
+
+export interface WorkflowRunsPage {
+    "items": WorkflowRun[] | null;
+    "totalCount": number;
+    "hasMore": boolean;
+}
+
+export interface WorkflowRunsRequest {
+    "workflowId": number;
+    "branch": string;
+    "status": string;
+    "page": number;
+}
+
+export interface WorkflowStep {
+    "name": string;
+    "number": number;
+    "status": string;
+    "conclusion": string;
+    "startedAt": string;
+    "completedAt": string;
 }

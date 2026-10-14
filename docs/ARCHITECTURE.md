@@ -22,6 +22,7 @@ The Go application owns filesystem access, Git, credentials, provider requests, 
 | Markdown and identities | GitHub user/comment DTOs | `Markdown.tsx`, `Avatar.tsx` |
 | Code highlighting and preferences | No server dependency | `syntaxHighlighter.ts`, `codeReviewPreferences.ts`, `CodeReviewSettings.tsx` |
 | Language intelligence | `lspservice.go`, `internal/lspclient/`, Git snapshot APIs | `CodeIntelligence.tsx`, `LanguageServerSettings.tsx` |
+| GitHub Actions | `github_actions_service.go`, `internal/githubclient/actions*.go` | `Actions.tsx`, `Checks.tsx`, `useActionsResource.ts` |
 | Notifications | `prnotificationservice.go`, `desktopnotificationservice.go` | `NotificationSettings.tsx`, `NotificationToasts.tsx` |
 | Editor launching | `editorservice.go` | `EditorActions.tsx` |
 | Jira Cloud tickets | `integrationservice.go`, `jira_oauth.go`, `jira_tickets.go` | `JiraIntegration.tsx`, `ReviewTickets.tsx`, `JiraRichText.tsx`, `useJiraConnection.ts` |

@@ -211,7 +211,13 @@ type CheckRun struct {
 	StartedAt   string `json:"startedAt"`
 	CompletedAt string `json:"completedAt"`
 	DetailsURL  string `json:"detailsUrl"`
-	Output      struct {
+	App         struct {
+		Slug string `json:"slug"`
+	} `json:"app"`
+	CheckSuite struct {
+		ID int64 `json:"id"`
+	} `json:"checkSuite"`
+	Output struct {
 		Title   string `json:"title"`
 		Summary string `json:"summary"`
 		Text    string `json:"text"`

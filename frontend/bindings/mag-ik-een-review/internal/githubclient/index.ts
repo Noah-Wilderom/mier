@@ -20,5 +20,17 @@ export type {
     ReviewRequest,
     Thread,
     UpdateRequest,
-    User
+    User,
+    Workflow,
+    WorkflowDispatch,
+    WorkflowDispatchRequest,
+    WorkflowInput,
+    WorkflowJob,
+    WorkflowJobLog,
+    WorkflowMutation,
+    WorkflowRun,
+    WorkflowRunDetail,
+    WorkflowRunsPage,
+    WorkflowRunsRequest,
+    WorkflowStep
 } from "./models.js";

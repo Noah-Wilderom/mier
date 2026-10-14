@@ -187,47 +187,7 @@ func (c *Client) request(ctx context.Context, method, path string, body, output 
 		}
 		response.Header = mergedHeaders
 	} else if response.StatusCode < 200 || response.StatusCode >= 300 {
-		var wire struct {
-			Message string `json:"message"`
-		}
-		_ = json.Unmarshal(data, &wire)
-		message := wire.Message
-		if message == "" {
-			message = http.StatusText(response.StatusCode)
-		}
-		if c.token != "" {
-			message = strings.ReplaceAll(message, c.token, "[redacted]")
-		}
-		switch response.StatusCode {
-		case 401:
-			message += ". Sign in again with gh auth login or replace the saved token"
-		case 403:
-			message += ". Check repository access, SSO authorization, and token permissions (Pull requests, Issues and Checks; Contents write for merging)"
-		case 404:
-			message += ". Verify the repository and that this account can access it"
-		case 409:
-			message += ". The pull request head changed; refresh before merging"
-		case 422:
-			message += ". Check branch names, diff line locations, and review state"
-		}
-		apiError := &APIError{Status: response.StatusCode, Message: message}
-		if seconds, _ := strconv.Atoi(response.Header.Get("Retry-After")); seconds > 0 {
-			apiError.RetryAt = time.Now().Add(time.Duration(seconds) * time.Second).UTC().Format(time.RFC3339)
-		} else if response.Header.Get("X-RateLimit-Remaining") == "0" {
-			if reset, err := strconv.ParseInt(response.Header.Get("X-RateLimit-Reset"), 10, 64); err == nil {
-				apiError.RetryAt = time.Unix(reset, 0).UTC().Format(time.RFC3339)
-			}
-		}
-		if apiError.RetryAt != "" {
-			if until, err := time.Parse(time.RFC3339, apiError.RetryAt); err == nil {
-				c.mu.Lock()
-				if until.After(c.blockedUntil) {
-					c.blockedUntil = until
-				}
-				c.mu.Unlock()
-			}
-		}
-		return response.Header, apiError
+		return response.Header, c.responseError(response, data)
 	}
 	if method == http.MethodGet && response.StatusCode == http.StatusOK {
 		if etag := response.Header.Get("ETag"); etag != "" {
@@ -248,6 +208,50 @@ func (c *Client) request(ctx context.Context, method, path string, body, output 
 		}
 	}
 	return response.Header, nil
+}
+
+func (c *Client) responseError(response *http.Response, data []byte) error {
+	var wire struct {
+		Message string `json:"message"`
+	}
+	_ = json.Unmarshal(data, &wire)
+	message := wire.Message
+	if message == "" {
+		message = http.StatusText(response.StatusCode)
+	}
+	if c.token != "" {
+		message = strings.ReplaceAll(message, c.token, "[redacted]")
+	}
+	switch response.StatusCode {
+	case 401:
+		message += ". Sign in again with gh auth login or replace the saved token"
+	case 403:
+		message += ". Check repository access, SSO authorization, and token permissions (Pull requests, Issues and Checks; Contents write for merging)"
+	case 404:
+		message += ". Verify the repository and that this account can access it"
+	case 409:
+		message += ". The pull request head changed; refresh before merging"
+	case 422:
+		message += ". Check branch names, diff line locations, and review state"
+	}
+	apiError := &APIError{Status: response.StatusCode, Message: message}
+	if seconds, _ := strconv.Atoi(response.Header.Get("Retry-After")); seconds > 0 {
+		apiError.RetryAt = time.Now().Add(time.Duration(seconds) * time.Second).UTC().Format(time.RFC3339)
+	} else if response.Header.Get("X-RateLimit-Remaining") == "0" {
+		if reset, err := strconv.ParseInt(response.Header.Get("X-RateLimit-Reset"), 10, 64); err == nil {
+			apiError.RetryAt = time.Unix(reset, 0).UTC().Format(time.RFC3339)
+		}
+	}
+	if apiError.RetryAt != "" {
+		if until, err := time.Parse(time.RFC3339, apiError.RetryAt); err == nil {
+			c.mu.Lock()
+			if until.After(c.blockedUntil) {
+				c.blockedUntil = until
+			}
+			c.mu.Unlock()
+		}
+	}
+	return apiError
 }
 
 func (c *Client) invalidate() { c.mu.Lock(); c.cache = map[string]cacheEntry{}; c.mu.Unlock() }

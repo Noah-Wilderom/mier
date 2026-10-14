@@ -54,6 +54,11 @@ export interface Check {
   required: boolean;
   duration: string;
   output: string[];
+  detailsUrl?: string;
+  checkRunId?: number;
+  appSlug?: string;
+  rawStatus?: string;
+  conclusion?: string;
 }
 export interface DiffLine {
   hunk?: number;

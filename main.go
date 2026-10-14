@@ -152,6 +152,7 @@ func createNativeMenu(app *application.App, window *application.WebviewWindow, u
 	view.Add("History").SetAccelerator("CmdOrCtrl+1").OnClick(command("navigate", "history"))
 	view.Add("Changes").SetAccelerator("CmdOrCtrl+2").OnClick(command("navigate", "changes"))
 	view.Add("Pull Requests").SetAccelerator("CmdOrCtrl+3").OnClick(command("navigate", "pull-requests"))
+	view.Add("Actions").SetAccelerator("CmdOrCtrl+4").OnClick(command("navigate", "actions"))
 	view.AddSeparator()
 	view.Add("Command Palette…").SetAccelerator("CmdOrCtrl+K").OnClick(command("command-palette", ""))
 	fullscreenShortcut := "F11"

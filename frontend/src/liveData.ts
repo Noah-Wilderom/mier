@@ -266,10 +266,15 @@ export function mapPullRequest(raw: PullRequestDetail, identity?: RepositoryIden
     status: check.status !== "completed" ? "running" : ["success", "neutral", "skipped"].includes(check.conclusion ?? "") ? "passed" : "failed",
     required: check.required === true || requiredContexts.has(check.name),
     duration: checkDuration(check.startedAt, check.completedAt),
-    output: [check.output.title, check.output.summary, check.output.text].filter(Boolean),
+    output: [check.output?.title, check.output?.summary, check.output?.text].filter(Boolean),
+    detailsUrl: check.detailsUrl,
+    checkRunId: check.id,
+    appSlug: check.app?.slug,
+    rawStatus: check.status,
+    conclusion: check.conclusion ?? undefined,
   }));
   for (const status of raw.statuses ?? []) {
-    checks.push({ id: `status:${status.id}`, name: status.context, status: status.state === "success" ? "passed" : status.state === "pending" || status.state === "expected" ? "running" : "failed", required: status.required === true || requiredContexts.has(status.context), duration: "", output: status.description ? [status.description] : [] });
+    checks.push({ id: `status:${status.id}`, name: status.context, status: status.state === "success" ? "passed" : status.state === "pending" || status.state === "expected" ? "running" : "failed", required: status.required === true || requiredContexts.has(status.context), duration: "", output: status.description ? [status.description] : [], detailsUrl: status.targetUrl, rawStatus: status.state });
   }
   return {
     ...mapped,

@@ -279,6 +279,8 @@ export interface GitHubCheckRun {
   startedAt: string | null;
   completedAt: string | null;
   detailsUrl: string;
+  app?: { slug: string };
+  checkSuite?: { id: number };
   output: { title: string; summary: string; text: string };
   required?: boolean;
 }
@@ -461,6 +463,17 @@ async function invoke<T>(method: string, ...args: unknown[]): Promise<T> {
   return (await Call.ByName(method, ...args)) as T;
 }
 
+async function invokeActions<T>(method: string, repository: RepositoryIdentity, args: unknown[], signal?: AbortSignal): Promise<T> {
+  if (!hasNativeBackend()) throw new Error('Open a GitHub repository in the desktop app to use Actions.');
+  if (signal?.aborted) throw new DOMException('Request cancelled', 'AbortError');
+  const { Call } = await import('@wailsio/runtime');
+  if (signal?.aborted) throw new DOMException('Request cancelled', 'AbortError');
+  const promise = Call.ByName(`main.GitHubService.${method}`, repository.host, repository.owner, repository.repo, ...args);
+  const abort = () => { void promise.cancel().catch(() => undefined); };
+  signal?.addEventListener('abort', abort, { once: true });
+  try { return await promise as T; } finally { signal?.removeEventListener('abort', abort); }
+}
+
 async function invokeLSP<T>(method: string, request: unknown, signal?: AbortSignal): Promise<T> {
   if (!hasNativeBackend()) throw new Error("Open M.I.E.R. in its desktop window to use language intelligence.");
   if (signal?.aborted) throw signal.reason ?? new DOMException("The request was cancelled.", "AbortError");
@@ -486,6 +499,16 @@ async function invokeTickets<T>(provider: 'jira' | 'linear', method: string, req
 }
 
 export const services = {
+  actions: {
+    dispatchConfig: (repository: RepositoryIdentity, id: number, ref: string, signal?: AbortSignal) => invokeActions<import('./actionsTypes').WorkflowDispatch>('GetWorkflowDispatch', repository, [id, ref], signal),
+    dispatch: (repository: RepositoryIdentity, input: import('./actionsTypes').WorkflowDispatchRequest) => invokeActions<void>('DispatchWorkflow', repository, [input]),
+    workflows: (repository: RepositoryIdentity, signal?: AbortSignal) => invokeActions<import('./actionsTypes').Workflow[]>('ListWorkflows', repository, [], signal),
+    runs: (repository: RepositoryIdentity, request: import('./actionsTypes').WorkflowRunsRequest, signal?: AbortSignal) => invokeActions<import('./actionsTypes').WorkflowRunsPage>('ListWorkflowRuns', repository, [request], signal),
+    run: (repository: RepositoryIdentity, id: number, attempt: number, signal?: AbortSignal) => invokeActions<import('./actionsTypes').WorkflowRunDetail>('GetWorkflowRun', repository, [id, attempt], signal),
+    checkJob: (repository: RepositoryIdentity, id: number, signal?: AbortSignal) => invokeActions<import('./actionsTypes').WorkflowJob | null>('GetCheckWorkflowJob', repository, [id], signal),
+    log: (repository: RepositoryIdentity, id: number, signal?: AbortSignal) => invokeActions<import('./actionsTypes').WorkflowJobLog>('GetWorkflowJobLog', repository, [id], signal),
+    mutate: (repository: RepositoryIdentity, input: import('./actionsTypes').WorkflowMutation) => invokeActions<void>('MutateWorkflowRun', repository, [input]),
+  },
   jira: {
     status: () => invoke<JiraStatus>('main.IntegrationService.GetJiraStatus'),
     configure: (configuration: { clientId: string; clientSecret: string; callbackPort: number }) => invoke<void>('main.IntegrationService.ConfigureJira', configuration),

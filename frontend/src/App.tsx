@@ -44,6 +44,8 @@ import CommitChanges, {type LoadCommitDiff} from "./CommitChanges";
 import Modal from "./Modal";
 import { services } from "./services";
 import { mapChangedFile } from "./liveData";
+import ActionsPage from "./Actions";
+import Checks from "./Checks";
 
 type Destination =
   | "inbox"
@@ -51,6 +53,7 @@ type Destination =
   | "requested"
   | "assigned"
   | "drafts"
+  | "actions"
   | "history"
   | "local-changes"
   | "settings";
@@ -346,7 +349,7 @@ export default function App() {
             ? "history"
             : value === "changes"
               ? "local-changes"
-              : "inbox",
+              : value === "actions" ? "actions" : "inbox",
         );
       if (action === "open-repository") void live.openRepository().catch(()=>{});
       if (action === "create-pr") {
@@ -390,14 +393,14 @@ export default function App() {
         return;
       }
       if (mod && event.key.toLowerCase() === "o") {event.preventDefault();void live.openRepository().catch(()=>{});return;}
-      if (mod && ["1", "2", "3"].includes(event.key)) {
+      if (mod && ["1", "2", "3", "4"].includes(event.key)) {
         event.preventDefault();
         navigate(
           event.key === "1"
             ? "history"
             : event.key === "2"
               ? "local-changes"
-              : "inbox",
+              : event.key === "4" ? "actions" : "inbox",
         );
         return;
       }
@@ -496,11 +499,13 @@ export default function App() {
     requested: "Review requested",
     assigned: "Assigned to you",
     drafts: "Draft pull requests",
+    actions: "Actions",
     history: "History",
     "local-changes": "Local changes",
     settings: "Settings",
   };
   const actions = [
+    { label: "GitHub Actions", detail: "Cmd/Ctrl 4", icon: "play", run: () => navigate("actions") },
     {
       label: "Review inbox",
       detail: "Cmd/Ctrl 3",
@@ -649,6 +654,7 @@ export default function App() {
             }}><Icon name={live.enabled&&live.repositoryCards[path]?.host?'github':'folder'}/><span className="sidebar-repository-name">{name}</span>{active&&<Icon name="check" size={14}/>}</button>
           })}
         </div>
+        <button className={`nav-item ${destination === "actions" ? "selected" : ""}`} onClick={() => navigate("actions")}><Icon name="play"/><span>Actions</span></button>
         <div className="nav-section-heading workspace-heading">
           <span>Local workspace</span>
         </div>
@@ -1033,7 +1039,7 @@ export default function App() {
                     ))}
                   </div>
                 )}
-                {tab === "checks" && <Checks pr={pr} />}
+                {tab === "checks" && <Checks pr={pr} repository={live.enabled ? live.identity : undefined} account={live.account?.login} />}
                 </>}
               </div>
               {(!live.enabled||pr.provider?.detailLoaded)&&<ReviewFooter
@@ -1065,6 +1071,7 @@ export default function App() {
               </button>
             </section>
           ))}
+        {destination === "actions" && (!live.enabled || !!live.repository) && <ActionsPage repository={live.enabled ? live.identity : undefined} account={live.account?.login}/>}
         {destination === "history" && (!live.enabled || !!live.repository) && (
           <HistoryView
             key={live.enabled ? live.repository?.root : 'demo'}
@@ -1924,76 +1931,6 @@ function Conversation({
             </button>
           )}
         </div>
-      </div>
-    </div>
-  );
-}
-
-function Checks({ pr }: { pr: PullRequest }) {
-  const [expanded, setExpanded] = useState<string | null>(null);
-  return (
-    <div className="checks-pane">
-      <div className="section-intro">
-        <h2>
-          {pr.checks.every((c) => c.status === "passed")
-            ? "All checks passed"
-            : pr.checks.some((c) => c.status === "failed")
-              ? "Some checks need attention"
-              : "Checks are in progress"}
-        </h2>
-        <span>
-          Results for commit <code>{(pr.checkHeadSha || pr.headSha).slice(0, 7)}</code>
-        </span>
-      </div>
-      {pr.checks.map((check) => (
-        <div className="check-entry" key={check.id}>
-          <button
-            className="check-row"
-            aria-expanded={expanded === check.id}
-            onClick={() => setExpanded(expanded === check.id ? null : check.id)}
-          >
-            <Icon
-              name={
-                check.status === "passed"
-                  ? "check-circle"
-                  : check.status === "failed"
-                    ? "alert-circle"
-                    : "clock"
-              }
-              className={
-                check.status === "passed"
-                  ? "text-green"
-                  : check.status === "failed"
-                    ? "text-red"
-                    : "text-amber"
-              }
-              size={20}
-            />
-            <div>
-              <strong>{check.name}</strong>
-              <span>
-                {check.status === "passed"
-                  ? "Completed successfully"
-                  : check.status === "failed"
-                    ? "Failed, changes needed"
-                    : "Running"}
-                {check.required ? " · Required" : ""}
-              </span>
-            </div>
-            <span>{check.duration}</span>
-            <Icon
-              name={expanded === check.id ? "chevron-down" : "chevron-right"}
-            />
-          </button>
-          {expanded === check.id && (
-            <pre className="check-output">{check.output.join("\n")}</pre>
-          )}
-        </div>
-      ))}
-      <div className="checks-note">
-        <Icon name="shield" size={16} />
-        Sample checks illustrate merge requirements. Their results do not run
-        against a live repository.
       </div>
     </div>
   );
