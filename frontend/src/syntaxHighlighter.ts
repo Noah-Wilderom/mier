@@ -65,8 +65,9 @@ export function codeLanguage(path: string): LanguageId | undefined {
 
 let highlighterPromise: Promise<HighlighterCore> | undefined
 const loaded = new Map<string, Promise<void>>()
+const warmSourceLanguages = new Set<LanguageId>()
 function getHighlighter(): Promise<HighlighterCore> {
-  if (!highlighterPromise) highlighterPromise = Promise.all([import('shiki/core'), import('shiki/engine/oniguruma')]).then(async ([core, engine]) => core.createHighlighterCore({ themes: [], langs: [], engine: engine.createOnigurumaEngine(import('shiki/wasm')) })).catch(error => { highlighterPromise = undefined; loaded.clear(); throw error })
+  if (!highlighterPromise) highlighterPromise = Promise.all([import('shiki/core'), import('shiki/engine/oniguruma')]).then(async ([core, engine]) => core.createHighlighterCore({ themes: [], langs: [], engine: engine.createOnigurumaEngine(import('shiki/wasm')) })).catch(error => { highlighterPromise = undefined; loaded.clear(); warmSourceLanguages.clear(); throw error })
   return highlighterPromise
 }
 async function loadTheme(theme: CodeThemeId): Promise<HighlighterCore> {
@@ -106,18 +107,22 @@ async function tokenize(path: string, lines: string[], theme: CodeThemeId, kind:
     const output: SyntaxToken[][] = []
     let grammarState: GrammarState | undefined
     const phpContext = language === 'php' && !lines.some(line => /<\?(?:php\b|=)/i.test(line)) ? '<?php\n' : undefined
-    for (let start = 0; start < lines.length; start += 200) {
+    for (let start = 0; start < lines.length;) {
       // Yield before each bounded chunk so settings/file navigation remain responsive.
       await new Promise<void>(resolve => setTimeout(resolve, 0))
-      const chunk = lines.slice(start, start + 200)
-      // Keep source-file work bounded. Small hover declarations use Shiki's
-      // normal 500ms cold-rule budget so a first signature is not cut short.
-      const result = highlighter.codeToTokens(chunk.join('\n'), { lang: language, theme, grammarState, grammarContextCode: grammarState ? undefined : phpContext, includeExplanation: 'tokenType', tokenizeMaxLineLength: 10_000, tokenizeTimeLimit: kind === 'signature' ? 500 : 50 })
+      // Cold rule compilation can exceed 50ms on slower hosts. Give the first
+      // source chunk the normal 500ms budget with ten times fewer lines; later
+      // chunks retain the short budget. Hover signatures already use 500ms.
+      const coldSource = kind === 'source' && !warmSourceLanguages.has(language)
+      const chunk = lines.slice(start, start + (coldSource ? 20 : 200))
+      const result = highlighter.codeToTokens(chunk.join('\n'), { lang: language, theme, grammarState, grammarContextCode: grammarState ? undefined : phpContext, includeExplanation: 'tokenType', tokenizeMaxLineLength: 10_000, tokenizeTimeLimit: kind === 'signature' || coldSource ? 500 : 50 })
+      if (kind === 'source') warmSourceLanguages.add(language)
       grammarState = result.grammarState
       for (let index = 0; index < chunk.length; index++) {
         const tokens = result.tokens[index] as ThemedToken[] | undefined
         output.push(tokens && tokens.map(token => token.content).join('') === chunk[index] ? tokens.map(({ content, color, fontStyle, type }) => ({ content, color, fontStyle, type })) : plainTokens([chunk[index]])[0])
       }
+      start += chunk.length
     }
     return { lines: output, foreground: fallback.foreground, background: fallback.background, highlighted: true }
   } catch { return fallback }

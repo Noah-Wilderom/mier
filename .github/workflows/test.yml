@@ -91,10 +91,40 @@ jobs:
       - run: go vet ./...
       - name: Build the desktop application
         run: wails3 build
-      - name: Build and inspect Linux distribution packages
-        if: runner.os == 'Linux'
-        run: node scripts/release.mjs linux-packages "$(go env GOARCH)" 0.1.0
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-${{ matrix.runner }}
           path: coverage.out
+
+  linux-packages:
+    name: Verify Linux packages (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    # Exercise the same compatibility baseline as release packaging.
+    container: ubuntu:24.04@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: amd64, runner: ubuntu-26.04 }
+          - { arch: arm64, runner: ubuntu-26.04-arm }
+    env:
+      CGO_ENABLED: '1'
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Bootstrap the Linux build container
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl git python3 jq zip unzip zstd
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-desktop
+      - run: npm ci
+        working-directory: frontend
+      - name: Build the compatible desktop application
+        run: wails3 build
+      - name: Build and inspect all Linux installer formats
+        run: node scripts/release.mjs linux-packages "${{ matrix.arch }}" 0.1.0
