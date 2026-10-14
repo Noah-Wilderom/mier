@@ -4,6 +4,7 @@ import { services, type RepositorySnapshot } from './services'
 import { mapRepositoryDiff } from './liveData'
 import { comparisonBase } from './gitWorkspace'
 import { Icon } from './Icon'
+import FileChangeIcon from './FileChangeIcon'
 import { codeReviewStyleVariables, DEFAULT_CODE_REVIEW_PREFERENCES, effectiveCodeTheme, getCodeAppearance, getCodeReviewPreferences, subscribeCodeAppearance, subscribeCodeReviewPreferences } from './codeReviewPreferences'
 import { highlightDiff, syntaxLineKey, syntaxTokenStyle, type HighlightedDiff } from './syntaxHighlighter'
 import './RepositoryWorkspace.css'
@@ -52,7 +53,7 @@ export function ComparisonPreview({ files, error, loading, retry, valid }: {
     {error && <div className="comparison-error" role="alert"><Icon name="alert-circle"/><span>{error}</span><button type="button" className="btn" disabled={loading} onClick={retry}>Retry comparison</button></div>}
     {!valid ? <p className="comparison-empty">Choose two different revisions to preview their changes.</p> : !files && loading ? <p role="status" className="comparison-empty">Loading committed changes…</p> : files?.length ? <>
       <div className="comparison-summary"><strong>{files.length} {files.length === 1 ? 'file' : 'files'} changed</strong><span className="text-green">+{totals?.additions}</span><span className="text-red">−{totals?.deletions}</span>{loading && <span role="status">Refreshing…</span>}</div>
-      <label className="comparison-file"><span className="sr-only">Compared file</span><select aria-label="Compared file" value={file?.path ?? ''} onChange={event => setSelected(event.target.value)}>{files.map(file => <option key={file.path} value={file.path}>{file.path}{file.previousPath ? ` ← ${file.previousPath}` : ''} · +{file.additions} −{file.deletions}</option>)}</select></label>
+      <label className="comparison-file">{file && <FileChangeIcon file={file}/>}<span className="sr-only">Compared file</span><select aria-label="Compared file" value={file?.path ?? ''} onChange={event => setSelected(event.target.value)}>{files.map(file => <option key={file.path} value={file.path}>{file.path}{file.previousPath ? ` ← ${file.previousPath}` : ''} · +{file.additions} −{file.deletions}</option>)}</select></label>
       {file && <DiffPreview file={file}/>}</> : files ? <p className="comparison-empty">No file changes between these revisions.</p> : null}
   </div>
 }

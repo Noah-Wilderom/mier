@@ -36,10 +36,6 @@
 .review-file-select > svg { flex-shrink: 0; color: var(--muted); }
 .review-file-row.is-active .review-file-select > svg { color: var(--accent); }
 .review-file-name { min-width: 0; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.review-file-status { font-family: var(--mono); font-weight: 600; font-size: 12px; }
-.review-file-status.status-modified, .review-file-status.status-renamed { color: var(--blue); }
-.review-file-status.status-added { color: var(--green); }
-.review-file-status.status-deleted { color: var(--red); }
 .review-file-viewed { opacity: .8; }
 .review-file-pane-footer { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 9px 10px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; flex-shrink: 0; }
 .review-file-shortcuts { display: flex; align-items: center; gap: 2px; white-space: nowrap; }

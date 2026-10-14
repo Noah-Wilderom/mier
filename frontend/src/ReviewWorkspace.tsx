@@ -5,6 +5,7 @@ import { currentUser, latestReview, submitReview } from './data'
 import type { ChangedFile, DiffLine, PendingComment, PullRequest, ReviewDecision, Thread } from './data'
 import './review.css'
 import { Markdown } from './Markdown'
+import FileChangeIcon from './FileChangeIcon'
 import { ActorName, Avatar } from './Avatar'
 import { codeReviewStyleVariables, DEFAULT_CODE_REVIEW_PREFERENCES, effectiveCodeTheme, getCodeAppearance, getCodeReviewPreferences, subscribeCodeAppearance, subscribeCodeReviewPreferences } from './codeReviewPreferences'
 import { highlightDiff, syntaxLineKey, syntaxTokenStyle, type HighlightedDiff, type SyntaxToken } from './syntaxHighlighter'
@@ -385,7 +386,7 @@ export default function ReviewWorkspace({ pr, onUpdate, onNotify, focusMode, onT
           {groups.map(([folder, files]) => <div className="review-file-group" key={folder}>
             <div className="review-folder-label" title={folder}><Icon name="chevron-down" size={11} /><Icon name="folder" size={13} /><span>{folder}</span></div>
             {files.map(item => <div className={`review-file-row ${file?.path === item.path ? 'is-active' : ''}`} key={item.path}>
-              <button className="review-file-select" title={item.path} aria-current={file?.path === item.path ? 'true' : undefined} onClick={() => setActivePath(item.path)}><Icon name="file-code" size={14} /><span className="review-file-name">{item.path.slice(item.path.lastIndexOf('/') + 1)}</span><span className={`review-file-status status-${item.status}`}>{item.status === 'modified' ? 'M' : item.status === 'added' ? 'A' : item.status === 'deleted' ? 'D' : 'R'}</span></button>
+              <button className="review-file-select" title={item.path} aria-current={file?.path === item.path ? 'true' : undefined} onClick={() => setActivePath(item.path)}><FileChangeIcon file={item}/><span className="review-file-name">{item.path.slice(item.path.lastIndexOf('/') + 1)}</span></button>
               <input className="review-file-viewed" type="checkbox" checked={pr.viewedFiles.includes(item.path)} disabled={busy || saving} onChange={event => setViewed(item.path, event.target.checked)} aria-label={`Mark ${item.path} as ${pr.viewedFiles.includes(item.path) ? 'not viewed' : 'viewed'}`} title={pr.viewedFiles.includes(item.path) ? 'Viewed' : 'Mark as viewed'} />
             </div>)}
           </div>)}

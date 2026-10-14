@@ -1538,7 +1538,7 @@ kbd {
   font-size: 12px;
   padding: 7px 3px;
 }
-.staging-file > button:first-child span:first-of-type {
+.staging-file > button:first-child > .staging-file-text {
   flex: 1;
   text-align: left;
   overflow: hidden;

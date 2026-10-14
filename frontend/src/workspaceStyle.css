@@ -1,0 +1,87 @@
+/* SourceGit's flat pane hierarchy, adapted to M.I.E.R.'s labeled navigation. */
+:root {
+  --bg: #f6f7f9;
+  --surface: #fff;
+  --panel: #f0f2f5;
+  --hover: #e7ebf0;
+  --border: #d0d5dc;
+  --text: #252a32;
+  --muted: #606a78;
+}
+:root[data-theme="dark"] {
+  --bg: #222428;
+  --surface: #27292e;
+  --panel: #232529;
+  --hover: #32363d;
+  --border: #40454d;
+  --text: #e5e8ed;
+  --muted: #a2aab7;
+}
+.app-shell { grid-template-rows: 48px minmax(0, 1fr) 25px; }
+.app-shell.has-repository-toolbar { grid-template-rows: 48px auto minmax(0, 1fr) 25px; }
+.app-shell .sidebar { padding-inline: 0; }
+.app-shell .brand { height: 74px; padding-inline: 18px; border-bottom: 1px solid var(--border); }
+:root[data-platform="darwin"] .app-shell .brand { height: 94px; padding-top: 35px; }
+.app-shell .brand strong { font-size: 17px; }
+.app-shell .primary-nav { padding-block: 8px; gap: 0; }
+.app-shell .nav-item { min-height: 33px; border-radius: 0; padding-inline: 18px; }
+.app-shell .nav-item.selected { color: var(--text); background: var(--blue-soft); box-shadow: inset 2px 0 var(--blue); }
+.app-shell .nav-item.selected svg { color: var(--blue); }
+.app-shell .nav-section-heading { padding: 16px 18px 7px; }
+.app-shell .nav-section-heading > span { font-size: 11px; font-weight: 600; }
+.app-shell .repo-nav { padding-bottom: 6px; }
+.app-shell .workspace-heading { border-top: 1px solid var(--border); margin-top: 7px; padding-top: 13px; }
+.app-shell .sidebar-bottom { padding-inline: 0; }
+.app-shell .branch-indicator { padding-inline: 18px; }
+.app-shell .user-card { border-radius: 0; padding-inline: 18px; }
+.app-shell .btn, .app-shell .input, .app-shell input:not([type="checkbox"]), .app-shell textarea, .app-shell select,
+.app-shell .global-search, .app-shell .editor-open-split, .app-shell .repository-switcher-trigger,
+.app-shell .review-segmented, .app-shell .review-file-search { border-radius: 3px; }
+.app-shell .btn, .app-shell .editor-open-split { box-shadow: none; }
+.app-shell .app-topbar { background: var(--panel); padding-inline: 14px; }
+.app-shell .app-statusbar { background: var(--panel); }
+.app-shell .pr-list-item { border-radius: 0; }
+.app-shell .pr-list-item.selected { background: var(--blue-soft); border-left-color: var(--blue); }
+.app-shell .workspace-toolbar { min-height: 42px; padding: 9px 15px; background: var(--panel); gap: 12px; }
+.app-shell .workspace-toolbar h1 { font-size: 14px; font-weight: 600; letter-spacing: 0; }
+.app-shell .local-columns { grid-template-columns: 310px minmax(0, 1fr); }
+.app-shell .staging-pane { display: flex; flex-direction: column; padding: 0; min-height: 0; overflow: hidden; background: var(--surface); }
+.app-shell .staging-group { display: flex; flex-direction: column; min-height: 95px; flex: 1; margin: 0; border-bottom: 1px solid var(--border); }
+.app-shell .staging-heading { padding: 7px 12px; min-height: 36px; border-bottom: 1px solid var(--border); background: var(--panel); }
+.app-shell .staging-heading strong { font-weight: 600; }
+.app-shell .staging-heading .btn { min-height: 24px; padding: 2px 6px; }
+.app-shell .staging-files { flex: 1; min-height: 0; overflow: auto; padding-block: 4px; }
+.app-shell .staging-file { padding: 2px 8px; border-radius: 0; min-height: 47px; gap: 4px; }
+.app-shell .staging-file:hover { background: var(--hover); }
+.app-shell .staging-file.selected { background: var(--blue-soft); box-shadow: inset 2px 0 var(--blue); }
+.app-shell .staging-file > button:first-child { gap: 9px; padding: 5px 4px; text-align: left; }
+.app-shell .staging-file > button:first-child > .staging-file-text { display: grid; flex: 1; gap: 2px; min-width: 0; }
+.app-shell .staging-file-text > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-shell .staging-file-name { color: var(--text); font-size: 12px; }
+.app-shell .staging-file-directory { color: var(--muted); font-size: 10px; }
+.app-shell .staging-empty { padding: 10px 12px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+.app-shell .commit-form { padding: 12px; flex-shrink: 0; border-top: 0; background: var(--panel); }
+.app-shell .commit-form textarea { min-height: 70px; max-height: 160px; }
+.app-shell .local-diff-heading { padding: 9px 13px; min-height: 37px; font-size: 12px; }
+.app-shell .review-file-row, .app-shell .review-file-select { border-radius: 0; }
+.app-shell .review-file-list { padding-inline: 0; }
+.app-shell .review-file-row { margin: 0; padding-right: 10px; }
+.app-shell .review-file-row.is-active { color: var(--text); background: var(--blue-soft); box-shadow: inset 2px 0 var(--blue); }
+.app-shell .review-toolbar { min-height: 40px; padding-block: 5px; }
+.app-shell .review-segmented button.is-selected { box-shadow: none; border: 1px solid var(--border); }
+.app-shell .history-table-heading > span + span { border-left: 1px solid var(--border); padding-left: 10px; }
+.app-shell .comparison-file { display: flex; align-items: center; gap: 8px; }
+.app-shell .comparison-file select { flex: 1; margin-top: 0; }
+.app-shell .actions-workspace { padding: 16px; }
+.app-shell .actions-browser, .app-shell .actions-jobs button, .app-shell .actions-log-output,
+.app-shell .actions-steps { border-radius: 3px; }
+.app-shell .actions-page-heading h1 { font-size: 18px; }
+.app-shell .actions-run-detail { padding: 16px; }
+@media (max-width: 900px) {
+  .app-shell .local-columns { grid-template-columns: 255px minmax(0, 1fr); }
+  .app-shell .workspace-toolbar { gap: 8px; }
+}
+@media (max-height: 650px) {
+  .app-shell .staging-group { min-height: 60px; }
+  .app-shell .commit-form textarea { min-height: 50px; height: 60px; }
+}

@@ -46,6 +46,7 @@ import { services } from "./services";
 import { mapChangedFile } from "./liveData";
 import ActionsPage from "./Actions";
 import Checks from "./Checks";
+import "./workspaceStyle.css";
 
 type Destination =
   | "inbox"

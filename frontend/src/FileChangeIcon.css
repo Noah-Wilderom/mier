@@ -1,0 +1,16 @@
+.file-change-icon {
+  --change-color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  color: var(--change-color);
+}
+.file-change-icon.change-modified { --change-color: var(--amber); }
+.file-change-icon.change-added { --change-color: var(--green); }
+.file-change-icon.change-deleted, .file-change-icon.change-conflict { --change-color: var(--red); }
+.file-change-icon.change-renamed, .file-change-icon.change-copied, .file-change-icon.change-typechanged { --change-color: var(--blue); }
+.file-change-icon.change-untracked { --change-color: var(--muted); }
+.file-change-icon > svg { color: inherit; stroke-width: 2; }
