@@ -957,7 +957,7 @@ export default function App() {
                 notify={reviewNotify}
                 busy={live.busy}
               />
-              {live.enabled && pr.provider && <JiraTickets key={`${pr.provider.host}/${pr.provider.owner}/${pr.provider.repo}#${pr.number}`} pr={pr} onOpenSettings={() => navigate('settings')}/>}
+              <JiraTickets key={`${pr.provider?.host}/${pr.provider?.owner}/${pr.provider?.repo}#${pr.number}`} enabled={live.enabled} pr={pr} onOpenSettings={() => navigate('settings')}>
               {live.enabled && pr.provider?.hasNewCommits && <div className="new-commits-banner" role="status"><Icon name="git-commit"/><div><strong>New commits are available</strong><span>Your current diff and draft comments are preserved.</span></div><button className="btn" disabled={live.busy} onClick={()=>void live.acceptNewCommits().catch(()=>{})}>Refresh changes</button></div>}
               {live.enabled && live.error && <div className="live-error" role="status"><Icon name="alert-circle"/><span>{live.error}</span><button className="btn btn-ghost" onClick={()=>void live.refresh()}>Retry</button></div>}
               <div
@@ -1042,6 +1042,7 @@ export default function App() {
                 onNotify={reviewNotify}
                 busy={live.busy}
               />}
+              </JiraTickets>
             </section>
           ) : live.enabled&&live.loadingPullRequests ? (<section className="detail-pane"><ReviewSkeleton label="Loading your review workspace…"/></section>) : (
             <section className="detail-pane empty-state">

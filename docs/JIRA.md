@@ -2,6 +2,8 @@
 
 M.I.E.R. discovers Jira issue keys in a pull request's branch, title, and description. Ticket cards show their source, summary, status, and assignee. Open a card to read the description, configured acceptance criteria, and ten recent comments while keeping the review open. **Add ticket** searches Jira; **Hide** and **Restore** keep personal selections for that PR.
 
+The ticket reader opens in a pane beside the editor, with its own scrolling area. Drag the divider to adjust its width, or focus the divider and use the arrow keys, Home, or End. The editor remains interactive, and opening, resizing, or closing the ticket preserves an in-progress review comment. Selecting the already-open ticket focuses its reader and keeps the loaded details. Close it with the header button or Escape while focused inside the reader. When the review area is too narrow for both columns, the ticket appears below the editor in a scrollable layout.
+
 ## Connect your app
 
 Jira is optional. Open the desktop application's **Settings → Apps → Configure Jira** during setup or connect later from a PR's **Connect Jira** button. The registration guide and credential fields are inside the application. Standalone browser previews cannot connect an account.
