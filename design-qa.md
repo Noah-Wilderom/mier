@@ -25,3 +25,15 @@ Focused inspection measured the live status marks at 14 × 14 CSS pixels, with t
 - **Content and behavior:** file names, directory context, stage/unstage controls, code views and review actions remain functional. Statuses use the correct Git index or working-tree code rather than conflating a partially staged file's states.
 
 Validation: frontend build and 58 unit tests passed, including independent index/worktree statuses. All 54 selected Chromium/WebKit workspace, Actions and code-intelligence regressions passed. T3 inspection covered both appearances, normal/expanded review, path truncation, marker dimensions and the smaller viewport. No actionable P0/P1/P2 findings remain. SourceGit's branch-navigation and history layout are references for styling rather than newly introduced functionality.
+
+## Git operation and conflict editor — 2026-10-14
+
+final result: passed
+
+The official [GitKraken merge workflow](https://help.gitkraken.com/gitkraken-desktop/branching-and-merging/) and its merge-tool screenshot were inspected before implementation. The reference uses two source panes above a merged output. M.I.E.R. adapts that workflow while retaining its own navigation, thin borders, plain status marks, explicit branch/commit labels and guarded operation controls. The reference image remains outside the repository.
+
+Implementation evidence: [dark conflict editor](art/mier-conflicts-dark.png) and [light conflict editor](art/mier-conflicts-light.png), captured through T3 at 1440 × 1000 CSS pixels and proportionally scaled to 1280 × 889. A T3 HTML preview placed reference and implementation together for inspection. This is a workflow adaptation, not a pixel clone.
+
+An initial layout placed the operation bar after the status bar because it lacked a grid position. The controls now share the Git toolbar's grid row, above the editor. A retained browser assertion verifies that placement. At 900 × 700, the page has no horizontal overflow, the result remains editable and the Save button stays within the viewport. Both themes show source syntax highlighting, separate blue/purple source dividers, neutral result styling and an always-visible resolution footer.
+
+Behavioral checks cover section choices, editable results, retained unsaved edits, stale file rejection, explicit abort confirmation, duplicate-click suppression, branch commit selection, merge preview and partial staging. All 116 Chromium/WebKit regressions and 61 frontend unit tests passed. Real Git tests cover successful/conflicting/empty cherry-picks, mainline validation, abort, linked worktrees, delete/modify and binary conflicts, rebase stage labels and index-only section staging. Go race checks, vet and the native build passed; isolated Linux desktop startup was also observed. No actionable P0/P1/P2 findings remain for this scope.

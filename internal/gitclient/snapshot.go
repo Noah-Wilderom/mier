@@ -20,6 +20,10 @@ func (c *Client) Snapshot(ctx context.Context, path string) (RepositorySnapshot,
 			return err
 		}
 		snapshot.Root, snapshot.Name = root, filepath.Base(root)
+		snapshot.Operation, err = c.operation(ctx, root, snapshot)
+		if err != nil {
+			return err
+		}
 		snapshot.Remotes, err = c.remotes(ctx, root)
 		if err != nil {
 			return err
@@ -143,7 +147,14 @@ func statusName(index, worktree string, conflict bool) string {
 }
 
 func (c *Client) history(ctx context.Context, root string) ([]Commit, error) {
-	output, err := c.run(ctx, root, c.options.LocalTimeout, "log", "-200", "--all", "HEAD", "--date-order", "-z", "--no-show-signature", "--no-decorate", "--format=%H%x00%P%x00%an%x00%ae%x00%aI%x00%s%x00%b%x00")
+	return c.historyFor(ctx, root, []string{"--all", "HEAD"})
+}
+
+func (c *Client) historyFor(ctx context.Context, root string, revisions []string) ([]Commit, error) {
+	args := []string{"log", "-200", "--date-order", "-z", "--no-show-signature", "--no-decorate", "--format=%H%x00%P%x00%an%x00%ae%x00%aI%x00%s%x00%b%x00"}
+	args = append(args, revisions...)
+	args = append(args, "--")
+	output, err := c.run(ctx, root, c.options.LocalTimeout, args...)
 	if err != nil {
 		return nil, err
 	}

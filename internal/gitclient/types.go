@@ -14,6 +14,7 @@ type RepositorySnapshot struct {
 	Branches      []Branch     `json:"branches"`
 	History       []Commit     `json:"history"`
 	Changes       []FileStatus `json:"changes"`
+	Operation     *Operation   `json:"operation,omitempty"`
 }
 
 type Remote struct {
@@ -60,6 +61,7 @@ type FileStatus struct {
 }
 
 type DiffLine struct {
+	Hunk    *int   `json:"hunk,omitempty"`
 	Kind    string `json:"kind"`
 	OldLine *int   `json:"oldLine,omitempty"`
 	NewLine *int   `json:"newLine,omitempty"`

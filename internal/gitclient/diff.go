@@ -88,6 +88,7 @@ func number(value int) *int { return &value }
 
 func parsePatch(result *ChangedFile) error {
 	oldLine, newLine := 0, 0
+	hunk := -1
 	inHunk := false
 	for _, raw := range strings.Split(result.RawPatch, "\n") {
 		if strings.HasPrefix(raw, "diff --git ") {
@@ -99,6 +100,7 @@ func parsePatch(result *ChangedFile) error {
 			continue
 		}
 		if match := hunkHeader.FindStringSubmatch(raw); len(match) == 3 {
+			hunk++
 			var err error
 			oldLine, err = strconv.Atoi(match[1])
 			if err != nil {
@@ -114,7 +116,7 @@ func parsePatch(result *ChangedFile) error {
 		if !inHunk || raw == "" || strings.HasPrefix(raw, "\\") {
 			continue
 		}
-		line := DiffLine{Text: raw[1:]}
+		line := DiffLine{Text: raw[1:], Hunk: number(hunk)}
 		switch raw[0] {
 		case ' ':
 			line.Kind, line.OldLine, line.NewLine = "context", number(oldLine), number(newLine)

@@ -17,6 +17,27 @@ func (c *Client) Stage(ctx context.Context, path string, files []string) error {
 		if err != nil {
 			return err
 		}
+		status, err := c.status(ctx, root)
+		if err != nil {
+			return err
+		}
+		for _, change := range status.Changes {
+			if !change.Conflict {
+				continue
+			}
+			for _, path := range paths {
+				if path != change.Path {
+					continue
+				}
+				working, _, err := c.conflictWorking(root, path)
+				if err != nil {
+					return err
+				}
+				if hasConflictMarkers(working) {
+					return errors.New("Resolve this file's conflict markers before staging")
+				}
+			}
+		}
 		_, err = c.run(ctx, root, c.options.LocalTimeout, append([]string{"add", "--"}, paths...)...)
 		return err
 	})
@@ -69,6 +90,17 @@ func (c *Client) Commit(ctx context.Context, path, message string) (string, erro
 	}
 	var sha string
 	err := c.withRepository(ctx, path, c.options.LocalTimeout, func(ctx context.Context, root string) error {
+		status, err := c.status(ctx, root)
+		if err != nil {
+			return err
+		}
+		op, err := c.operation(ctx, root, status)
+		if err != nil {
+			return err
+		}
+		if op != nil {
+			return errors.New("Use Continue to finish the current Git operation")
+		}
 		if _, err := c.run(ctx, root, c.options.LocalTimeout, "commit", "-m", message); err != nil {
 			return err
 		}

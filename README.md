@@ -6,6 +6,8 @@
 
 Manage branches and local changes, compare commits, and review pull requests with inline comments, syntax highlighting, and light or dark appearance.
 
+[Stage individual sections, cherry-pick local commits, merge branches, and resolve conflicts](docs/LOCAL_GIT.md) with a side-by-side editor and editable result.
+
 Install and update PHP, TypeScript/JavaScript, and Vue language servers from Settings for symbol information and go to definition.
 
 View related [Jira Cloud](docs/JIRA.md) and [Linear](docs/LINEAR.md) tickets alongside a PR using your own OAuth app.

@@ -4,9 +4,17 @@
 export type {
     Branch,
     ChangedFile,
+    CherryPickRequest,
     Commit,
+    ConflictFile,
+    ConflictVersion,
     DiffLine,
     FileStatus,
+    MergeBranchRequest,
+    Operation,
+    OperationResult,
     Remote,
-    RepositorySnapshot
+    RepositorySnapshot,
+    ResolveConflictRequest,
+    StageHunkRequest
 } from "./models.js";

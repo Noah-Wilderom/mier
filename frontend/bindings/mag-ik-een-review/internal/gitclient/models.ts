@@ -23,6 +23,13 @@ export interface ChangedFile {
     "truncated": boolean;
 }
 
+export interface CherryPickRequest {
+    "sha": string;
+    "expectedHead": string;
+    "expectedBranch": string;
+    "mainline": number;
+}
+
 export interface Commit {
     "sha": string;
     "parents": string[] | null;
@@ -33,7 +40,29 @@ export interface Commit {
     "createdAt": string;
 }
 
+export interface ConflictFile {
+    "path": string;
+    "token": string;
+    "base": ConflictVersion;
+    "current": ConflictVersion;
+    "incoming": ConflictVersion;
+    "working": string;
+    "editable": boolean;
+    "reason": string;
+    "currentLabel": string;
+    "incomingLabel": string;
+}
+
+export interface ConflictVersion {
+    "exists": boolean;
+    "sha": string;
+    "mode": string;
+    "content": string;
+    "binary": boolean;
+}
+
 export interface DiffLine {
+    "hunk"?: number | null;
     "kind": string;
     "oldLine"?: number | null;
     "newLine"?: number | null;
@@ -51,6 +80,34 @@ export interface FileStatus {
     "conflict": boolean;
     "untracked": boolean;
     "submodule"?: string;
+}
+
+export interface MergeBranchRequest {
+    "branch": string;
+    "expectedSource": string;
+    "expectedHead": string;
+    "expectedBranch": string;
+}
+
+/**
+ * Operation describes Git's actual sequencer state, including operations begun
+ * in another Git client. Token guards against continuing a different operation.
+ */
+export interface Operation {
+    "kind": string;
+    "token": string;
+    "sourceSha": string;
+    "sourceLabel": string;
+    "currentLabel": string;
+    "conflicts": number;
+    "message": string;
+    "canSkip": boolean;
+    "empty": boolean;
+}
+
+export interface OperationResult {
+    "headSha": string;
+    "operation"?: Operation | null;
 }
 
 export interface Remote {
@@ -77,4 +134,23 @@ export interface RepositorySnapshot {
     "branches": Branch[] | null;
     "history": Commit[] | null;
     "changes": FileStatus[] | null;
+    "operation"?: Operation | null;
+}
+
+export interface ResolveConflictRequest {
+    "path": string;
+    "token": string;
+
+    /**
+     * result, current, incoming, delete
+     */
+    "choice": string;
+    "content": string;
+}
+
+export interface StageHunkRequest {
+    "path": string;
+    "staged": boolean;
+    "hunk": number;
+    "expectedPatch": string;
 }

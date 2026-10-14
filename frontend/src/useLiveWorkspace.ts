@@ -6,6 +6,7 @@ import { readReviewDrafts, restoreReviewDraft, reviewDraftStorageKey, type Saved
 import { hasNativeBackend, services, subscribeWorkspaceUpdates, type AccountStatus, type PullRequestPageQuery, type PullRequestSummary, type RepositorySnapshot, type WorkspaceUpdate } from './services'
 import type { GitAction } from './gitWorkspace'
 import { preferredRemote, gitHubIdentity as identityFor } from './gitWorkspace'
+import type { GitMutation, GitOperationResult } from './gitOperations'
 
 const emptyHistory: ReturnType<typeof mapRepositorySnapshot>['history'] = []
 const emptyChanges: ReturnType<typeof mapRepositorySnapshot>['changes'] = []
@@ -281,6 +282,31 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
     },epoch)
   },[notify,perform])
   const diff=useCallback(async(path:string,staged:boolean):Promise<ChangedFile>=>{const repo=repoRef.current;if(!repo)throw new Error('Open a repository first.');return mapRepositoryDiff(await services.repository.diff(repo.root,path,staged))},[])
+  const operate=useCallback(async(mutation:GitMutation)=>{
+    const repo=repoRef.current,epoch=activeEpoch.current
+    return perform(async()=>{
+      if(!repo)throw new Error('Open a Git repository first.')
+      let result:GitOperationResult|undefined, failure:unknown
+      try {
+        switch(mutation.kind){
+          case 'cherry-pick':result=await services.repository.cherryPick(repo.root,mutation.request);break
+          case 'merge':result=await services.repository.mergeBranch(repo.root,mutation.request);break
+          case 'resolve':await services.repository.resolveConflict(repo.root,mutation.request);break
+          case 'hunk':await services.repository.stageHunk(repo.root,mutation.request);break
+          default:result=await services.repository.controlOperation(repo.root,mutation.token,mutation.kind)
+        }
+      } catch(issue){failure=issue}
+      if(epoch!==activeEpoch.current){if(failure)throw failure;return result}
+      localMutationAt.current=Date.now()
+      try {
+        const snapshot=await services.repository.snapshot(repo.root)
+        if(epoch===activeEpoch.current){repoRef.current=snapshot;setRepository(snapshot);setError('')}
+      } catch(issue){if(!failure)failure=new Error(`Refresh the repository before repeating this action. ${issue instanceof Error?issue.message:String(issue)}`)}
+      if(failure)throw failure
+      notify(result?.operation ? `${result.operation.kind} paused. ${result.operation.conflicts ? 'Resolve the conflicted files to continue.' : 'Review the operation before continuing or skipping.'}` : mutation.kind==='resolve'?'Conflict resolved and staged.':mutation.kind==='hunk'?'Index updated.':mutation.kind==='abort'?'Git operation aborted.':'Git operation completed.')
+      return result
+    },epoch)
+  },[notify,perform])
   const commitDiff=useCallback(async(sha:string)=>{const repo=repoRef.current;if(!repo)throw new Error('Open a repository first.');return {files:(await services.repository.commitDiff(repo.root,sha)).map(mapRepositoryDiff)}},[])
   const useDemo=useCallback(()=>{++activeEpoch.current;++openIntent.current;authenticationError.current='';enabledRef.current=false;repoRef.current=null;selectedRef.current=0;resetPullRequestPage();setRepository(null);setEnabled(false);setItems([]);setAccount(null);configureCurrentUser('noah');setError('')},[resetPullRequestPage,setItems])
   useEffect(()=>{
@@ -311,5 +337,5 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
   const inboxPullRequests=useMemo(()=>{const byNumber=new Map(prs.map(pr=>[pr.number,pr]));return pullRequestNumbers.flatMap(number=>{const pr=byNumber.get(number);return pr?[pr]:[]})},[prs,pullRequestNumbers])
   const loadMorePullRequests=useCallback(()=>loadPullRequestPage(true),[loadPullRequestPage])
   const retryPullRequests=useCallback(()=>loadPullRequestPage(pageNumbersRef.current.length>0),[loadPullRequestPage])
-  return {available,enabled,repository,identity:repository?identityFor(repository):undefined,prs,inboxPullRequests,account,recent,repositoryCards,busy,openingRepository,loadingPullRequests,loadingMorePullRequests,hasMorePullRequests,pullRequestTotal,openPullRequestCount,pullRequestResultLimit,pullRequestPageError,setPullRequestQuery,loadMorePullRequests,retryPullRequests,error,updatedAt,selected,history:mapped?.history??emptyHistory,changes:mapped?.changes??emptyChanges,branch:mapped?.branch??'',openRepository,connect,selectPullRequest,updatePullRequest,acceptNewCommits,merge,create,git,diff,commitDiff,refresh,useDemo}
+  return {available,enabled,repository,identity:repository?identityFor(repository):undefined,prs,inboxPullRequests,account,recent,repositoryCards,busy,openingRepository,loadingPullRequests,loadingMorePullRequests,hasMorePullRequests,pullRequestTotal,openPullRequestCount,pullRequestResultLimit,pullRequestPageError,setPullRequestQuery,loadMorePullRequests,retryPullRequests,error,updatedAt,selected,history:mapped?.history??emptyHistory,changes:mapped?.changes??emptyChanges,branch:mapped?.branch??'',openRepository,connect,selectPullRequest,updatePullRequest,acceptNewCommits,merge,create,git,operate,diff,commitDiff,refresh,useDemo}
 }

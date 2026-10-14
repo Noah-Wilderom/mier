@@ -4,15 +4,18 @@ import { preferredRemote, pullUnavailableReason, type GitAction } from './gitWor
 import { Icon } from './Icon'
 import Modal from './Modal'
 import BranchComparison from './BranchComparison'
+import { MergeBranchDialog } from './GitCommitActions'
+import type { GitMutation } from './gitOperations'
 import './RepositoryWorkspace.css'
 
 type RunGit = (action: GitAction, argument?: string | string[], remote?: string) => Promise<void>
 
-export default function RepositoryToolbar({ repository, busy, onGit, onRefresh }: {
-  repository: RepositorySnapshot; busy: boolean; onGit: RunGit; onRefresh: () => Promise<void>
+export default function RepositoryToolbar({ repository, busy, onGit, onRefresh, onOperate, onConflicts }: {
+  repository: RepositorySnapshot; busy: boolean; onGit: RunGit; onRefresh: () => Promise<void>; onOperate?: (mutation:GitMutation)=>Promise<unknown>; onConflicts?:()=>void
 }) {
   const [remote, setRemote] = useState(() => preferredRemote(repository))
   const [dialog, setDialog] = useState<'branches' | 'compare' | null>(null)
+  const [mergeBranch, setMergeBranch] = useState<RepositoryBranch>()
   const [error, setError] = useState('')
   const [pending, setPending] = useState('')
   const guard = useRef(false)
@@ -41,12 +44,13 @@ export default function RepositoryToolbar({ repository, busy, onGit, onRefresh }
       <button className="icon-button" aria-label="Refresh repository" title="Refresh repository status" disabled={locked} onClick={() => { setError(''); void onRefresh() }}><Icon name="refresh" size={15}/></button>
     </div>
     {error && <div className="repository-operation-error" role="alert"><Icon name="alert-circle"/><span>{error}</span><button className="btn btn-ghost" disabled={locked} onClick={() => { setError(''); void onRefresh() }}>Refresh status</button></div>}
-    {dialog === 'branches' && <Modal title="Manage branches" onClose={() => setDialog(null)}><BranchManager repository={repository} busy={locked} onGit={run}/></Modal>}
+    {dialog === 'branches' && <Modal title="Manage branches" onClose={() => setDialog(null)}><BranchManager repository={repository} busy={locked} onGit={run} onMerge={onOperate?branch=>{setDialog(null);setMergeBranch(branch)}:undefined}/></Modal>}
     {dialog === 'compare' && <Modal title="Compare branches" onClose={() => setDialog(null)}><BranchComparison repository={repository}/></Modal>}
+    {mergeBranch&&onOperate&&<MergeBranchDialog branch={mergeBranch} repository={repository} busy={locked} onClose={()=>setMergeBranch(undefined)} onOperate={onOperate} onConflicts={()=>onConflicts?.()}/>}
   </section>
 }
 
-function BranchManager({ repository, busy, onGit }: { repository: RepositorySnapshot; busy: boolean; onGit: RunGit }) {
+function BranchManager({ repository, busy, onGit, onMerge }: { repository: RepositorySnapshot; busy: boolean; onGit: RunGit; onMerge?:(branch:RepositoryBranch)=>void }) {
   const [query, setQuery] = useState('')
   const [name, setName] = useState('')
   const [checkout, setCheckout] = useState(true)
@@ -78,7 +82,8 @@ function BranchManager({ repository, busy, onGit }: { repository: RepositorySnap
     <label className="branch-search"><span className="sr-only">Filter branches</span><input aria-label="Filter branches" value={query} onChange={event => setQuery(event.target.value)} placeholder="Filter local and remote branches…"/></label>
     <div className="branch-list">{branches.map(branch => <div className="branch-row" key={`${branch.remote}/${branch.name}`}>
       <Icon name="branch"/><div className="branch-description"><strong title={branch.name}>{branch.name}</strong><span>{branch.current ? 'Current branch' : branch.remote ? 'Remote branch' : branch.upstream || 'Local branch'}{branch.upstream && ` · ↑ ${branch.ahead} ↓ ${branch.behind}`}</span></div>
-      <button className="btn" disabled={locked || branch.current} aria-label={`Switch to ${branch.name}`} onClick={() => void run('checkout', branch.name)}>{branch.current ? 'Current' : 'Switch'}</button>
+      <button className="btn" disabled={locked || branch.current || !!repository.operation} aria-label={`Switch to ${branch.name}`} onClick={() => void run('checkout', branch.name)}>{branch.current ? 'Current' : 'Switch'}</button>
+      {onMerge&&!branch.remote&&!branch.current&&<button className="btn" disabled={locked||!!repository.operation||repository.detached} aria-label={`Merge ${branch.name} into ${repository.currentBranch}`} onClick={()=>onMerge(branch)}>Merge…</button>}
       {!branch.remote && <><button className="icon-button" disabled={locked} aria-label={`Rename ${branch.name}`} onClick={() => { setEdit({ action: 'renameBranch', branch }); setRenamed(branch.name) }}><Icon name="edit" size={14}/></button><button className="icon-button" disabled={locked || branch.current} aria-label={`Delete ${branch.name}`} onClick={() => setEdit({ action: 'deleteBranch', branch })}><Icon name="trash" size={14}/></button></>}
     </div>)}{!branches.length && <p className="branch-empty">{repository.hasHead ? 'No branches match this filter.' : 'Create your first commit to record this branch.'}</p>}</div>
   </div>

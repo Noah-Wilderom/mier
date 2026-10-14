@@ -394,6 +394,7 @@ export interface RepositoryFileStatus {
 }
 
 export interface RepositorySnapshot {
+	operation?: import('./gitOperations').GitOperation;
   root: string;
   name: string;
   currentBranch: string;
@@ -603,6 +604,13 @@ export const services = {
     setLabels: async (host: string, owner: string, repo: string, number: number, labels: string[]) => (await invoke<string[] | null>("main.GitHubService.SetLabels", host, owner, repo, number, labels)) ?? [],
   },
   repository: {
+    cherryPick: (root: string, request: import('./gitOperations').CherryPickRequest) => invoke<import('./gitOperations').GitOperationResult>("main.RepositoryService.CherryPick", root, request),
+    mergeBranch: (root: string, request: import('./gitOperations').MergeBranchRequest) => invoke<import('./gitOperations').GitOperationResult>("main.RepositoryService.MergeBranch", root, request),
+    controlOperation: (root: string, token: string, action: string) => invoke<import('./gitOperations').GitOperationResult>("main.RepositoryService.ControlOperation", root, token, action),
+    conflict: (root: string, file: string) => invoke<import('./gitOperations').ConflictFile>("main.RepositoryService.Conflict", root, file),
+    resolveConflict: (root: string, request: import('./gitOperations').ResolveConflictRequest) => invoke<void>("main.RepositoryService.ResolveConflict", root, request),
+    stageHunk: (root: string, request: import('./gitOperations').StageHunkRequest) => invoke<void>("main.RepositoryService.StageHunk", root, request),
+    branchCommits: (root: string, branch: string, expectedTip: string) => invoke<RepositoryCommit[]>("main.RepositoryService.BranchCommits", root, branch, expectedTip),
     commitDiff: async (root: string, revision: string) => (await invoke<RepositoryDiff[] | null>("main.RepositoryService.CommitDiff", root, revision)) ?? [],
     open: (path: string) => invoke<RepositorySnapshot>("main.RepositoryService.Open", path),
     snapshot: (path: string) => invoke<RepositorySnapshot>("main.RepositoryService.Snapshot", path),

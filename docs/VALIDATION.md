@@ -1,5 +1,13 @@
 # Validation record
 
+## Local Git workflows — 2026-10-14
+
+- All **61 frontend unit tests** and **116 Chromium/WebKit browser tests** passed after adding section staging, local branch commit selection, cherry-pick, merge preview and the conflict editor.
+- `go test -race ./...`, `go vet ./...` and `wails3 build` passed. The final Git operation additions also passed an independent race-enabled Git-client run.
+- Real disposable repositories verified clean-tree and stale-branch guards, authorship/source attribution, conflicting and empty cherry-picks, continue/abort/skip, linked worktree state, binary and delete/modify resolutions, external rebase labels and staging/unstaging one section without changing working bytes.
+- T3 inspected dark/light conflict editors and a 900 × 700 viewport. The operation bar is above the editor, with its position asserted in browser tests. A stale-save test verifies retained edits, and a duplicate-click test verifies one mutation request.
+- The rebuilt Linux desktop opened in an isolated configuration/cache profile. macOS/Windows runtime interaction and large/submodule conflict qualification remain separate; see [workflow limits](LOCAL_GIT.md).
+
 Workspace, managed language tools, SSH remote handling, large PHP dependency capture, symbol preparation/rendering, and Jira configuration/ticket fixtures verified through **2026-10-14**. The earlier documentation handoff is preserved in [the historical record](validation/handoff-2026-10-13.md); its temporary QA paths and Jira simulation are historical, not the current test suite.
 
 ## Environment

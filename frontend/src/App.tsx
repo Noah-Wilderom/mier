@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Icon } from "./Icon";
 import { Markdown } from "./Markdown";
@@ -40,10 +40,14 @@ import {CodeReviewSettings} from "./CodeReviewSettings";
 import LanguageServerSettings from "./LanguageServerSettings";
 import {NotificationToasts, type PullRequestNotice} from "./NotificationToasts";
 import RepositoryToolbar from "./RepositoryToolbar";
+import GitOperationBanner from "./GitOperationBanner";
+import { CherryPickControl, useHistoryBranch } from "./GitCommitActions";
+import type { GitMutation } from "./gitOperations";
+import type { RepositorySnapshot } from "./services";
 import CommitChanges, {type LoadCommitDiff} from "./CommitChanges";
 import Modal from "./Modal";
 import { services } from "./services";
-import { mapChangedFile } from "./liveData";
+import { mapChangedFile, mapRepositorySnapshot } from "./liveData";
 import ActionsPage from "./Actions";
 import Checks from "./Checks";
 import "./workspaceStyle.css";
@@ -771,7 +775,7 @@ export default function App() {
         )}
       </header>
 
-      {live.enabled && live.repository && !focusMode && destination !== 'settings' && <RepositoryToolbar key={live.repository.root} repository={live.repository} busy={live.busy} onGit={live.git} onRefresh={live.refresh}/>}
+      {live.enabled && live.repository && !focusMode && destination !== 'settings' && <div className="repository-tools"><RepositoryToolbar key={live.repository.root} repository={live.repository} busy={live.busy} onGit={live.git} onRefresh={live.refresh} onOperate={live.operate} onConflicts={()=>navigate('local-changes')}/>{live.repository.operation&&<GitOperationBanner key={live.repository.root+live.repository.operation.token} operation={live.repository.operation} busy={live.busy} onOperate={live.operate} onResolve={()=>navigate('local-changes')}/>}</div>}
 
       <main
         aria-busy={!!live.openingRepository||(isPRView&&live.loadingPullRequests)}
@@ -1082,6 +1086,10 @@ export default function App() {
             onReview={() => navigate("inbox")}
             root={live.repository?.root}
             loadCommitDiff={live.enabled?live.commitDiff:undefined}
+            repository={live.enabled?live.repository??undefined:undefined}
+            busy={live.busy}
+            onOperate={live.operate}
+            onConflicts={()=>navigate('local-changes')}
           />
         )}
         {destination === "local-changes" && (!live.enabled || !!live.repository) && (
@@ -1097,6 +1105,8 @@ export default function App() {
             onOpenSettings={() => navigate("settings")}
             onChange={setLocalChanges}
             onStage={live.enabled?(paths,stage)=>live.git(stage?'stage':'unstage',paths):undefined}
+            onOperate={live.enabled?live.operate:undefined}
+            operation={live.repository?.operation}
             loadDiff={live.enabled?live.diff:undefined}
             busy={live.busy}
             onCommit={(message) => {
@@ -2122,6 +2132,10 @@ function HistoryView({
   onReview,
   root,
   loadCommitDiff,
+  repository,
+  busy=false,
+  onOperate,
+  onConflicts,
 }: {
   history: Commit[];
   branch: string;
@@ -2129,9 +2143,15 @@ function HistoryView({
   onReview: () => void;
   root?: string;
   loadCommitDiff?: LoadCommitDiff;
+  repository?:RepositorySnapshot;
+  busy?:boolean;
+  onOperate?:(mutation:GitMutation)=>Promise<unknown>;
+  onConflicts?:()=>void;
 }) {
+  const source=useHistoryBranch(repository);
+  const filtered=useMemo(()=>repository&&source.commits?mapRepositorySnapshot({...repository,history:source.commits}).history:history,[repository,source.commits,history]);
   const [selected, setSelected] = useState(history[0]?.sha);
-  const commit = history.find((c) => c.sha === selected) || history[0];
+  const commit = filtered.find((c) => c.sha === selected) || filtered[0];
   return (
     <section className="history-workspace">
       <div className="workspace-toolbar">
@@ -2140,16 +2160,19 @@ function HistoryView({
           <Icon name="branch" size={14} />
           {branch}
         </code>
+        {repository&&<label className="history-branch-filter">History from<select aria-label="History branch" value={source.branch} onChange={e=>source.setBranch(e.target.value)}><option value="">All branches</option>{repository.branches?.filter(branch=>!branch.remote).map(branch=><option key={branch.name}>{branch.name}</option>)}</select></label>}
         <button className="btn" onClick={onReview}>
           <Icon name="pull-request" />
           Review pull requests
         </button>
       </div>
-      <HistoryGraph commits={history} selectedSha={commit?.sha} onSelect={setSelected}/>
+      {source.error&&<div className="git-operation-error" role="alert">{source.error}<button className="btn" onClick={source.retry}>Retry branch history</button></div>}
+      {source.loading?<p role="status" className="comparison-empty">Loading branch history…</p>:<HistoryGraph commits={filtered} selectedSha={commit?.sha} onSelect={setSelected}/>}
       {commit && (
         <div className="commit-inspector">
           <div className="section-intro">
             <h2>{commit.subject}</h2>
+            {repository&&onOperate&&<CherryPickControl commit={commit} repository={repository} busy={busy} onOperate={onOperate} onConflicts={()=>onConflicts?.()}/>}
             <span>
               <Avatar user={commit.author} size={22} />
               {people[commit.author].name} · {relativeTime(commit.createdAt)}
