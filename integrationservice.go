@@ -103,7 +103,7 @@ func newJiraIntegration(path string, store secretStore, client *http.Client) *In
 	ctx, cancel := context.WithCancel(context.Background())
 	copyClient := *client
 	copyClient.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	s := &IntegrationService{ctx: ctx, cancel: cancel, store: store, configPath: path, state: "idle", client: &copyClient, cache: map[string]jiraCachedIssue{}}
+	s := &IntegrationService{ctx: ctx, cancel: cancel, store: &jiraKeychainStore{base: store}, configPath: path, state: "idle", client: &copyClient, cache: map[string]jiraCachedIssue{}}
 	s.config.CallbackPort = defaultJiraCallbackPort
 	s.config.Repositories = map[string]JiraRepositoryPreferences{}
 	s.config.Selections = map[string]jiraSelection{}
@@ -179,10 +179,13 @@ func (s *IntegrationService) loadSecretsLocked() error {
 		return nil
 	}
 	if err != nil {
-		return errors.New("Jira credentials could not be read from the OS keychain. Unlock your keychain and retry.")
+		if errors.Is(err, errJiraKeychainCorrupt) {
+			return errors.New("Saved Jira credentials are incomplete. Configure your app and authorize again.")
+		}
+		return errors.New("Jira credentials could not be read from the OS keychain. Check keychain access and retry.")
 	}
 	var credentials jiraSecrets
-	if len(data) > 64*1024 || json.Unmarshal([]byte(data), &credentials) != nil {
+	if len(data) > maxJiraSecretsBytes || json.Unmarshal([]byte(data), &credentials) != nil {
 		return errors.New("Saved Jira credentials could not be read. Configure your app again.")
 	}
 	s.secrets = credentials
@@ -195,8 +198,11 @@ func (s *IntegrationService) saveSecretsLocked(value jiraSecrets) error {
 	if err != nil {
 		return err
 	}
-	if s.store.Set(jiraKeyringService, s.config.ClientID, string(data)) != nil {
-		return errors.New("Jira credentials could not be saved in the OS keychain. Unlock your keychain and retry.")
+	if err := s.store.Set(jiraKeyringService, s.config.ClientID, string(data)); err != nil {
+		if errors.Is(err, keyring.ErrSetDataTooBig) {
+			return errors.New("Jira credentials exceed the secure storage size limit (64 KiB).")
+		}
+		return errors.New("Jira credentials could not be saved in the OS keychain. Check keychain access and retry.")
 	}
 	s.secrets = value
 	s.secretsLoaded = true

@@ -29,6 +29,10 @@ If the developer console's Authorization page says **Your app doesn't have any A
 
 If the browser still shows an error, expand **Information for the owner** on Atlassian's error page for the provider's specific cause. Check that the saved callback exactly matches M.I.E.R.'s displayed URL and that the Client ID came from this OAuth app's Settings. For a private app, sign in as the app owner; using a different Atlassian account requires enabling sharing under Distribution. Atlassian documents these requirements in its [OAuth guide](https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/). Keep M.I.E.R. open until consent finishes so its temporary callback listener is available.
 
+If the browser reaches M.I.E.R.'s callback and says **Jira could not be connected**, return to Settings for the specific error. Earlier builds incorrectly described every keychain write failure as a locked keychain. The [macOS keyring backend](https://github.com/zalando/go-keyring/blob/v0.2.8/keyring_darwin.go) rejects encoded commands over 4096 bytes, and the [Windows backend](https://github.com/zalando/go-keyring/blob/v0.2.8/keyring_windows.go) limits individual values to 2560 bytes; a combined OAuth token record can exceed those limits even though the client secret alone fits. That rejection happens without a permission prompt. Update or rebuild M.I.E.R. and authorize again; existing app credentials remain readable.
+
+Current builds store larger records as bounded keychain entries and distinguish size-limit errors from access failures. If an access failure remains on macOS, open **Keychain Access**, check that the **login** keychain is unlocked, and inspect access permissions for the `mag-ik-een-review.jira` entries.
+
 ## Match tickets to a repository
 
 Open a PR and select **Jira repository settings** beside its Tickets row.
@@ -43,7 +47,7 @@ Discovery reads references in PR text. It does not query Jira's native developme
 
 ## Storage and recovery
 
-The client secret, access token, rotating refresh token, and token expiry live in the OS keychain under `mag-ik-een-review.jira`. They are not returned to React or written to browser storage. Jira site metadata, client ID, callback port, repository mappings, and personal PR selections live in the user configuration directory's `mag-ik-een-review/jira.json`, using atomic replacement and private file permissions where supported.
+The client secret, access token, rotating refresh token, and token expiry live in the OS keychain under `mag-ik-een-review.jira`. Small records retain the existing single-item format. Larger records use a small manifest in that item and bounded, encoded parts under `mag-ik-een-review.jira.parts`, with an overall 64 KiB credential limit. Each update writes a new generation of parts before publishing its manifest; incomplete writes leave the previous complete record in use. Reads validate the bounded manifest, part sizes, and checksum. Replaced generations and failed staging writes are cleaned up where keychain access permits; a process interruption before cleanup can leave unused parts in the keychain. All parts remain in the OS credential store. Secrets are not returned to React or written to browser storage. Jira site metadata, client ID, callback port, repository mappings, and personal PR selections live in the user configuration directory's `mag-ik-een-review/jira.json`, using atomic replacement and private file permissions where supported.
 
 The authorization listener binds only to IPv4 loopback while a connection attempt is active. Attempts last up to five minutes and continue when navigating away from Settings. **Cancel authorization**, application shutdown, or completion closes the listener. An occupied port produces a setup error; choose another port in M.I.E.R. and update the registered callback URL before trying again.
 
@@ -56,5 +60,7 @@ Refresh failures retain the currently displayed cards and offer a retry. A missi
 ## Verification
 
 Retained Go tests exercise loopback callbacks, state validation, denied consent, occupied ports, configuration corruption, secure-store failures, rotating tokens, revoked grants, redirects, cancellation, rate limits, ticket matching, project/site mappings, personal selections, and stale account results. Chromium and WebKit tests exercise the setup form and ticket reader through the Wails RPC boundary.
+
+Keychain regressions reproduce the original callback failure using the macOS command and Windows entry limits. They cover larger authorization/refresh records, restart, legacy single-item reads, maximum client ID length, Unicode boundaries, interrupted staging and publication, corrupt manifests/parts, account removal, and disconnect cleanup. The macOS and Windows CI jobs also opt into `MIER_JIRA_KEYCHAIN_SMOKE=1 go test -run '^TestRealJiraKeychainLargeRecord$' -count=1 -timeout 90s .`, which round-trips synthetic data through the real OS keychain using a temporary account and cleans it up. This smoke test does not authorize a Jira account or establish behavior of a user's locked keychain.
 
 These fixtures do not establish live Jira account access. A real OAuth consent flow, your site's field IDs and permissions, and macOS/Windows keychain and callback behavior still need qualification with your own registered app. See [the validation record](VALIDATION.md).
