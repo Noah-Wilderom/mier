@@ -46,7 +46,7 @@ No Apple, Windows certificate, Linux package-signing, or AUR credentials are req
 
 ## Retrying a failed release
 
-A missing signing secret causes **Validate release and signing key** to fail. GitHub then skips its dependent packaging and publication jobs. A skipped job can display the literal `Package ${{ matrix.platform }}/${{ matrix.arch }}` name because no matrix jobs were expanded; this is not evidence of a malformed matrix. [GitHub job dependencies](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-jobs#defining-prerequisite-jobs).
+A missing signing secret causes **Validate release and signing key** to fail. GitHub then skips its dependent packaging and publication jobs. The packaging job uses GitHub's default matrix names, such as `package (linux, amd64, ubuntu-24.04)`, and displays `package` when skipped before expansion. The packaging step also explicitly names its platform and architecture. [GitHub job dependencies](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-jobs#defining-prerequisite-jobs).
 
 After configuring the secret, open the failed run under **Actions** and choose **Re-run all jobs**. This reuses the existing release and tag; creating another release is unnecessary. From GitHub CLI, substitute the failed run's numeric ID:
 

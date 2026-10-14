@@ -32,7 +32,7 @@ jobs:
               '## Release setup required' \
               '' \
               'The required **UPDATER_PRIVATE_KEY** Actions repository secret is missing.' \
-              'Packaging and publication are skipped until this secret is configured. The skipped matrix job may display its unevaluated name.' \
+              'Packaging and publication are skipped until this secret is configured.' \
               '' \
               "[Signing setup](https://github.com/$GITHUB_REPOSITORY/blob/master/docs/RELEASING.md#signing-setup)" \
               >> "$GITHUB_STEP_SUMMARY"
@@ -54,8 +54,9 @@ jobs:
           node scripts/release.mjs validate "$RELEASE_TAG"
           printf 'commit=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-  build:
-    name: Package ${{ matrix.platform }}/${{ matrix.arch }}
+  # Let GitHub append the matrix values to its default job name. A job skipped
+  # before matrix expansion still has a readable name without raw expressions.
+  package:
     needs: prepare
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
@@ -93,7 +94,7 @@ jobs:
           npx playwright install --with-deps chromium webkit
           npm run test:ui
       - run: go test ./...
-      - name: Build and package the target
+      - name: Package ${{ matrix.platform }}/${{ matrix.arch }}
         env:
           TARGET_PLATFORM: ${{ matrix.platform }}
           TARGET_ARCH: ${{ matrix.arch }}
@@ -109,7 +110,7 @@ jobs:
 
   publish:
     name: Sign updates and attach release assets
-    needs: [prepare, build]
+    needs: [prepare, package]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
