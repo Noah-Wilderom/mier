@@ -27,14 +27,17 @@
 .jira-setup-form { display: flex; flex-direction: column; gap: 13px; margin-top: 17px; max-width: 620px; }
 .jira-setup-form > strong, .jira-registration-guide > strong { font-size: 13px; font-weight: 600; }
 .jira-registration-guide { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); }
-.jira-registration-guide p, .jira-setup-form details p, .jira-disconnect-confirm p { margin: 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.jira-registration-guide p, .jira-setup-form details p, .jira-disconnect-confirm p, .jira-authorization-help p { margin: 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
 .jira-registration-guide a { display: inline-flex; align-items: center; gap: 4px; color: var(--blue); font-size: 12px; }
-.jira-scopes { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 12px; }
-.jira-scopes code { padding: 3px 5px; border-radius: 4px; background: var(--surface); font-family: var(--mono); }
+.jira-registration-guide ol { display: flex; flex-direction: column; gap: 7px; margin: 0; padding-left: 19px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.jira-registration-guide code, .jira-authorization-help code { padding: 2px 4px; border-radius: 4px; background: var(--surface); font-family: var(--mono); overflow-wrap: anywhere; }
 .jira-setup-actions, .jira-repository-form > div { display: flex; gap: 7px; }
 .jira-setup-form details summary { cursor: pointer; font-size: 12px; color: var(--muted); }
 .jira-setup-form details label { margin: 10px 0; }
 .jira-authorization-status { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; margin: 12px 0; color: var(--muted); font-size: 12px; }
+.jira-authorization-help { margin-top: 12px; }
+.jira-authorization-help summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+.jira-authorization-help p { margin-top: 9px; }
 .jira-disconnect-confirm { margin-top: 13px; padding: 12px; border: 1px solid var(--border); border-radius: 5px; }
 .jira-disconnect-confirm p { margin-bottom: 10px; }
 .detail-pane { position: relative; }

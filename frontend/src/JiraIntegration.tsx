@@ -31,9 +31,25 @@ export function JiraIntegration() {
       {(error || statusError || status?.error) && <p className="jira-integration-error" role="alert">{error || statusError || status?.error}{statusError && <button className="btn-ghost" type="button" onClick={refresh}>Retry</button>}</p>}
       {notice && <p role="status" className="jira-integration-status">{notice}</p>}
       {authorizing && <div className="jira-authorization-status" role="status"><span className="jira-install-spinner"/>{status?.state === 'verifying' ? 'Verifying Jira access…' : 'Finish authorizing in your browser…'}<button className="btn-ghost" disabled={busy} onClick={() => void run(() => services.jira.cancelAuthorization())}>Cancel authorization</button></div>}
+      {status?.configured && !open && (!status.connected || authorizing || status.error) && <details className="jira-authorization-help">
+        <summary>Browser authorization failed?</summary>
+        <p>If Atlassian says “Your app doesn’t have any APIs”, open your app’s <strong>Permissions</strong>, add the <strong>Jira API</strong>, and configure the classic <code>read:jira-work</code> scope (“View Jira issue data”). Save the changes, cancel the current authorization attempt, and select <strong>Authorize Jira</strong> again.</p>
+        <p>The registered callback must match <code>{status.callbackUrl}</code>. If authorization still fails, expand the owner information on Atlassian’s error page to see the specific cause.</p>
+      </details>}
       {status?.connected && <label className="jira-site-setting">Default Jira site<select aria-label="Default Jira site" value={status.defaultSiteId} disabled={busy || authorizing} onChange={event => void run(() => services.jira.defaultSite(event.target.value))}>{status.sites.map(site => <option key={site.id} value={site.id}>{site.name} · {site.url}</option>)}</select></label>}
       {open && <form className="jira-setup-form" onSubmit={event => { event.preventDefault(); void run(async () => { await services.jira.configure({ clientId, clientSecret: secret, callbackPort: port }); setSecret(''); setOpen(false); setNotice('App credentials saved. Authorize Jira to finish connecting.'); }) }}>
-        <div className="jira-registration-guide"><strong>1. Register your OAuth app</strong><p>In the Atlassian developer console, create an OAuth 2.0 integration, add Jira API access, and enable the permissions below.</p><a href="https://developer.atlassian.com/console/myapps/" target="_blank" rel="noopener noreferrer" onClick={event => { event.preventDefault(); void openWebURL(event.currentTarget.href).catch(() => setError('The developer console could not be opened.')) }}>Open developer console <Icon name="external" size={12}/></a><label>Callback URL<input aria-label="Jira callback URL" value={callback} readOnly onFocus={event => event.target.select()}/></label><p>Register this exact URL under Authorization → OAuth 2.0.</p><div className="jira-scopes">Permissions: <code>read:jira-work</code><code>offline_access</code></div><p>Enable Jira read access in Permissions. M.I.E.R. requests offline access during sign-in to keep your connection active.</p></div>
+        <div className="jira-registration-guide">
+          <strong>1. Register your OAuth app</strong>
+          <p>In the Atlassian developer console, create an OAuth 2.0 integration.</p>
+          <a href="https://developer.atlassian.com/console/myapps/" target="_blank" rel="noopener noreferrer" onClick={event => { event.preventDefault(); void openWebURL(event.currentTarget.href).catch(() => setError('The developer console could not be opened.')) }}>Open developer console <Icon name="external" size={12}/></a>
+          <ol>
+            <li>Open <strong>Permissions</strong> and select <strong>Add</strong> next to the <strong>Jira API</strong>.</li>
+            <li>Select <strong>Configure</strong> for the Jira API. Add the classic <code>read:jira-work</code> scope (“View Jira issue data”) and save your changes.</li>
+            <li>Under <strong>Authorization → OAuth 2.0</strong>, register this exact callback URL.</li>
+          </ol>
+          <label>Callback URL<input aria-label="Jira callback URL" value={callback} readOnly onFocus={event => event.target.select()}/></label>
+          <p>M.I.E.R. adds <code>offline_access</code> to the sign-in request automatically to keep your connection active. This is separate from the Jira API permission configured above.</p>
+        </div>
         <strong>2. Enter your app credentials</strong>
         <label>Client ID<input aria-label="Jira client ID" required autoComplete="off" value={clientId} disabled={busy} onChange={event => setClientId(event.target.value)}/></label>
         <label>Client secret<input aria-label="Jira client secret" type="password" required={!status?.configured || clientId !== status.clientId} autoComplete="new-password" value={secret} disabled={busy} onChange={event => setSecret(event.target.value)} placeholder={status?.configured ? 'Leave blank to keep your saved secret' : 'From your OAuth app settings'}/></label>

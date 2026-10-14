@@ -7,7 +7,7 @@ M.I.E.R. discovers Jira issue keys in a pull request's branch, title, and descri
 Jira is optional. Open the desktop application's **Settings → Apps → Configure Jira** during setup or connect later from a PR's **Connect Jira** button. The registration guide and credential fields are inside the application. Standalone browser previews cannot connect an account.
 
 1. Open the [Atlassian developer console](https://developer.atlassian.com/console/myapps/) and create an **OAuth 2.0 integration**. Choose the account-level grant if the console asks for a grant type.
-2. Under **Permissions**, add the Jira API and its classic **`read:jira-work`** permission.
+2. Under **Permissions**, select **Add** next to the **Jira API**. Then select **Configure** for that API, add the classic **`read:jira-work`** scope (**View Jira issue data**), and save your changes. Creating the OAuth app and registering a callback do not add Jira API access automatically.
 3. Under **Authorization → OAuth 2.0**, register the exact callback URL displayed by M.I.E.R. The default is:
 
    ```text
@@ -17,11 +17,17 @@ Jira is optional. Open the desktop application's **Settings → Apps → Configu
 4. Copy your app's **Client ID** and **Secret** from its Settings into M.I.E.R. and select **Save app credentials**.
 5. Select **Authorize Jira**, complete consent in your browser, and return to M.I.E.R. Choose your default Jira site from the authorized sites.
 
-M.I.E.R. requests `offline_access` during consent for refresh tokens. These steps follow the [Atlassian OAuth guide](https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/). The callback must match the registered URL, including the port and path. Changing credentials or the callback port requires authorization again. Leaving the secret blank when editing the same client ID keeps the saved secret.
+M.I.E.R. adds `offline_access` to the authorization request automatically for refresh tokens. It is separate from the Jira API scope configured in Permissions. These steps follow the [Atlassian OAuth guide](https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/); the classic permission is described in [Jira's scope reference](https://developer.atlassian.com/cloud/jira/platform/scopes-for-oauth-2-3LO-and-forge-apps/). The callback must match the registered URL, including the port and path. Changing credentials or the callback port requires authorization again. Leaving the secret blank when editing the same client ID keeps the saved secret.
 
 Each installation uses the app credentials supplied locally. Jira credentials belong in the application's setup form; no Jira repository or GitHub Actions secret is required, and M.I.E.R. supplies no shared Jira app.
 
 Atlassian's current cloud-app requirements prohibit distributed integrations that require customers to create individual OAuth apps. This implementation follows the maintainer's requested credentials model; it should not be described as satisfying Atlassian's public distribution requirements. See the notice in [Atlassian's OAuth documentation](https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/).
+
+## Browser authorization errors
+
+If the developer console's Authorization page says **Your app doesn't have any APIs**, the app has no Jira API configured. This can leave Atlassian's consent page displaying **Something went wrong** before it redirects back to M.I.E.R. Follow the Permissions step above to add the Jira API and its classic `read:jira-work` scope, save, then **Cancel authorization** in M.I.E.R. and start **Authorize Jira** again. The same recovery instructions are available under **Browser authorization failed?** while a connection attempt is active.
+
+If the browser still shows an error, expand **Information for the owner** on Atlassian's error page for the provider's specific cause. Check that the saved callback exactly matches M.I.E.R.'s displayed URL and that the Client ID came from this OAuth app's Settings. For a private app, sign in as the app owner; using a different Atlassian account requires enabling sharing under Distribution. Atlassian documents these requirements in its [OAuth guide](https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/). Keep M.I.E.R. open until consent finishes so its temporary callback listener is available.
 
 ## Match tickets to a repository
 
