@@ -92,7 +92,9 @@ Linux selects pacman, dnf, or apt when available and lets that manager install t
 
 ## App behavior
 
-Portable release builds check the latest stable release quietly on startup and use Wails' periodic checks every six hours. **Help → Check for Updates…** checks manually. Wails displays the download and restart flow when an update is found. Development builds disable updates. Linux packages installed under `/usr` or `/opt` use their package manager for upgrades; AppImages are replaced as whole files. Those installations disable the binary-replacement updater. See [Linux installation](LINUX.md) for CLI commands.
+**About M.I.E.R.** shows the installed GitHub release version, including any alpha, beta, or rc suffix. The version is embedded from the release tag when the app is built; development builds show `dev`.
+
+Portable release builds check the latest stable release quietly on startup and use Wails' periodic checks every six hours. **M.I.E.R. → Check for Updates…** on macOS, or **Help → Check for Updates…** on Windows and Linux, checks manually. Wails displays the download and restart flow when an update is found. Development builds disable updates. Linux packages installed under `/usr` or `/opt` use their package manager for upgrades; AppImages are replaced as whole files. Those installations disable the binary-replacement updater. See [Linux installation](LINUX.md) for CLI commands.
 
 The endpoint is `https://github.com/Noah-Wilderom/mier/releases/latest/download/manifest.json`. The app rejects unsigned feeds and incorrect signatures before downloading, then Wails verifies the downloaded bytes before staging and replacing the installed application. Prereleases can have downloadable assets, but GitHub's latest stable release endpoint does not offer them to this channel.
 

@@ -47,7 +47,7 @@ func main() {
 	syncService.observePRs = prNotifications.Observe
 	app = application.New(application.Options{
 		Name:        "M.I.E.R.",
-		Description: "A native Git and pull request workspace",
+		Description: fmt.Sprintf("A native Git and pull request workspace\n\nVersion %s", appVersion),
 		Services: []application.Service{
 			application.NewService(NewIntegrationService()),
 			application.NewService(NewLinearService()),
@@ -107,8 +107,22 @@ func main() {
 
 func createNativeMenu(app *application.App, window *application.WebviewWindow, updatesEnabled bool) *application.Menu {
 	menu := application.NewMenu()
+	about := func(_ *application.Context) { app.Menu.ShowAbout() }
+	checkUpdates := func(_ *application.Context) { go checkForUpdates(app) }
 	if runtime.GOOS == "darwin" {
-		menu.AddRole(application.AppMenu)
+		appMenu := menu.AddSubmenu("M.I.E.R.")
+		// Cocoa's About role reads the numeric bundle version. Use our About
+		// dialog to retain the full GitHub release version, including prereleases.
+		appMenu.Add("About M.I.E.R.").OnClick(about)
+		appMenu.Add("Check for Updates…").SetEnabled(updatesEnabled).OnClick(checkUpdates)
+		appMenu.AddSeparator()
+		appMenu.AddRole(application.ServicesMenu)
+		appMenu.AddSeparator()
+		appMenu.AddRole(application.Hide)
+		appMenu.AddRole(application.HideOthers)
+		appMenu.AddRole(application.UnHide)
+		appMenu.AddSeparator()
+		appMenu.AddRole(application.Quit)
 	}
 
 	command := func(action, value string) func(*application.Context) {
@@ -152,11 +166,11 @@ func createNativeMenu(app *application.App, window *application.WebviewWindow, u
 	appearance.AddRadio("Dark", false).OnClick(command("theme", "dark"))
 
 	menu.AddRole(application.WindowMenu)
-	help := menu.AddSubmenu("Help")
-	help.Add("Check for Updates…").SetEnabled(updatesEnabled).OnClick(func(_ *application.Context) {
-		go checkForUpdates(app)
-	})
-	help.AddSeparator()
-	help.Add("About M.I.E.R.").OnClick(func(_ *application.Context) { app.Menu.ShowAbout() })
+	if runtime.GOOS != "darwin" {
+		help := menu.AddSubmenu("Help")
+		help.Add("Check for Updates…").SetEnabled(updatesEnabled).OnClick(checkUpdates)
+		help.AddSeparator()
+		help.Add("About M.I.E.R.").OnClick(about)
+	}
 	return menu
 }
