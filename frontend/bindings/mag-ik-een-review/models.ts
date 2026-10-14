@@ -10,6 +10,46 @@ import * as githubclient$0 from "./internal/githubclient/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as lspclient$0 from "./internal/lspclient/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as reviewagent$0 from "./internal/reviewagent/models.js";
+
+export interface AIConnection {
+    "run": reviewagent$0.RunSnapshot;
+    "url": string;
+    "token": string;
+    "tools": string[] | null;
+}
+
+export interface AILogin {
+    "loginId": string;
+    "url": string;
+    "code": string;
+}
+
+export interface AILoginStatus {
+    "state": string;
+    "error": string;
+}
+
+export interface AIPreferences {
+    "codexPath": string;
+    "copilotPath": string;
+    "provider": string;
+    "model": string;
+}
+
+export interface AIReviewRequest {
+    "host": string;
+    "owner": string;
+    "repository": string;
+    "pullRequest": number;
+    "headSha": string;
+    "baseSha": string;
+    "provider": string;
+    "model": string;
+    "instructions": string;
+}
 
 export interface Account {
     "host": string;

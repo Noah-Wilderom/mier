@@ -42,7 +42,7 @@ Commit messages and PR creation drafts persist per repository across navigation 
 
 ## Scope and Validation
 
-GitKraken provides a reference for pull request breadth, not a claim that every GitKraken operation is implemented. GitHub is the current provider; other hosting integrations, conflict-resolution editing, rebasing, cherry-picking, and stash management remain future work. Inaccessible protection details and missing or limited patches are communicated as such.
+GitKraken informs local branch, cherry-pick and merge-conflict workflows. M.I.E.R. supports partial staging, guarded local merges/cherry-picks, editable conflict resolutions and continuing or aborting existing Git operations. GitHub is the current hosting provider; other hosting integrations, starting interactive rebases and stash management remain future work. Inaccessible protection details and missing or limited patches are communicated as such.
 
 The retained suite covers isolated Git operations, provider HTTP requests, frontend logic, and browser workflows through the Wails RPC transport. CI tests and builds Linux, macOS, and Windows, with Linux distribution package inspection. The release workflow builds both architectures for all three platforms and signs the updater archives. Native window behavior, real keychain/provider writes, and installer upgrades still need target-platform release qualification. See [validation](docs/VALIDATION.md) and [release readiness](docs/PRODUCTION.md) for the evidence and remaining external setup.
 
@@ -66,3 +66,5 @@ Avoid marketing-style layouts, large decorative cards, unnecessary motion, and b
 ## Accessibility & Inclusion
 
 Provide keyboard navigation, visible focus, labeled controls, sufficient contrast, and reduced-motion support. Pair state colors with icons and text. Use system typography and selectable review and code content.
+
+AI PR review supports ChatGPT through the local Codex app-server, GitHub Copilot through its official SDK, and explicitly connected external MCP clients. Findings become private native comments. The user controls publication through the existing review flow. These reviewers inspect captured changes and source; general coding chat, autonomous working-tree edits and automatic GitHub submission are outside this implementation. See [AI review](docs/AI.md).

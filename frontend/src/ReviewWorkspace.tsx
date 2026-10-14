@@ -168,11 +168,11 @@ function PendingThread({ comment, pr, onUpdate, onNotify, busy = false }: Review
     } catch (issue) { setError(issue instanceof Error ? issue.message : 'The pending comment could not be removed.') }
     finally { setSaving(false) }
   }
-  return <section className="review-thread review-pending-thread" aria-label={`Pending comment on line ${comment.line}`}>
+  return <section id={`review-thread-${comment.id}`} className="review-thread review-pending-thread" aria-label={`Pending comment on line ${comment.line}`}>
     <div className="review-comment">
       <PersonAvatar author={currentUser} />
       <div className="review-comment-content">
-        <div className="review-comment-meta"><strong><ActorName user={currentUser} author={pr.author} /></strong><span className="review-pending-label">Pending review</span><button className="icon-button review-delete-comment" disabled={busy || saving} title="Delete pending comment" aria-label={`Delete pending comment on line ${comment.line}`} onClick={remove}><Icon name="trash" size={13} /></button></div>
+        <div className="review-comment-meta"><strong><ActorName user={currentUser} author={pr.author} /></strong><span className="review-pending-label">{comment.ai?'AI suggestion · '+comment.ai.severity:'Pending review'}</span><button className="icon-button review-delete-comment" disabled={busy || saving} title="Delete pending comment" aria-label={`Delete pending comment on line ${comment.line}`} onClick={remove}><Icon name="trash" size={13} /></button></div>
         <Markdown>{comment.body}</Markdown>
       </div>
     </div>

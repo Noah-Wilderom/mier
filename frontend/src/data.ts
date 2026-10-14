@@ -88,6 +88,7 @@ export interface Commit {
   createdAt: string;
 }
 export interface PendingComment {
+  ai?: {runId:string;provider:'codex'|'copilot'|'external';model:string;severity:'bug'|'warning'|'suggestion'};
   headSha?: string;
   outdated?: boolean;
   id: string;

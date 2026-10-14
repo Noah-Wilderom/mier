@@ -14,6 +14,8 @@ View related [Jira Cloud](docs/JIRA.md) and [Linear](docs/LINEAR.md) tickets alo
 
 Browse [GitHub Actions](docs/ACTIONS.md), inspect job logs, rerun or cancel runs, and start workflows with their declared inputs.
 
+Review PRs with [ChatGPT/Codex, GitHub Copilot, or your own MCP client](docs/AI.md). AI suggestions become private native review comments for you to inspect before submitting.
+
 [Download the latest release](https://github.com/Noah-Wilderom/mier/releases/latest) · macOS, Windows, and Linux · Intel/AMD and ARM64
 
 [Linux and Omarchy installation](docs/LINUX.md) — DEB, RPM, Arch packages, and AppImage.

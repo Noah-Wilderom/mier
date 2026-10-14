@@ -156,3 +156,7 @@ GitHub is the implemented pull request provider. GitLab, Bitbucket, and Azure De
 - `frontend/src/data.ts`: separate demo fixtures and review state helpers.
 - `frontend/src/native.ts` and `main.go`: Wails menus, native command bridge, and full screen.
 - `PRODUCT.md` and `DESIGN.md`: the confirmed product and visual direction.
+
+## AI reviewer development
+
+[AI review setup](AI.md) describes ChatGPT/Codex, Copilot and external MCP connections. Deterministic CI tests exercise Codex initialization, immutable read-only review configuration, rejection of command/file approvals, cancellation, a real local MCP transport and Copilot's SDK tool forwarding. No provider account is needed for the automated suite. The Chromium/WebKit cases cover native draft suggestions, duplicate starts, removal/restoration, human draft coexistence, cancellation, external connection restoration, old revisions and failed device login. Live subscription smoke reviews are a separate manual check using disposable source, without publishing GitHub comments.

@@ -630,6 +630,19 @@ export const services = {
     push: (path: string, remote: string) => invoke<void>("main.RepositoryService.Push", path, remote),
     clone: (url: string, directory: string) => invoke<RepositorySnapshot>("main.RepositoryService.Clone", url, directory),
   },
+  ai: {
+    preferences:()=>invoke<import('./aiTypes').AIPreferences>('main.AIService.GetPreferences'),
+    savePreferences:(preferences:import('./aiTypes').AIPreferences)=>invoke<void>('main.AIService.SavePreferences',preferences),
+    status:(provider:import('./aiTypes').AIProvider)=>invoke<import('./aiTypes').AIProviderStatus>('main.AIService.GetProviderStatus',provider),
+    beginLogin:()=>invoke<import('./aiTypes').AILogin>('main.AIService.BeginCodexLogin'),
+    cancelLogin:(id:string)=>invoke<void>('main.AIService.CancelCodexLogin',id),
+    loginStatus:(id:string)=>invoke<import('./aiTypes').AILoginStatus>('main.AIService.GetCodexLoginStatus',id),
+    start:(request:import('./aiTypes').AIReviewRequest)=>invoke<import('./aiTypes').AIReview>('main.AIService.StartReview',request),
+    startMCP:(request:import('./aiTypes').AIReviewRequest)=>invoke<import('./aiTypes').AIConnection>('main.AIService.StartMCPReview',request),
+    get:(id:string)=>invoke<import('./aiTypes').AIReview>('main.AIService.GetReview',id),
+    connection:(id:string)=>invoke<import('./aiTypes').AIConnection>('main.AIService.GetMCPConnection',id),
+    cancel:(id:string)=>invoke<void>('main.AIService.CancelReview',id),
+  },
 };
 
 /** The callback is silent in a regular browser; live calls still reject there. */

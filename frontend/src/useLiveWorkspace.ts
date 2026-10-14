@@ -7,6 +7,7 @@ import { hasNativeBackend, services, subscribeWorkspaceUpdates, type AccountStat
 import type { GitAction } from './gitWorkspace'
 import { preferredRemote, gitHubIdentity as identityFor } from './gitWorkspace'
 import type { GitMutation, GitOperationResult } from './gitOperations'
+import { aiPendingComment, mergePendingComments, type AIFinding, type AIReview } from './aiTypes'
 
 const emptyHistory: ReturnType<typeof mapRepositorySnapshot>['history'] = []
 const emptyChanges: ReturnType<typeof mapRepositorySnapshot>['changes'] = []
@@ -219,13 +220,28 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
     let canonical:PullRequest
     try{canonical=await syncPullRequest(previous,next)}catch(issue){if(issue instanceof RemoteActionAppliedError&&epoch===activeEpoch.current){await loadDetail(previous.number).catch(()=>{});void refresh()}throw issue}
     if(epoch!==activeEpoch.current)return
+    const currentPending=prsRef.current.find(pr=>pr.number===next.number)?.pendingComments??previous.pendingComments
+    const pendingComments=mergePendingComments(previous.pendingComments,next.pendingComments,currentPending)
     applyDetail(canonical);
-    setItems(prsRef.current.map(p=>p.number===next.number?{...p,pendingComments:next.pendingComments,viewedFiles:next.viewedFiles}:p));
+    setItems(prsRef.current.map(p=>p.number===next.number?{...p,pendingComments,viewedFiles:next.viewedFiles}:p));
     if(canonical!==next)notify("Pull request updated.");
     const saved=prsRef.current.find(pr=>pr.number===next.number)
     if(saved)saveDraft(saved)
     setError('')
   },epoch)},[applyDetail,perform,setItems,notify,saveDraft,loadDetail,refresh])
+  const appendAISuggestions=useCallback(async(origin:{host:string;owner:string;repo:string;number:number},run:AIReview,findings:AIFinding[])=>{
+    const epoch=activeEpoch.current
+    return perform(async()=>{
+      const repo=repoRef.current,identity=repo&&identityFor(repo)
+      if(!identity||identity.host!==origin.host||identity.owner!==origin.owner||identity.repo!==origin.repo)throw new Error('Reopen the reviewed repository to import these suggestions.')
+      const current=prsRef.current.find(pr=>pr.number===origin.number)
+      if(!current)throw new Error('Reopen this pull request to import its suggestions.')
+      const comments=findings.map(finding=>aiPendingComment(run,finding,current)).filter(comment=>!current.pendingComments.some(existing=>existing.id===comment.id))
+      if(!comments.length)return
+      const next={...current,pendingComments:[...current.pendingComments,...comments]}
+      saveDraft(next);setItems(prsRef.current.map(pr=>pr.number===current.number?next:pr))
+    },epoch)
+  },[perform,saveDraft,setItems])
   const acceptNewCommits=useCallback(async()=>{const epoch=activeEpoch.current,number=selectedRef.current;return perform(async()=>{await loadDetail(number,true);if(epoch===activeEpoch.current)notify('Review updated to the latest commits. Draft comments from earlier commits are retained for you to reposition.')},epoch)},[loadDetail,notify,perform])
   const merge=useCallback(async(pr:PullRequest,method:MergeMethod)=>{const epoch=activeEpoch.current;return perform(async()=>{
     const p=pr.provider;if(!p)throw new Error('This pull request is not connected to GitHub.')
@@ -337,5 +353,5 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
   const inboxPullRequests=useMemo(()=>{const byNumber=new Map(prs.map(pr=>[pr.number,pr]));return pullRequestNumbers.flatMap(number=>{const pr=byNumber.get(number);return pr?[pr]:[]})},[prs,pullRequestNumbers])
   const loadMorePullRequests=useCallback(()=>loadPullRequestPage(true),[loadPullRequestPage])
   const retryPullRequests=useCallback(()=>loadPullRequestPage(pageNumbersRef.current.length>0),[loadPullRequestPage])
-  return {available,enabled,repository,identity:repository?identityFor(repository):undefined,prs,inboxPullRequests,account,recent,repositoryCards,busy,openingRepository,loadingPullRequests,loadingMorePullRequests,hasMorePullRequests,pullRequestTotal,openPullRequestCount,pullRequestResultLimit,pullRequestPageError,setPullRequestQuery,loadMorePullRequests,retryPullRequests,error,updatedAt,selected,history:mapped?.history??emptyHistory,changes:mapped?.changes??emptyChanges,branch:mapped?.branch??'',openRepository,connect,selectPullRequest,updatePullRequest,acceptNewCommits,merge,create,git,operate,diff,commitDiff,refresh,useDemo}
+  return {available,enabled,repository,identity:repository?identityFor(repository):undefined,prs,inboxPullRequests,account,recent,repositoryCards,busy,openingRepository,loadingPullRequests,loadingMorePullRequests,hasMorePullRequests,pullRequestTotal,openPullRequestCount,pullRequestResultLimit,pullRequestPageError,setPullRequestQuery,loadMorePullRequests,retryPullRequests,error,updatedAt,selected,history:mapped?.history??emptyHistory,changes:mapped?.changes??emptyChanges,branch:mapped?.branch??'',openRepository,connect,selectPullRequest,updatePullRequest,appendAISuggestions,acceptNewCommits,merge,create,git,operate,diff,commitDiff,refresh,useDemo}
 }

@@ -49,6 +49,7 @@ func main() {
 		Name:        "M.I.E.R.",
 		Description: fmt.Sprintf("A native Git and pull request workspace\n\nVersion %s", appVersion),
 		Services: []application.Service{
+			application.NewService(NewAIService(github, credentials)),
 			application.NewService(NewIntegrationService()),
 			application.NewService(NewLinearService()),
 			application.NewService(NewEditorService(repositories)),

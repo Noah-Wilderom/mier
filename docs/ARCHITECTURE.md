@@ -27,6 +27,7 @@ The Go application owns filesystem access, Git, credentials, provider requests, 
 | Editor launching | `editorservice.go` | `EditorActions.tsx` |
 | Jira Cloud tickets | `integrationservice.go`, `jira_oauth.go`, `jira_tickets.go` | `JiraIntegration.tsx`, `ReviewTickets.tsx`, `JiraRichText.tsx`, `useJiraConnection.ts` |
 | Linear tickets | `linearservice.go`, `linear_oauth.go`, `linear_api.go`, `linear_tickets.go` | `LinearIntegration.tsx`, `ReviewTickets.tsx`, `useLinearConnection.ts` |
+| AI review and local MCP | `aiservice.go`, `internal/reviewagent/`, `internal/githubclient/review_context.go` | `ReviewAssistant.tsx`, `AISettings.tsx`, `aiTypes.ts` |
 
 ## Git and provider execution
 
@@ -91,3 +92,11 @@ Branch/title/body references and personal additions are deduplicated and filtere
 Other hosting providers, starting interactive rebases, stash management, comment reactions, PR projects/milestones, framework-specific LSP plugins, and completion/rename/diagnostics remain outside the current implementation. Platform installer signing/notarization is configured separately in [Releasing](RELEASING.md) and still needs release qualification. The initial design image is not evidence that additional controls are implemented.
 
 Keep new hosting providers behind the provider boundary, framework server configuration behind the LSP manager, and view-state continuity in the review helpers. Validate each distribution OS's window behavior, credentials, editor discovery, notification permissions, and process cleanup before claiming a tested platform release.
+
+## AI review boundaries
+
+`AIService` owns provider detection, managed Codex device login, immutable PR capture, bounded background reviews, cancellation and the lifetime of a per-review loopback MCP server. Codex uses the supported app-server NDJSON protocol; its own CLI owns ChatGPT credentials. GitHub Copilot uses the official Go SDK with an existing GitHub OAuth credential held only by Go. Models are discovered rather than hardcoded. Each reviewer runs in a disposable private directory, with unrelated provider MCP servers and host tools disabled.
+
+`internal/reviewagent` validates every suggestion against captured diff anchors and exposes only context, pinned source reads, private draft additions and summary completion. The MCP bridge uses Streamable HTTP, a fresh per-review bearer, origin/Host checks and request/output limits. Codex connects directly; Copilot uses SDK custom tools backed by an authenticated Go MCP client. The same server can be connected explicitly to an external local agent. Provider/session secrets are never stored in frontend localStorage.
+
+`ReviewAssistant` polls an opaque run ID and imports new findings through the existing persistent review draft store. Imports are keyed to repository and PR identity; draft changes merge by comment ID so concurrent human edits and AI suggestions preserve one another. Removed suggestions are not reimported by polling. Only the ordinary user-controlled review submission publishes to GitHub. Review sessions stop at application exit; imported draft comments remain. See [AI setup and limits](AI.md).

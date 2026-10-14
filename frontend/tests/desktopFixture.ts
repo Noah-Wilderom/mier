@@ -73,6 +73,8 @@ export async function desktopFixture(page: Page) {
         case 'main.PRNotificationService.GetPreferences': result = { toastsEnabled: true, desktopEnabled: false, opened: true, closed: true, merged: true, reviewRequested: true }; break
         case 'main.LSPService.Servers': case 'main.LSPService.CheckServerUpdates': result = []; break
         case 'main.LSPService.Warmup': result = null; break
+        case 'main.AIService.GetPreferences': result = {provider:'codex',model:'',codexPath:'',copilotPath:''}; break
+        case 'main.AIService.GetProviderStatus': result = {provider:args[0],installed:true,executable:`/fixture/${args[0]}`,authenticated:true,account:'reviewer',plan:'',models:[{id:'fixture-model',name:'Fixture model',default:true}],error:''}; break
         case 'main.IntegrationService.GetJiraStatus': result = { configured: false, connected: false, clientId: '', callbackPort: 43827, callbackUrl: 'http://localhost:43827/oauth/jira/callback', scopes: ['read:jira-work', 'offline_access'], state: 'idle', error: '', sites: [], defaultSiteId: '' }; break
         case 'main.LinearService.GetLinearStatus': result = { configured: false, connected: false, clientId: '', callbackPort: 43828, callbackUrl: 'http://localhost:43828/oauth/linear/callback', scopes: ['read'], state: 'idle', error: '', workspace: null, account: '' }; break
         case 'main.GitHubService.ListPullRequestsPage': {

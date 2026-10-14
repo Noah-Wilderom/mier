@@ -41,6 +41,8 @@ import LanguageServerSettings from "./LanguageServerSettings";
 import {NotificationToasts, type PullRequestNotice} from "./NotificationToasts";
 import RepositoryToolbar from "./RepositoryToolbar";
 import GitOperationBanner from "./GitOperationBanner";
+import ReviewAssistant from "./ReviewAssistant";
+import AISettings from "./AISettings";
 import { CherryPickControl, useHistoryBranch } from "./GitCommitActions";
 import type { GitMutation } from "./gitOperations";
 import type { RepositorySnapshot } from "./services";
@@ -969,6 +971,7 @@ export default function App() {
                 notify={reviewNotify}
                 busy={live.busy}
               />
+              <ReviewAssistant expanded={focusMode} onExpand={()=>setFocusMode(true)} key={`ai:${pr.provider?.host}/${pr.provider?.owner}/${pr.provider?.repo}#${pr.number}`} enabled={live.enabled} pr={pr} onImport={(run,findings)=>pr.provider?live.appendAISuggestions({host:pr.provider.host,owner:pr.provider.owner,repo:pr.provider.repo,number:pr.number},run,findings):Promise.resolve()} onOpenSettings={()=>navigate('settings')} onOpenComment={(threadId,path)=>{setReviewLocation({path,threadId});setTab('changes')}}>
               <ReviewTickets key={`${pr.provider?.host}/${pr.provider?.owner}/${pr.provider?.repo}#${pr.number}`} enabled={live.enabled} pr={pr} onOpenSettings={() => navigate('settings')}>
               {live.enabled && pr.provider?.hasNewCommits && <div className="new-commits-banner" role="status"><Icon name="git-commit"/><div><strong>New commits are available</strong><span>Your current diff and draft comments are preserved.</span></div><button className="btn" disabled={live.busy} onClick={()=>void live.acceptNewCommits().catch(()=>{})}>Refresh changes</button></div>}
               {live.enabled && live.error && <div className="live-error" role="status"><Icon name="alert-circle"/><span>{live.error}</span><button className="btn btn-ghost" onClick={()=>void live.refresh()}>Retry</button></div>}
@@ -1055,6 +1058,7 @@ export default function App() {
                 busy={live.busy}
               />}
               </ReviewTickets>
+              </ReviewAssistant>
             </section>
           ) : live.enabled&&live.loadingPullRequests ? (<section className="detail-pane"><ReviewSkeleton label="Loading your review workspace…"/></section>) : (
             <section className="detail-pane empty-state">
@@ -2219,6 +2223,7 @@ function Settings({
       <div className="settings-section">{codeReviewSettings}</div>
       <div className="settings-section">{notificationSettings}</div>
       <div className="settings-section"><h2>Apps</h2><p>Extend your review workspace.</p><div className="settings-app-integrations"><JiraIntegration/><LinearIntegration/></div></div>
+      <AISettings/>
       <div className="settings-section">
         <h2>Appearance</h2>
         <p>Make the workspace comfortable for how you review.</p>
