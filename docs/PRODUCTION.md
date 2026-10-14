@@ -16,7 +16,7 @@ The maintainer has chosen to keep M.I.E.R. unlicensed for now. There is no proje
 
 ## Maintainer setup before the first public release
 
-1. Back up the local updater private key and configure the repository's `UPDATER_PRIVATE_KEY` Actions secret using [the release instructions](RELEASING.md#signing-setup). The key is outside Git. The workflow rejects a missing key or a key that differs from the committed public key.
+1. Back up the local updater private key in 1Password using [the release instructions](RELEASING.md#signing-setup). The repository's `UPDATER_PRIVATE_KEY` Actions secret is configured, and the key remains outside Git. The workflow rejects a missing key or a key that differs from the committed public key.
 2. Publish a SemVer-tagged release from tested code. Confirm all six update archives, every installer, `SHA256SUMS`, and `manifest.json` are attached. The manifest is uploaded last after signature verification.
 3. Exercise first installation and an actual previous-version update on supported OS/architecture pairs. Test GitHub login/keychains, repository opening and Git writes, real provider reviews/merges in a disposable repository, editor discovery, notifications, and process cleanup.
 4. Publish the generated `mier-bin` recipe to the AUR after licensing/package review to enable `omarchy pkg aur add mier-bin`. Release assets alone do not register an AUR or Omarchy package.

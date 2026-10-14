@@ -100,6 +100,6 @@ Provider writes, live Jira OAuth consent and account access, OS keychain operati
 
 Managed LSP installation was exercised on Linux amd64. macOS/Windows native installation interaction is not established by these checks. Managed Phpactor needs PHP's POSIX extension and is unavailable with native Windows PHP; TypeScript/Vue have Windows runtime/CLI paths.
 
-The updater private key is outside Git; configuring the Actions secret, publishing an AUR package, and qualifying actual platform installs are tracked in [release readiness](PRODUCTION.md). M.I.E.R. remains unlicensed by maintainer choice. No live GitHub release was published during verification.
+The updater private key is outside Git. On **2026-10-14**, it was validated against the local and remote master public keys and uploaded as the repository's `UPDATER_PRIVATE_KEY` Actions secret; GitHub confirmed its name and update timestamp. Key backup, AUR publication, and actual platform installation qualification remain tracked in [release readiness](PRODUCTION.md). M.I.E.R. remains unlicensed by maintainer choice. No live GitHub release was published during verification.
 
 Vite's large-chunk and npm's unsupported `minimum-release-age` configuration warnings remain nonfatal. This record is evidence for the current implementation, not a claim of exhaustive Git-provider parity.
