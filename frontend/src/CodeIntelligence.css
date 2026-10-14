@@ -16,7 +16,7 @@
 .code-definition-header > code { font-size: 12px; font-family: var(--mono); }
 .code-definition-scroll { flex: 1; min-height: 0; min-width: 0; overflow: auto; padding: 10px 0 25px; user-select: text; background: var(--definition-background); color: var(--definition-foreground); }
 .code-definition-row { display: grid; grid-template-columns: 56px minmax(max-content, 1fr); font-family: var(--mono); font-size: var(--review-code-font-size, 13px); line-height: var(--review-code-line-height, 23px); min-height: var(--review-code-line-height, 23px); }
-.code-definition-row.is-target { background: var(--accent-soft); }
+.code-definition-row.is-target { background: var(--blue-soft); }
 .code-definition-line-number { color: var(--muted); text-align: right; padding-right: 14px; user-select: none; font-variant-numeric: tabular-nums; }
 .code-definition-row > code { font-family: inherit; font-size: inherit; padding-right: 24px; white-space: pre; tab-size: 4; }
 .code-intelligence [data-code-path] { cursor: text; }
