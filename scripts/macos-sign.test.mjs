@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -110,6 +110,7 @@ test('native certificate import and keychain cleanup work without Apple account 
   tool('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1',
     '-subj', '/CN=' + identity + '/OU=' + teamID, '-keyout', keyPath, '-out', certificatePath]);
   tool('openssl', ['pkcs12', '-export', '-inkey', keyPath, '-in', certificatePath,
+    '-keypbe', 'PBE-SHA1-3DES', '-certpbe', 'PBE-SHA1-3DES', '-macalg', 'sha1',
     '-out', p12, '-passout', 'pass:' + env.MACOS_CERTIFICATE_PASSWORD]);
   env.MACOS_CERTIFICATE = readFileSync(p12).toString('base64');
   const original = parseKeychains(tool('security', ['list-keychains', '-d', 'user']).stdout);
@@ -236,7 +237,7 @@ test('subprocesses receive no signing secrets and failures redact passwords', t 
   });
   assert.ok(macOSSecrets.every(key => !(key in withoutSigningSecrets(env))));
   assert.ok(!('UPDATER_PRIVATE_KEY' in withoutSigningSecrets(env)));
-  assert.equal(tool(process.execPath, ['-e', 'console.log(process.cwd())'], { cwd: root }).stdout.trim(), root);
+  assert.equal(tool(process.execPath, ['-e', 'console.log(process.cwd())'], { cwd: root }).stdout.trim(), realpathSync(root));
 });
 
 test('production entitlements allow networking without development privileges or an app sandbox', () => {
