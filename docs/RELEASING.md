@@ -4,7 +4,7 @@ Publishing a GitHub release runs `.github/workflows/release.yml`. Use a SemVer t
 
 ## Signing setup
 
-Only one manually configured repository secret is required for the current release workflow:
+The updater uses the following signing secret:
 
 | Value | Setup | Source |
 | --- | --- | --- |
@@ -42,9 +42,9 @@ chmod 600 "$HOME/.config/mier/release/updater.key"
 
 Wails writes the public key alongside it as `updater.key.pub`. Copy that public file to `build/updater.key.pub` and commit it before tagging a release; add the corresponding private file as `UPDATER_PRIVATE_KEY`. For this repository, use the already generated key instead. If it is lost, the public key cannot reconstruct it; restore a backup or plan a key migration before generating a replacement. The CLI refuses to overwrite an existing key unless explicitly forced. [Wails updater documentation](https://v3.wails.io/guides/updater/).
 
-Platform installers initially have no Developer ID signature, notarization, or Windows Authenticode signature. macOS bundles use Wails' ad hoc signing. Updater artifacts are separately signed with the local Ed25519 key; operating system installer signing is independent of update verification.
+macOS release apps and DMGs are signed with Developer ID, notarized by Apple, and stapled before publication. The updater ZIP contains the signed and stapled app; both archives are unpacked and checked before upload. Development builds retain Wails' ad hoc signing. Windows installers have no Authenticode signature. Updater artifacts are separately signed with the local Ed25519 key; operating system signing is independent of update verification.
 
-No Apple, Windows certificate, Linux package-signing, or AUR credentials are required by the current workflow. Those become separate setup work when platform signing or automated AUR publication is added. A personal access token is not required for uploading assets to this repository's release. [GitHub's automatic workflow token](https://docs.github.com/en/actions/concepts/security/github_token) and [repository secret setup](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets).
+Apple certificate and account setup is maintained outside this repository. The release workflow requires that setup and stops if credentials, signing, or notarization fail. Windows certificate, Linux package-signing, and AUR credentials are not required. A personal access token is not required for uploading assets to this repository's release. [GitHub's automatic workflow token](https://docs.github.com/en/actions/concepts/security/github_token) and [repository secret setup](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets).
 
 ## Retrying a failed release
 

@@ -1,8 +1,9 @@
 import { createHash, createPrivateKey, createPublicKey, timingSafeEqual } from 'node:crypto';
-import { appendFileSync, copyFileSync, cpSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import { packageMacOSRelease, validateMacOSCredentials, withMacOSSigning, withoutSigningSecrets } from './macos-sign.mjs';
 
 export const targets = ['darwin-amd64', 'darwin-arm64', 'linux-amd64', 'linux-arm64', 'windows-amd64', 'windows-arm64'];
 const appName = 'mag-ik-een-review';
@@ -75,7 +76,7 @@ export function prepareMetadata(root, version) {
 }
 
 function run(command, args, extraEnv = {}, cwd) {
-  const result = spawnSync(command, args, { stdio: 'inherit', env: { ...process.env, ...extraEnv }, shell: false, cwd });
+  const result = spawnSync(command, args, { stdio: 'inherit', env: withoutSigningSecrets({ ...process.env, ...extraEnv }), shell: false, cwd });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`${command} exited with status ${result.status}.`);
 }
@@ -87,6 +88,7 @@ function packageTarget(platform, arch, version) {
     throw new Error('Use a native runner for macOS/Linux and a Windows runner for Windows packaging.');
   }
   prepareMetadata('.', version);
+  if (platform === 'darwin') validateMacOSCredentials();
   mkdirSync('dist/updates', { recursive: true });
   mkdirSync('dist/installers', { recursive: true });
   const binary = `bin/${appName}${platform === 'windows' ? '.exe' : ''}`;
@@ -105,14 +107,10 @@ function packageTarget(platform, arch, version) {
     });
     copyFileSync(`bin/${appName}-${arch}-installer.exe`, `dist/installers/mier-${version}-windows-${arch}-setup.exe`);
   } else {
-    const stage = resolve('dist/dmg-stage');
-    rmSync(stage, { recursive: true, force: true });
-    mkdirSync(stage, { recursive: true });
-    cpSync(`bin/${appName}.app`, join(stage, 'MIER.app'), { recursive: true, dereference: false });
-    // Only one top-level .app: no __MACOSX/resource-fork sidecar directory.
-    run('zip', ['-q', '-r', '-y', archive, 'MIER.app'], { COPYFILE_DISABLE: '1' }, stage);
-    symlinkSync('/Applications', join(stage, 'Applications'));
-    run('hdiutil', ['create', '-volname', 'M.I.E.R.', '-srcfolder', stage, '-format', 'UDZO', '-ov', resolve(`dist/installers/mier-${version}-darwin-${arch}.dmg`)]);
+    withMacOSSigning(signing => packageMacOSRelease({
+      appBundle: resolve('bin/' + appName + '.app'), archive,
+      dmg: resolve('dist/installers/mier-' + version + '-darwin-' + arch + '.dmg'), signing,
+    }));
   }
 }
 
@@ -258,6 +256,7 @@ function main(args) {
   if (args[0] === 'validate') {
     const { version } = parseTag(args[1]);
     validateSigningKey(process.env.UPDATER_PRIVATE_KEY, readFileSync(publicKeyPath));
+    validateMacOSCredentials();
     if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);
     console.log(`Release ${version} signing key matches the pinned public key.`);
   } else if (args[0] === 'package') {
