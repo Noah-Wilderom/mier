@@ -2,20 +2,21 @@ import { Children, isValidElement, useEffect, useMemo, useState, type CSSPropert
 import type { Components } from 'react-markdown'
 import { Markdown } from './Markdown'
 import type { CodeThemeId } from './codeReviewPreferences'
-import { highlightCodeLines, syntaxTokenStyle, type HighlightedCode } from './syntaxHighlighter'
+import { syntaxTokenStyle, type HighlightedCode } from './syntaxHighlighter'
+import { highlightSymbolSignature, prepareSymbolSignature } from './symbolSignature'
 
 const extensions: Record<string, string> = {
   php: 'php', typescript: 'ts', ts: 'ts', javascript: 'js', js: 'js', typescriptreact: 'tsx', tsx: 'tsx', jsx: 'jsx', vue: 'vue', json: 'json', html: 'html', css: 'css', shell: 'sh', bash: 'sh', go: 'go', python: 'py', rust: 'rs', java: 'java',
 }
 
 function SignatureCode({ source, language, theme }: { source: string; language: string; theme: CodeThemeId }) {
-  const lines = useMemo(() => source.split('\n'), [source])
-  const [code, setCode] = useState<{ source: string; theme: CodeThemeId; value: HighlightedCode }>()
-  const highlight = code?.source === source && code.theme === theme ? code.value : undefined
+  const lines = useMemo(() => prepareSymbolSignature(source, language).lines, [source, language])
+  const [code, setCode] = useState<{ source: string; language: string; theme: CodeThemeId; value: HighlightedCode }>()
+  const highlight = code?.source === source && code.language === language && code.theme === theme ? code.value : undefined
   useEffect(() => {
     let stale = false
-    void highlightCodeLines(`symbol.${extensions[language.toLowerCase()] || 'txt'}`, lines, theme).then(value => {
-      if (!stale) setCode({ source, theme, value })
+    void highlightSymbolSignature(`symbol.${extensions[language.toLowerCase()] || 'txt'}`, source, language, theme).then(value => {
+      if (!stale) setCode({ source, language, theme, value })
     })
     return () => { stale = true }
   }, [source, lines, language, theme])

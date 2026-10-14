@@ -82,8 +82,8 @@ async function loadLanguage(language: LanguageId, highlighter: HighlighterCore) 
   await loaded.get(key)
 }
 
-const MAX_HIGHLIGHT_LINES = 6000
-const MAX_HIGHLIGHT_CHARACTERS = 300_000
+export const MAX_HIGHLIGHT_LINES = 6000
+export const MAX_HIGHLIGHT_CHARACTERS = 300_000
 const MAX_CACHE_CHARACTERS = 1_000_000
 const codeCache = new Map<string, { size: number; value: Promise<HighlightedCode> }>()
 let cachedCharacters = 0
@@ -93,7 +93,7 @@ export function syntaxTokenStyle(token: SyntaxToken): CSSProperties {
   return { color: token.color, fontStyle: token.fontStyle && (token.fontStyle & 1) ? 'italic' : undefined, fontWeight: token.fontStyle && (token.fontStyle & 2) ? 600 : undefined, textDecoration: token.fontStyle && (token.fontStyle & 4) ? 'underline' : undefined }
 }
 
-async function tokenize(path: string, lines: string[], theme: CodeThemeId): Promise<HighlightedCode> {
+async function tokenize(path: string, lines: string[], theme: CodeThemeId, kind: 'source' | 'signature'): Promise<HighlightedCode> {
   const fallback: HighlightedCode = { lines: plainTokens(lines), foreground: 'var(--text)', background: 'var(--surface)', highlighted: false }
   try {
     const highlighter = await loadTheme(theme)
@@ -110,9 +110,9 @@ async function tokenize(path: string, lines: string[], theme: CodeThemeId): Prom
       // Yield before each bounded chunk so settings/file navigation remain responsive.
       await new Promise<void>(resolve => setTimeout(resolve, 0))
       const chunk = lines.slice(start, start + 200)
-      // Cold PHP grammar rules can exceed 10ms and leave closing quotes
-      // unparsed. Keep a per-line budget without truncating normal fragments.
-      const result = highlighter.codeToTokens(chunk.join('\n'), { lang: language, theme, grammarState, grammarContextCode: grammarState ? undefined : phpContext, includeExplanation: 'tokenType', tokenizeMaxLineLength: 10_000, tokenizeTimeLimit: 50 })
+      // Keep source-file work bounded. Small hover declarations use Shiki's
+      // normal 500ms cold-rule budget so a first signature is not cut short.
+      const result = highlighter.codeToTokens(chunk.join('\n'), { lang: language, theme, grammarState, grammarContextCode: grammarState ? undefined : phpContext, includeExplanation: 'tokenType', tokenizeMaxLineLength: 10_000, tokenizeTimeLimit: kind === 'signature' ? 500 : 50 })
       grammarState = result.grammarState
       for (let index = 0; index < chunk.length; index++) {
         const tokens = result.tokens[index] as ThemedToken[] | undefined
@@ -124,13 +124,13 @@ async function tokenize(path: string, lines: string[], theme: CodeThemeId): Prom
 }
 
 /** Full-file highlighting also supports read-only language-server definition documents. */
-export function highlightCodeLines(path: string, lines: string[], theme: CodeThemeId): Promise<HighlightedCode> {
+export function highlightCodeLines(path: string, lines: string[], theme: CodeThemeId, kind: 'source' | 'signature' = 'source'): Promise<HighlightedCode> {
   const source = lines.join('\n')
-  if (source.length > MAX_HIGHLIGHT_CHARACTERS || lines.length > MAX_HIGHLIGHT_LINES) return tokenize(path, lines, theme)
-  const key = `${theme}\0${path}\0${source}`
+  if (source.length > MAX_HIGHLIGHT_CHARACTERS || lines.length > MAX_HIGHLIGHT_LINES) return tokenize(path, lines, theme, kind)
+  const key = `${kind}\0${theme}\0${path}\0${source}`
   const existing = codeCache.get(key)
   if (existing) { codeCache.delete(key); codeCache.set(key, existing); return existing.value }
-  const entry = { size: source.length + path.length, value: tokenize(path, lines, theme) }
+  const entry = { size: source.length + path.length, value: tokenize(path, lines, theme, kind) }
   codeCache.set(key, entry)
   cachedCharacters += entry.size
   void entry.value.then(result => {

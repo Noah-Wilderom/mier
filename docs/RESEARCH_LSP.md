@@ -136,6 +136,14 @@ The npm packages were installed in an isolated tools directory, not added to the
 
 **Evidence:** `TestPlaintextHoverPreservesLiteralMarkupCharacters` in [dependencies_test.go](../internal/lspclient/dependencies_test.go) and isolated browser tests for literal content, Escape/close dismissal, and same-symbol re-entry.
 
+### 12. PHP class outlines are not complete source files
+
+**Reproduction (2026-10-14):** The reported popup showed some `public function` declarations in the default foreground after earlier members had been coloured correctly. A real Phpactor `2026.10.07.0` probe against a disposable PHP repository returned a class outline with an opening `<?php` scaffold, circled type glyphs, inferred return types such as `HomeValuationOrderEntity[]`, and method signatures without bodies or terminators. Feeding the outline through continuous PHP source grammar reproduced the lost keyword colours. The [hover wrapper](https://github.com/phpactor/phpactor/blob/master/templates/help/markdown/Phpactor/Extension/LanguageServerHover/Renderer/HoverInformation.twig) and [method template](https://github.com/phpactor/phpactor/blob/master/templates/help/markdown/Phpactor/WorseReflection/Core/Reflection/ReflectionMethod.twig) explain that shape.
+
+**Decision:** Format PHP hover code separately from source files. Hide only the opening scaffold and decorative reflected-type glyphs outside literals/comments; preserve inferred types and documentation. Reset the highlighting context before each declaration, while retaining multiline parameters, comments, and heredocs. Small signatures use Shiki's normal cold-rule time budget. The [grammar-context API](https://shiki.style/guide/grammar-state) supplies PHP context without rendering a synthetic tag. Source diffs and definition documents continue to preserve their original bytes and grammar continuity.
+
+**Layout defect:** The generic Markdown `pre code` selector overrode the signature's wrapping rule, causing long outlines to scroll horizontally. A more specific hover rule now wraps those lines within the popup. Retained tests cover every member's keyword colour in all eight themes, literal/comment preservation, overall size limits, both browser engines and appearances, a small viewport, and unchanged PHP tags in the definition reader.
+
 ## Retained regressions and validation
 
 The final verification reported a passing full Go race run, all five opt-in real LSP tests under the race detector, frontend tests/typechecking, and the Linux amd64 native Wails build. Reproduction commands and optional-tool layout are in [the handoff](LANGUAGE_INTELLIGENCE.md#validation).

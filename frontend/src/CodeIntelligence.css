@@ -31,7 +31,7 @@
 .code-hover-documentation > :first-child { margin-top: 0; }
 .code-hover-documentation > :last-child { margin-bottom: 0; }
 .code-hover-documentation .code-hover-signature { padding: 11px 12px; margin: 8px 0 10px; border: 1px solid var(--border); border-radius: 5px; color: var(--signature-foreground, var(--text)); background: var(--signature-background, var(--panel)); font-family: var(--mono); font-size: var(--review-code-font-size, 13px); line-height: 1.65; overflow: auto; max-height: 240px; white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 4; }
-.code-hover-signature > code { font: inherit; color: inherit; white-space: inherit; background: none; padding: 0; }
+.code-hover-documentation .code-hover-signature > code { font: inherit; color: inherit; white-space: pre-wrap; overflow-wrap: anywhere; background: none; padding: 0; }
 .code-hover-plaintext { padding: 9px 12px 11px; font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 .code-hover-loading { padding: 13px 12px; }
 .code-hover-loading > :first-child { display: block; font-size: 12px; color: var(--muted); margin-bottom: 12px; }

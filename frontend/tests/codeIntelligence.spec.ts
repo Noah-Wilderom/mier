@@ -121,3 +121,53 @@ test('failed preparation retries and abandoned views ignore late preparation res
   expect(desktop.calls.filter(call => call.name.endsWith('.Warmup'))).toHaveLength(2)
   expect(desktop.repositories.get(root)!.headSha).toBe(headSHA)
 })
+
+test('PHP class outlines keep every member colored and wrap long signatures in both appearances', async ({ desktop, page }) => {
+  const outline = `<?php class HomeValuationService {
+    public function __construct(Ⓒ CalcasaService $calcasaService)
+    public function createOrder(Ⓒ UserEntity $user, Ⓒ Address $address, Ⓘ HomeValuationOrderRepositoryInterface $repository): Ⓒ HomeValuationOrderEntity
+    public function findById(int $id): ?HomeValuationOrderEntity
+    public function findOneByAddress(Ⓒ UserEntity $user, Ⓒ Address $address): ?HomeValuationOrderEntity
+    public function getOrdersAwaitingReport(): HomeValuationOrderEntity[]
+    public function fetchAndCompleteReport(Ⓒ HomeValuationOrderEntity $order): Collection<string, HomeValuationOrderEntity>
+    public function completeOrder(Ⓒ HomeValuationOrderEntity $order): void
+}`
+  desktop.handlers.set('main.LSPService.Hover', () => ({ language: 'php', revision: snapshot, kind: 'markdown', contents: `### App\\Business\\Service\\HomeValuationService\n\n${'```'}php\n${outline}\n${'```'}` }))
+  desktop.handlers.set('main.LSPService.Definition', () => [{ id: 'definition', uri: 'mier-lsp://definition/fixture', path: 'src/HomeValuationService.php', language: 'php', revision: snapshot, external: false, range: { start: { line: 1, character: 0 }, end: { line: 1, character: 5 } } }])
+  desktop.handlers.set('main.LSPService.ReadDefinition', () => ({ uri: 'mier-lsp://definition/fixture', path: 'src/HomeValuationService.php', language: 'php', revision: snapshot, external: false, range: { start: { line: 1, character: 0 }, end: { line: 1, character: 5 } }, text: '<?php\nclass HomeValuationService {\n    public function completeOrder(): void {}\n}\n' }))
+  await changes(desktop, page)
+  await point(page)
+  const popup = page.getByRole('dialog', { name: 'Symbol information' })
+  const signature = popup.getByLabel('Symbol signature')
+  await expect(signature).toContainText('class HomeValuationService')
+  await expect(signature).not.toContainText('<?php')
+  await expect(signature).not.toContainText('Ⓒ')
+  await expect(signature).not.toContainText('Ⓘ')
+  await expect(signature).toContainText('HomeValuationOrderEntity[]')
+  for (const appearance of ['light', 'dark']) {
+    await page.getByRole('button', { name: `${appearance} appearance`, exact: true }).click()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', appearance)
+    await point(page)
+    await expect(signature).toBeVisible()
+    await popup.hover()
+    await expect.poll(() => signature.evaluate(element => {
+      const tokens = [...element.querySelectorAll<HTMLSpanElement>('span[style*="color"]')]
+      const keyword = tokens.find(token => token.textContent === 'class')?.style.color
+      const members = tokens.filter(token => token.textContent === 'public' || token.textContent === 'function')
+      return !!keyword && members.length === 14 && members.every(token => token.style.color === keyword)
+    })).toBe(true)
+    await expect(signature.locator('code')).toHaveCSS('white-space', 'pre-wrap')
+    expect(await signature.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true)
+    expect(await popup.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true)
+  }
+  await page.setViewportSize({ width: 720, height: 520 })
+  await point(page)
+  await expect(signature).toBeVisible()
+  await popup.hover()
+  await expect.poll(() => signature.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true)
+  await expect(popup.getByRole('button', { name: /Go to definition/ })).toBeVisible()
+  await popup.getByRole('button', { name: /Go to definition/ }).click()
+  const reader = page.getByRole('region', { name: 'Read-only definition src/HomeValuationService.php' })
+  await expect(reader).toContainText('<?php')
+  await expect(reader).toContainText('class HomeValuationService')
+})
