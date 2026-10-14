@@ -1,6 +1,6 @@
 # Validation record
 
-Workspace and managed language-tool work verified through **2026-10-14**. The earlier documentation handoff is preserved in [the historical record](validation/handoff-2026-10-13.md); its temporary QA paths and Jira simulation are historical, not the current test suite.
+Workspace, managed language tools, and SSH remote handling verified through **2026-10-14**. The earlier documentation handoff is preserved in [the historical record](validation/handoff-2026-10-13.md); its temporary QA paths and Jira simulation are historical, not the current test suite.
 
 ## Environment
 
@@ -26,17 +26,18 @@ The managed installer also downloaded and verified all three current servers int
 | Check | Result |
 | --- | --- |
 | `npm --prefix frontend test` | 46 passed, zero failed or skipped |
-| `npm --prefix frontend run test:ui` | 34 passed across Chromium and WebKit; includes TypeScript checking of the harness |
+| `npm --prefix frontend run test:ui -- --project=chromium` | 26 passed; includes TypeScript checking of the harness |
+| `npm --prefix frontend run test:ui -- --project=webkit` | 26 passed; final browser validation ran each engine separately after the native build finished |
 | Modal focus regression after the final focus change | Both browser projects passed |
 | `npm --prefix frontend run build` | TypeScript and production frontend build passed |
 | `go test -race ./...` | All ordinary package tests passed |
 | `go vet ./...` | Passed |
-| `MIER_LSP_SMOKE_TOOLS=/tmp/mier-lsp-smoke-tools go test -race -timeout 3m -run '^TestReal' -count=1 -v .` | All five actual PHP/TypeScript/Vue tests passed |
+| `MIER_LSP_SMOKE_TOOLS="$(cat /tmp/mier-managed-lsp-protocol-root)" go test -race -timeout 3m -run '^TestReal' -count=1 -v .` | All six actual PHP/TypeScript/Vue tests passed, including PHP navigation after fetching a missing PR commit through an SCP-style remote |
 | `MIER_LSP_INSTALL_SMOKE=1 MIER_LSP_INSTALL_TOOLS=/tmp/mier-managed-lsp-installation go test -race ./internal/lspclient -run '^TestRealManagedToolInstallation$' -count=1 -timeout 10m -v` | Official Phpactor, TypeScript, and Vue downloads installed, verified, and activated; no repository/global package installation |
 | Five real-server tests rerun against the newly managed packages | All five passed with the race detector |
 | `node --test scripts/release.test.mjs` | 10 passed |
 | `actionlint .github/workflows/test.yml .github/workflows/release.yml` | Passed |
-| `wails3 build` | Binding generation and Linux production build passed; 9 bound RPC services, 60 methods, 50 models, 3 events |
+| `wails3 build` | Binding generation and Linux production build passed; 9 bound RPC services, 61 methods, 52 models, 3 events |
 
 Go embeds `frontend/dist`, so frontend builds and Go checks were sequenced with the Wails watcher stopped. The native app was launched from the production binary, rather than Vite's standalone demo.
 
@@ -54,8 +55,11 @@ Go embeds `frontend/dist`, so frontend builds and Go checks were sequenced with 
 - Repository switching and isolation of pending requests and saved draft text.
 - Account removal using the confirmed account's hostname, invalid appearance recovery, and Jira's unavailable state.
 - Managed language-server installs before repository selection, persisted progress after navigation, duplicate suppression, cancellation/retry, failed updates preserving the installed version, pending-update badges, prerequisite blocking, repair, offline checks, custom executable selection, and background activation refreshing code navigation.
+- Inbox pagination, overlapping pages, preservation of the selected review revision, full-result filters/counts, empty filtered results, error recovery, duplicate suppression, stale responses after filter/repository changes, and account lookup failures surviving local refreshes.
 
 New backend tests cover dirty/unborn branch creation, protected merged-only deletion, rename/tracking preservation, provider-specific PR checkout, root/merge commit diffs without checkout/index mutation, immutable GitHub commit validation and pagination, and canonical path/dependency metadata handling across OS aliases. Existing Git, provider, sync, notification, editor, highlighting, and review-draft tests remain in the suite.
+
+SSH regressions reproduce the former **Invalid Git remote URL** failure before Git was invoked. The shared authentication runner now leaves SCP-style addresses and local paths to Git. Tests cover SSH with/without a username, host aliases, explicit ports, bracketed IPv6 hosts, percent characters in local paths, and Windows path spelling; non-HTTPS transports never request an application token. An isolated Git URL rewrite fixture exercises actual clone/fetch/pull/push and missing-PR source capture, while checking that analysis preserves dirty files, refs, and `FETCH_HEAD`. External helper transports remain rejected; IPv6 colons no longer trigger that rejection.
 
 Managed-tool backend regressions cover persisted installations, correct Vue companion/plugin versions, dependency updates, SHA-256 rejection of a corrupted PHAR, failed updates retaining the previous server, cancellation, concurrent-install rejection, custom configuration preservation, cached updates during provider failure, invalid paths/versions/redirects, missing prerequisites, shutdown, repository isolation, and successful-activation notifications.
 
@@ -66,6 +70,8 @@ Actual language-server checks exercised PHP cross-file signatures/definitions, s
 The Linux production binary opened through the native folder dialog in a disposable Git repository. Its comparison dialog displayed the committed branch change while the working file remained dirty. Creating and selecting a new branch from the UI preserved that dirty work. Native staging and commit actions then produced a clean working tree; history displayed the committed change. [The native comparison screenshot](validation/native-comparison.png) records the actual GTK/WebKit window.
 
 The managed-tool desktop check used a real installed TypeScript language server 6.0.1 in isolated configuration. Settings discovered 6.0.2 and displayed [the pending update](validation/native-lsp-update-pending.png). Clicking **Update** installed and activated 6.0.2, retained the 6.0.1 directory, and displayed [Up to date](validation/native-lsp-update-ready.png). Clicking **Install** for Phpactor and Vue installed their current official versions; Vue included its SDK, matching plugin, and TypeScript companion. These checks used the native GTK/WebKit window through T3's browser and noVNC, without opening or modifying a user repository.
+
+The SSH fix was also checked in the production desktop binary through T3/noVNC, with a disposable PHP repository and isolated application configuration. Clicking **Fetch** contacted `git@github.com:Noah-Wilderom/mier.git` through the existing SSH setup and created `origin/master` at `250f169`. No application GitHub account was connected in that profile. Native [PHP hover](validation/native-ssh-php-hover.png) displayed the actual method signature, and [Go to definition](validation/native-ssh-php-definition.png) opened `src/Greeter.php` in the read-only reader. The working change remained intact. The separate real-server regression validates the missing PR commit path end to end; no remote repository was written during these checks.
 
 The final feature commit `de9bf12` passed [CI run 38487224237](https://github.com/Noah-Wilderom/mier/actions/runs/38487224237) on **2026-10-14**: the retained browser regression job and native Linux, macOS, and Windows tests/builds all succeeded. Linux built and inspected DEB/RPM/Arch/AppImage packages. Canonical source scope and Composer metadata fixes had also passed [the preceding cross-platform run](https://github.com/Noah-Wilderom/mier/actions/runs/38482044287).
 

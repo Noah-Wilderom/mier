@@ -89,6 +89,8 @@ Configuration is stored atomically at the OS configuration directory's `mag-ik-e
 
 Immutable snapshots read tree entries and blob object IDs. Packaging attributes such as `export-ignore` and `export-subst` cannot omit or rewrite analysis source. Capture does not checkout a branch or change the working tree/index. If a PR commit is missing locally, the Git backend can fetch it only through a configured remote matching the PR's host/repository identity, without changing tracking refs or `FETCH_HEAD`. See [Git/provider research](RESEARCH_GIT_GITHUB_WAILS.md) for that remote boundary.
 
+PR hover and definitions can therefore need Git authentication before the language server starts. SCP-style SSH remotes (`git@github.com:owner/repository.git`), explicit `ssh://` URLs, and local repository paths are passed to Git with its existing SSH configuration and URL rewrites. They do not request an application HTTPS token. Bracketed IPv6 SSH hosts are supported too. Git documents these transport spellings in [Git URLs](https://git-scm.com/docs/git-fetch#_git_urls). A fetch failure is reported by code navigation; reinstalling a language server cannot repair a Git authentication or network failure.
+
 An index snapshot records one `ls-files --stage` listing and reads those immutable blob IDs; it does not reread mutable `:0:path` values for each file. An unresolved index is rejected. A working snapshot reads actual tracked files even when Git flags would hide their edits, includes nonignored untracked files, omits deletions/symlinks, and uses index content for missing sparse files. Capture checks metadata and the final index/name listing; an observed concurrent change produces an error rather than a known mixed snapshot.
 
 Local input tokens `working` and `index` resolve to a **64-character content digest**. That digest identifies captured bytes, not a Git commit. Each mutable request captures again; identical bytes reuse the cache, changed bytes produce another revision. Mutable requests never use `comparisonHead`.
@@ -178,7 +180,7 @@ node_modules/@vue/typescript-plugin/             3.3.13
 
 The npm packages can be installed outside a project with `npm install --prefix /absolute/path/to/mier-lsp-tools --no-save typescript@5.9.3 typescript-language-server@6.0.2 @vue/language-server@3.3.13 @vue/typescript-plugin@3.3.13`. Obtain the PHAR from [Phpactor's official installation instructions](https://phpactor.readthedocs.io/en/master/usage/standalone.html); the `latest` download is mutable, so record its reported version when reproducing. No PHAR means the PHP smoke skips while TypeScript/Vue can still run.
 
-At this handoff, all five real-server tests passed with the race detector, including a dirty monorepo dependency-link regression. The native Wails build also passed on Linux amd64. Those results do not establish complete Laravel/Symfony support or cross-platform server compatibility.
+All six real-server tests passed with the race detector, including a dirty monorepo dependency-link regression and PHP hover/definition navigation after fetching a PR commit absent from the local clone through an SCP-style remote. The native Wails build also passed on Linux amd64. Those results do not establish complete Laravel/Symfony support or cross-platform server compatibility.
 
 ## Implementation map and extension seam
 

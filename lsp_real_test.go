@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -67,7 +69,7 @@ func realLSPFixture(t *testing.T) (*lspclient.Manager, string, string) {
 		if request.Revision == "working" || request.Revision == "index" {
 			archive, err = client.ArchiveWorkspace(ctx, request.Root, request.Revision)
 		} else {
-			archive, err = client.ArchiveCommit(ctx, request.Root, gitclient.CommitArchiveRequest{Revision: request.Revision, ComparisonHead: request.ComparisonHead})
+			archive, err = client.ArchiveCommit(ctx, request.Root, gitclient.CommitArchiveRequest{Revision: request.Revision, ComparisonHead: request.ComparisonHead, Host: request.Host, Owner: request.Owner, Repo: request.Repo, PullRequest: request.PullRequest})
 		}
 		return lspclient.ArchiveResult{Revision: archive.Revision, Tar: archive.Data}, err
 	}})
@@ -123,6 +125,87 @@ func TestRealPHPHoverAndDefinition(t *testing.T) {
 	doc, err := m.ReadDefinition(ctx, lspclient.ReadDefinitionRequest{Root: root, Revision: targets[0].Revision, Target: targets[0].URI})
 	if err != nil || !strings.Contains(doc.Text, "public function greet") {
 		t.Fatalf("PHP source unavailable: %+v %v", doc, err)
+	}
+}
+
+func TestRealPHPReviewFetchesMissingCommitThroughSCPRemote(t *testing.T) {
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(t.TempDir(), "gitconfig"))
+	m, source, _ := realLSPFixture(t)
+	phar := filepath.Join(os.Getenv("MIER_LSP_SMOKE_TOOLS"), "phpactor.phar")
+	if _, err := os.Stat(phar); err != nil {
+		t.Skip("Download the official Phpactor PHAR into MIER_LSP_SMOKE_TOOLS for PHP smoke testing")
+	}
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	if err := m.Configure(context.Background(), "php", lspclient.ServerConfiguration{Command: "php", Args: []string{phar, "language-server"}}); err != nil {
+		t.Fatal(err)
+	}
+	git := func(root string, args ...string) string {
+		t.Helper()
+		command := exec.Command("git", args...)
+		command.Dir = root
+		out, err := command.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v %s", args, err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	bare := filepath.Join(t.TempDir(), "review remote.git")
+	git(source, "clone", "--bare", "--", source, bare)
+	barePath := filepath.ToSlash(bare)
+	if runtime.GOOS == "windows" {
+		barePath = "/" + barePath
+	}
+	bareURL := (&url.URL{Scheme: "file", Path: barePath}).String()
+	remote := "git@github.com:team/lsp-review.git"
+	// Only Git rewrites this URL. The application must accept its original SSH
+	// syntax and the PR must still match the configured repository identity.
+	git(source, "config", "--global", "url."+bareURL+".insteadOf", remote)
+	review := filepath.Join(t.TempDir(), "review checkout")
+	git(source, "clone", "--", remote, review)
+	line := "$message = $greeter->reviewOnlyMethod('PHP');"
+	if err := os.WriteFile(filepath.Join(source, "src", "Greeter.php"), []byte("<?php\nnamespace Smoke;\nclass Greeter {\n    public function reviewOnlyMethod(string $name): string { return 'Review ' . $name; }\n}\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "src", "use.php"), []byte("<?php\nuse Smoke\\Greeter;\n$greeter = new Greeter();\n"+line+"\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	git(source, "commit", "--all", "--quiet", "-m", "Review-only PHP method")
+	sha := git(source, "rev-parse", "HEAD")
+	git(source, "push", "--", bare, "HEAD:refs/pull/12/head")
+	// Dirty code in the current checkout must not replace the displayed PR.
+	if err := os.WriteFile(filepath.Join(review, "src", "use.php"), []byte("<?php LOCAL_DIRTY_SOURCE;\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	before := git(review, "status", "--porcelain=v2", "--branch")
+	refs := git(review, "show-ref")
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+	request := lspclient.CodePositionRequest{Root: review, Revision: sha, Path: "src/use.php", Host: "github.com", Owner: "team", Repo: "lsp-review", PullRequest: 12, Line: 3, Character: strings.Index(line, "reviewOnlyMethod") + 4, LineText: &line}
+	hover, err := m.Hover(ctx, request)
+	warmup := time.Now().Add(12 * time.Second)
+	for err == nil && !strings.Contains(hover.Contents, "string") && time.Now().Before(warmup) {
+		select {
+		case <-ctx.Done():
+			t.Fatal(ctx.Err())
+		case <-time.After(500 * time.Millisecond):
+		}
+		hover, err = m.Hover(ctx, request)
+	}
+	if err != nil || hover.Revision != sha || !strings.Contains(hover.Contents, "reviewOnlyMethod") || !strings.Contains(hover.Contents, "string") {
+		t.Fatalf("PHP hover could not use the missing PR commit: %+v %v", hover, err)
+	}
+	targets, err := m.Definition(ctx, request)
+	if err != nil || len(targets) != 1 || targets[0].Path != "src/Greeter.php" || targets[0].Revision != sha {
+		t.Fatalf("PHP definition could not use the missing PR commit: %+v %v", targets, err)
+	}
+	document, err := m.ReadDefinition(ctx, lspclient.ReadDefinitionRequest{Root: review, Revision: sha, Target: targets[0].URI})
+	if err != nil || !strings.Contains(document.Text, "public function reviewOnlyMethod") {
+		t.Fatalf("PHP definition source could not be read: %+v %v", document, err)
+	}
+	if git(review, "status", "--porcelain=v2", "--branch") != before || git(review, "show-ref") != refs {
+		t.Fatal("PHP code navigation modified the checkout or its refs")
 	}
 }
 

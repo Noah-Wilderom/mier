@@ -14,6 +14,12 @@ import (
 // Authentication is scoped to one process and HTTPS origin. Secrets are never
 // written to a Git configuration file or passed as command-line arguments.
 func (c *Client) authenticatedRun(ctx context.Context, root string, timeout time.Duration, remoteURL string, args ...string) ([]byte, error) {
+	// Git's SCP-style SSH addresses and local paths are not RFC web URLs.
+	// Leave their parsing and authentication (including SSH config and URL
+	// rewrites) to Git rather than rejecting them in net/url.Parse.
+	if !strings.Contains(remoteURL, "://") {
+		return c.execute(ctx, root, timeout, nil, nil, args...)
+	}
 	parsed, err := url.Parse(remoteURL)
 	if err != nil {
 		return nil, errors.New("Invalid Git remote URL")

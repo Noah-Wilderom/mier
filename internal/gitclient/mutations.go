@@ -286,10 +286,12 @@ func validateRemoteURL(raw string) error {
 		}
 		return nil
 	}
-	if strings.Contains(raw, "::") {
-		return errors.New("External Git helper transports are not supported")
-	}
 	if match := scpRemote.FindStringSubmatch(raw); len(match) == 3 && !filepath.IsAbs(raw) {
+		// A second colon after the transport name requests a remote helper;
+		// colons inside a bracketed IPv6 host or a local path do not.
+		if strings.HasPrefix(match[2], ":") {
+			return errors.New("External Git helper transports are not supported")
+		}
 		if strings.HasPrefix(match[1], "-") {
 			return errors.New("Enter a valid remote host")
 		}
