@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -176,7 +177,8 @@ func TestJiraOAuthCredentialsStorageAndState(t *testing.T) {
 		}
 	}
 	info, _ := os.Stat(h.service.configPath)
-	if info.Mode().Perm() != 0600 {
+	// Windows uses inherited ACLs; chmod/Mode report only its read-only flag.
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0600 {
 		t.Fatal("config permissions are not private")
 	}
 	reopened := newJiraIntegration(h.service.configPath, h.store, h.service.client)
