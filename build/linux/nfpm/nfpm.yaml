@@ -11,8 +11,7 @@ maintainer: Noah Wilderom <wilderomnoah@gmail.com>
 description: Mag ik een review — a desktop Git and GitHub pull request workspace
 vendor: M.I.E.R. contributors
 homepage: https://github.com/Noah-Wilderom/mier
-# The repository does not yet contain a project LICENSE; do not infer MIT
-# from Wails' generated packaging template.
+# The maintainer has chosen to keep M.I.E.R. unlicensed for now.
 license: unknown
 
 contents:

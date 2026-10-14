@@ -64,6 +64,6 @@ The final feature commit `de9bf12` passed [CI run 38487224237](https://github.co
 
 Provider writes, OS keychain operations, external editor launching, OS notification delivery, macOS/Windows native interaction, six-target installation, and a real previous-version updater migration still require release qualification. HTTP fixtures and native compilation do not establish those outcomes. Installers remain unsigned initially, as requested.
 
-The updater private key is outside Git; configuring the Actions secret, selecting a project license, publishing an AUR package, and qualifying actual platform installs are tracked in [release readiness](PRODUCTION.md). No live GitHub release was published during verification.
+The updater private key is outside Git; configuring the Actions secret, publishing an AUR package, and qualifying actual platform installs are tracked in [release readiness](PRODUCTION.md). M.I.E.R. remains unlicensed by maintainer choice. No live GitHub release was published during verification.
 
 Vite's large-chunk and npm's unsupported `minimum-release-age` configuration warnings remain nonfatal. This record is evidence for the current implementation, not a claim of exhaustive Git-provider parity.

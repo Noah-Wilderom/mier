@@ -21,3 +21,5 @@ wails3 dev
 ```
 
 [Development guide](docs/DEVELOPMENT.md) · [Releasing and updates](docs/RELEASING.md) · [Architecture](docs/ARCHITECTURE.md)
+
+M.I.E.R. is currently unlicensed.

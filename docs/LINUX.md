@@ -37,7 +37,7 @@ The release also contains `mier-VERSION-aur.tar.gz`. It holds a `mier-bin` PKGBU
 makepkg -si
 ```
 
-To enable installation by package name, a maintainer must publish the generated recipe to the AUR and refresh it on each release. Confirm the project license first; current metadata uses `unknown` because the repository has no `LICENSE` file. The package is not registered in the AUR by this change.
+To enable installation by package name, a maintainer must publish the generated recipe to the AUR and refresh it on each release. M.I.E.R. remains unlicensed by maintainer choice, so package metadata uses `unknown` and there is no project `LICENSE` file. The package is not registered in the AUR by this change.
 
 Once `mier-bin` is published to the AUR, Omarchy 4 supports:
 
