@@ -36,6 +36,8 @@ The managed installer also downloaded and verified all three current servers int
 | `MIER_LSP_INSTALL_SMOKE=1 MIER_LSP_INSTALL_TOOLS=/tmp/mier-managed-lsp-installation go test -race ./internal/lspclient -run '^TestRealManagedToolInstallation$' -count=1 -timeout 10m -v` | Official Phpactor, TypeScript, and Vue downloads installed, verified, and activated; no repository/global package installation |
 | Five real-server tests rerun against the newly managed packages | All five passed with the race detector |
 | `node --test scripts/release.test.mjs` | 10 passed |
+| `node --test scripts/install.test.mjs` | 11 passed; covers channel isolation, SemVer ordering, pagination, six target selections, Rosetta/Windows ARM64, verified package handoff, portable launch, failed-download preservation, macOS rollback, and NSIS arguments |
+| `bash -n install.sh` and `shellcheck install.sh` | Passed |
 | `actionlint .github/workflows/test.yml .github/workflows/release.yml` | Passed |
 | `wails3 build` | Binding generation and Linux production build passed; 9 bound RPC services, 73 methods, 65 models, 3 events |
 
@@ -71,6 +73,8 @@ Large dependency regressions first reproduced **Capture vendor source: Installed
 Preparation regressions verify that cancelling a waiter preserves the shared initial capture, a later hover uses that capture, failures can retry, application shutdown cancels pending work, and PHP initialization disables diagnostics/highlighting that this client does not consume. The retained real-PHP timing test separates preparation, first/full signature, and warmed requests; it asserts correctness without a machine-dependent latency threshold. Earlier isolated timing measured 3.254 seconds for a partial cold hover, 5.649 seconds for a full signature, and 2 milliseconds for a warm hover. These are small-fixture measurements, not a latency guarantee for a large application. Cold capture/indexing still costs time; the application now begins it when the review file opens.
 
 ## Native and CI evidence
+
+On **2026-10-14**, the root installer selected the published `v0.1.0-alpha.1` Linux AMD64 package through GitHub's live API. A portable installation into a disposable directory downloaded the actual AppImage, matched its release SHA-256 checksum, installed its executable/launcher, and successfully ran the AppImage runtime version command. The stable lookup correctly reported that no stable release exists. An actual run of the pinned Ubuntu 24.04 compatibility container installed the release bootstrap/build dependencies as root and reported GTK 4.14.5, WebKitGTK 2.52.6, and glibc 2.39. These checks do not establish a native package-manager installation or macOS/Windows first installation. Installer fixtures use simulated download/package-manager calls; macOS CI uses actual ditto for its temporary app-bundle fixture.
 
 Jira's retained backend tests exercised actual loopback HTTP callbacks with a fake Atlassian transport and credential store. They verified state validation, denied consent, duplicate authorization, occupied callback ports, secure storage/restart, corrupt configuration recovery, rotating-token concurrency and keychain recovery, revoked grants, credential-bearing redirect rejection, cancellation, rate-limit cooldowns, reference matching, project/site mapping, cached summaries, detail/comments, personal hide/restore, and obsolete account response rejection. These checks do not use a real Jira account.
 

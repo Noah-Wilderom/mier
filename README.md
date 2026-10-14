@@ -14,6 +14,17 @@ View related Jira Cloud tickets alongside a PR using [your own OAuth app](docs/J
 
 [Linux and Omarchy installation](docs/LINUX.md) — DEB, RPM, Arch packages, and AppImage.
 
+## Installation
+
+With `curl` and `jq` installed:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Noah-Wilderom/mier/master/install.sh -o install.sh
+bash install.sh
+```
+
+The script detects your OS and architecture and installs the latest stable release. Add `--alpha`, `--beta`, or `--rc` for that prerelease channel. Until the first stable release, use `bash install.sh --alpha`. [Installer options](docs/RELEASING.md#command-line-installation).
+
 ## Development
 
 Install Go, Node.js, Git, and the [Wails platform dependencies](https://v3.wails.io/getting-started/installation/), then run:

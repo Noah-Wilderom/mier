@@ -48,7 +48,7 @@ No Apple, Windows certificate, Linux package-signing, or AUR credentials are req
 
 ## Retrying a failed release
 
-A missing signing secret causes **Validate release and signing key** to fail. GitHub then skips its dependent packaging and publication jobs. The packaging job uses GitHub's default matrix names, such as `package (linux, amd64, ubuntu-24.04)`, and displays `package` when skipped before expansion. The packaging step also explicitly names its platform and architecture. [GitHub job dependencies](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-jobs#defining-prerequisite-jobs).
+A missing signing secret causes **Validate release and signing key** to fail. GitHub then skips its dependent packaging and publication jobs. The packaging job uses GitHub's default matrix names, such as `package (linux, amd64, ubuntu-26.04)`, and displays `package` when skipped before expansion. The packaging step also explicitly names its platform and architecture. [GitHub job dependencies](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-jobs#defining-prerequisite-jobs).
 
 After configuring the secret, open the failed run under **Actions** and choose **Re-run all jobs**. This reuses the existing release and tag; creating another release is unnecessary. From GitHub CLI, substitute the failed run's numeric ID:
 
@@ -57,6 +57,8 @@ gh run rerun RUN_ID --repo Noah-Wilderom/mier
 ```
 
 Reruns use the original workflow and commit. Workflow changes pushed to `master` apply to releases whose tags include those changes; leave existing release tags in place. [GitHub rerun documentation](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs).
+
+Reruns use the workflow revision from the original run. To use updated action pins and runner labels, publish a new release tag containing those workflow changes; rerunning an older tag does not pick up master automatically.
 
 ## Release assets
 
@@ -68,9 +70,25 @@ Each release contains:
 - An AUR recipe archive containing `PKGBUILD` and `.SRCINFO`, with checksums pinned to both architecture downloads.
 - `SHA256SUMS` for the downloads and `manifest.json` for the updater.
 
-DMGs and setup installers are for first installation. Wails updates use the ZIP or `tar.gz` archives, because its updater does not install DMGs or NSIS packages. Windows setup installs for the current user, allowing the updater to replace the executable without elevation. Linux needs the GTK 4 and WebKitGTK 6 runtime libraries; its archive does not bundle them. macOS and Linux use native runners. Windows ARM64 is cross-built on a Windows AMD64 runner.
+DMGs and setup installers are for first installation. Wails updates use the ZIP or `tar.gz` archives, because its updater does not install DMGs or NSIS packages. Windows setup installs for the current user, allowing the updater to replace the executable without elevation. Linux needs the GTK 4 and WebKitGTK 6 runtime libraries; its archive does not bundle them. All six targets now use a matching native runner architecture. Linux releases build in a pinned Ubuntu 24.04 container on Ubuntu 26.04 hosts to retain the glibc 2.39 compatibility baseline; the native test matrix also tests Ubuntu 26.04 directly.
 
 All six archives must exist before the workflow signs the feed. It verifies every archive with the pinned public key, uploads the downloads, then uploads the manifest last. Release version metadata is written into the executable, macOS bundle, and Windows installer.
+
+## Command-line installation
+
+The root `install.sh` requires Bash, `curl`, `jq`, and either `sha256sum` or `shasum`. It detects Linux/macOS/Windows and AMD64/ARM64, including Rosetta and an AMD64 shell on ARM64 Windows. On Windows, use Git Bash, MSYS2, or Cygwin.
+
+```sh
+bash install.sh               # latest stable
+bash install.sh --alpha       # latest alpha only
+bash install.sh --beta        # latest beta only
+bash install.sh --rc          # latest release candidate only
+bash install.sh --alpha --dry-run
+```
+
+Selection compares SemVer across paginated published releases, excludes drafts, and never substitutes another channel. An unavailable channel reports an error; the initial `v0.1.0-alpha.1` release therefore needs `--alpha`. Downloads must have their matching asset, `SHA256SUMS`, and the final `manifest.json` publication marker. The script verifies the selected download before changing an installation.
+
+Linux selects pacman, dnf, or apt when available and lets that manager install the native package and dependencies. `--portable` instead installs a user-owned AppImage and a FUSE-free launcher, with a `~/.local/bin/mier` alias. A custom `--prefix DIR` also selects portable Linux installation and places the launcher at `DIR/mier`. macOS installs the ZIP's complete `MIER.app` bundle into `~/Applications`, or the directory given by `--prefix`; a failed replacement restores the previous bundle. Windows runs the architecture-matched setup EXE silently for the current user; `--prefix` is unavailable there. Close M.I.E.R. before upgrading. Installer signing remains as described above; checksums establish download integrity and do not provide macOS notarization or Windows Authenticode.
 
 ## App behavior
 
@@ -88,6 +106,9 @@ npm --prefix frontend test
 npx --prefix frontend playwright install --with-deps chromium webkit
 npm --prefix frontend run test:ui
 node --test scripts/release.test.mjs
+node --test scripts/install.test.mjs
+shellcheck install.sh
+actionlint .github/workflows/test.yml .github/workflows/release.yml
 npm --prefix frontend run build
 go test ./...
 go vet ./...
@@ -97,5 +118,9 @@ wails3 build
 The test workflow runs native checks on Linux, macOS, and Windows, with Go race detection on Linux and macOS. A separate Linux job runs the retained Chromium/WebKit UI suite and retains failure traces. The release workflow also requires that UI suite on its Linux AMD64 job before publication. Linux CI builds all four installer formats and extracts them to verify architecture, dependencies, desktop files, permissions, and bundled AppImage subprocesses. The release helper passes `GOARCH` to Wails' build/package commands and validates the executable's actual CPU architecture before archiving it. `ARCH` is a Task variable; the Wails command wrappers replace it with their resolved `GOARCH`.
 
 The release workflow generates the AUR recipe after both Linux builds finish and includes it in the release checksums. Publishing that recipe to the AUR is a separate maintainer action; this workflow does not modify the AUR or Omarchy's package repository. M.I.E.R. remains unlicensed by maintainer choice. There is no project `LICENSE`, and Linux package metadata reports `unknown`.
+
+All external actions are pinned to verified release commits: [checkout 7.0.1](https://github.com/actions/checkout/releases/tag/v7.0.1), [setup-node 7.1.0](https://github.com/actions/setup-node/releases/tag/v7.1.0), [setup-go 7.0.0](https://github.com/actions/setup-go/releases/tag/v7.0.0), [upload-artifact 7.0.2](https://github.com/actions/upload-artifact/releases/tag/v7.0.2), and [download-artifact 8.0.2](https://github.com/actions/download-artifact/releases/tag/v8.0.2), checked on 2026-10-14. They declare Node 24 as their action runtime, removing the former artifact-action Node 20 warning. This runtime is independent of the Node version installed for frontend commands.
+
+Hosted labels follow GitHub's current [runner image catalog](https://github.com/actions/runner-images): Ubuntu 26.04 for both architectures, macOS 26 for Intel and ARM64, Windows Server 2025 with Visual Studio 2026 for AMD64, and Windows 11 with Visual Studio 2026 for ARM64. The three newest labels are registered in `.github/actionlint.yaml` because actionlint 1.7.12's bundled catalog predates them. Weekly grouped Dependabot updates maintain the action pins; runner major versions and the Linux compatibility container remain deliberate upgrades.
 
 References: [Wails testing](https://v3.wails.io/guides/testing/), [updater guide](https://v3.wails.io/guides/updater/), [self-update tutorial](https://v3.wails.io/tutorials/04-self-update-a-wails-app/), [cross-platform builds](https://v3.wails.io/guides/build/cross-platform/), [Windows builds and NSIS](https://v3.wails.io/guides/build/windows/), and [macOS builds](https://v3.wails.io/guides/build/macos/).

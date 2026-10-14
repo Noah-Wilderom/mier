@@ -2,6 +2,8 @@
 
 Every published release builds Linux AMD64 and ARM64 downloads. Choose `amd64` for Intel/AMD (`uname -m` reports `x86_64`) or `arm64` for ARM (`aarch64`). Packages install M.I.E.R. into the desktop application launcher and provide the `mier` terminal command.
 
+The root [install.sh](../install.sh) detects the architecture and selects apt, pacman, or dnf automatically. Run `bash install.sh` for stable, or add `--alpha`, `--beta`, or `--rc` for that channel. Use `--portable` for an AppImage with a FUSE-free launcher, or `--dry-run` to inspect the selection. The installer requires `curl` and `jq`, verifies release checksums, and requires completed publication. See [all installer options](RELEASING.md#command-line-installation).
+
 | System | Download | Install |
 | --- | --- | --- |
 | Omarchy, Arch Linux, and derivatives | `.pkg.tar.zst` | `sudo pacman -U ./mier-VERSION-linux-ARCH.pkg.tar.zst` |
