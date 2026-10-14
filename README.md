@@ -19,11 +19,10 @@ View related Jira Cloud tickets alongside a PR using [your own OAuth app](docs/J
 With `curl` and `jq` installed:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/Noah-Wilderom/mier/master/install.sh -o install.sh
-bash install.sh
+curl -fsSL https://raw.githubusercontent.com/Noah-Wilderom/mier/master/install.sh | bash
 ```
 
-The script detects your OS and architecture and installs the latest stable release. Add `--alpha`, `--beta`, or `--rc` for that prerelease channel. Until the first stable release, use `bash install.sh --alpha`. [Installer options](docs/RELEASING.md#command-line-installation).
+The script detects your OS and architecture and installs the latest stable release. Append `-s -- --alpha`, `-s -- --beta`, or `-s -- --rc` to select a prerelease channel. Until the first stable release, use the alpha channel. [Installer options](docs/RELEASING.md#command-line-installation).
 
 ## Development
 
