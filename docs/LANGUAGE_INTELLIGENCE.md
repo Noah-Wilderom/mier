@@ -99,7 +99,9 @@ The frontend includes the displayed line text with a symbol request. The backend
 
 ## Dependencies and definition boundaries
 
-Installed `node_modules` and `vendor` source/metadata are copied into the private revision workspace within bounded limits. Selected tracked files take precedence. Workspace package links into the repository are rebased to the selected snapshot, and generated Composer autoload metadata has absolute project base paths rebased. Links outside the repository and the known installed dependency root are omitted.
+Installed dependencies are copied into the private revision workspace for the requested language family: PHP captures `vendor`; TypeScript, JavaScript, and Vue capture `node_modules`. PHP capture includes PHP source and package/configuration metadata, while skipping frontend scripts, source maps, stylesheets, and binary assets. Selected tracked files take precedence. Workspace package links into the repository are rebased to the selected snapshot, and generated Composer autoload metadata has absolute project base paths rebased. Links outside the repository and the known installed dependency root are omitted.
+
+Each captured workspace allows up to **1 GiB of dependency source**, shared across its monorepo projects. Ordinary files stream through a reusable 64 KiB buffer, so the cache size does not become one large memory allocation. Source files remain bounded at 4 MiB; Composer metadata has a separate 32 MiB file limit to retain large generated autoload maps. PHP and JS/Vue captures for the same commit are cached separately, so an unrelated dependency tree does not consume the requested language's budget. A capture failure or cancellation removes the incomplete workspace.
 
 This uses **installed dependencies**, not dependencies reconstructed from the selected commit's lockfile. Dependency content is captured on first analysis for a cached revision. Updating an installation without changing source does not invalidate that cache; restart the app or let the revision be evicted to recapture it. Saving server configuration stops sessions but preserves cached source/dependency workspaces. Binaries/assets are excluded from dependency copying. Yarn PnP, arbitrary external workspace links, and every framework resolver have not been validated.
 
@@ -115,9 +117,9 @@ For PHP, an initial authentic result appears immediately. If the same symbol and
 
 | Resource | Current limit |
 | --- | --- |
-| Cached source revisions | Four across the manager; active requests prevent eviction. An all-busy cache returns an explicit error. |
+| Cached source workspaces | Four across the manager, keyed by revision and dependency family; active requests prevent eviction. An all-busy cache returns an explicit error. |
 | Selected source | 20,000 files and 64 MiB per revision; individual analyzed text files are at most 4 MiB. |
-| Copied dependencies | 128 MiB of source per revision; up to 200,000 walked entries per dependency capture; 4 MiB per copied file. |
+| Copied dependencies | 1 GiB of source per revision/family; up to 200,000 walked entries per dependency capture; 4 MiB per source file and 32 MiB per Composer metadata file. |
 | Definition targets | 32 per response. |
 | Frozen definition grants | 64 grants and 32 MiB aggregate text; eviction requires reopening a definition. |
 | Hover content | 64 KiB, then truncation. |
@@ -180,7 +182,7 @@ node_modules/@vue/typescript-plugin/             3.3.13
 
 The npm packages can be installed outside a project with `npm install --prefix /absolute/path/to/mier-lsp-tools --no-save typescript@5.9.3 typescript-language-server@6.0.2 @vue/language-server@3.3.13 @vue/typescript-plugin@3.3.13`. Obtain the PHAR from [Phpactor's official installation instructions](https://phpactor.readthedocs.io/en/master/usage/standalone.html); the `latest` download is mutable, so record its reported version when reproducing. No PHAR means the PHP smoke skips while TypeScript/Vue can still run.
 
-All six real-server tests passed with the race detector, including a dirty monorepo dependency-link regression and PHP hover/definition navigation after fetching a PR commit absent from the local clone through an SCP-style remote. The native Wails build also passed on Linux amd64. Those results do not establish complete Laravel/Symfony support or cross-platform server compatibility.
+The real-server suite includes a dirty monorepo dependency-link regression, PHP hover/definition navigation after fetching a PR commit absent from the local clone through an SCP-style remote, and navigation into an installed PHP dependency with over 128 MiB of vendor PHP source. The large-vendor test verifies a frozen dependency definition and unchanged tracked source/Git state. These fixtures do not establish complete Laravel/Symfony support or cross-platform server compatibility.
 
 ## Implementation map and extension seam
 

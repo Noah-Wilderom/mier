@@ -2,11 +2,85 @@ package lspclient
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestDependencyCaptureSupportsMoreThan128MiBOfPHPSource(t *testing.T) {
+	root := t.TempDir()
+	source := "<?php /*" + strings.Repeat(" ", 2*1024*1024) + "*/\n"
+	for index := 0; index < 65; index++ {
+		writeTestFile(t, filepath.Join(root, "vendor", "fixture", "library", fmt.Sprintf("Source%02d.php", index)), source)
+	}
+	writeTestFile(t, filepath.Join(root, "vendor", "fixture", "library", "Greeter.php"), "<?php class DependencyGreeter {}\n")
+	cache := t.TempDir()
+	w, err := extractWorkspace(context.Background(), root, cache, ArchiveResult{Revision: testRevision, Tar: sourceArchive(t, map[string]string{"composer.json": "{}", "use.php": "<?php use DependencyGreeter;\n"})})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.close()
+	if w.dependencyBytes <= 128*1024*1024 {
+		t.Fatal("Fixture did not exceed the original dependency budget")
+	}
+	path := filepath.Join(w.directory, "vendor", "fixture", "library", "Greeter.php")
+	writeTestFile(t, filepath.Join(root, "vendor", "fixture", "library", "Greeter.php"), "<?php CHANGED_DEPENDENCY;\n")
+	text, _, external, err := w.read(path)
+	if err != nil || !external || !strings.Contains(text, "class DependencyGreeter") {
+		t.Fatalf("Large dependency capture lost frozen definition source: %q %v", text, err)
+	}
+}
+
+func TestDependencyCaptureKeepsLargeComposerMetadataAndChecksItsBudget(t *testing.T) {
+	root := t.TempDir()
+	metadata := "<?php /*" + strings.Repeat(" ", maxDocumentBytes) + "*/ $baseDir = '" + filepath.ToSlash(root) + "';\n"
+	writeTestFile(t, filepath.Join(root, "vendor", "composer", "autoload_classmap.php"), metadata)
+	w, err := extractWorkspace(context.Background(), root, t.TempDir(), ArchiveResult{Revision: testRevision, Tar: sourceArchive(t, map[string]string{"composer.json": "{}"})}, "vendor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.close()
+	data, err := os.ReadFile(filepath.Join(w.directory, "vendor", "composer", "autoload_classmap.php"))
+	if err != nil || !strings.Contains(string(data), filepath.ToSlash(w.directory)) || strings.Contains(string(data), filepath.ToSlash(root)) {
+		t.Fatalf("Large Composer metadata was omitted or pointed to the dirty checkout: %v", err)
+	}
+	// Exercise the actual bound without allocating a GiB in a regression test.
+	w.dependencyBytes = maxDependencyBytes - 1
+	destination := filepath.Join(w.directory, "budget-test")
+	if err := w.captureDependencies(context.Background(), filepath.Join(root, "vendor"), destination, "vendor", "vendor"); err == nil || !strings.Contains(err.Error(), "1 GiB") {
+		t.Fatalf("Dependency budget was not enforced: %v", err)
+	}
+	if existingFile(filepath.Join(destination, "composer", "autoload_classmap.php")) {
+		t.Fatal("Over-budget metadata was copied")
+	}
+}
+
+func TestDependencyCopyCancellationRemovesPartialFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "source.php")
+	writeTestFile(t, path, "<?php class Source {}\n")
+	source, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer source.Close()
+	info, err := source.Stat()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	target := filepath.Join(t.TempDir(), "cancelled.php")
+	_, err = copyDependency(ctx, source, target, info, maxDocumentBytes, make([]byte, 64*1024))
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Dependency copy ignored cancellation: %v", err)
+	}
+	if _, err := os.Stat(target); !os.IsNotExist(err) {
+		t.Fatal("Cancelled copy left a partial dependency file")
+	}
+}
 
 func TestInstalledDependencyCaptureRebasesWorkspaceLinksAndFreezesSources(t *testing.T) {
 	root := t.TempDir()

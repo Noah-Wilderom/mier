@@ -1,6 +1,6 @@
 # Validation record
 
-Workspace, managed language tools, and SSH remote handling verified through **2026-10-14**. The earlier documentation handoff is preserved in [the historical record](validation/handoff-2026-10-13.md); its temporary QA paths and Jira simulation are historical, not the current test suite.
+Workspace, managed language tools, SSH remote handling, and large PHP dependency capture verified through **2026-10-14**. The earlier documentation handoff is preserved in [the historical record](validation/handoff-2026-10-13.md); its temporary QA paths and Jira simulation are historical, not the current test suite.
 
 ## Environment
 
@@ -32,7 +32,7 @@ The managed installer also downloaded and verified all three current servers int
 | `npm --prefix frontend run build` | TypeScript and production frontend build passed |
 | `go test -race ./...` | All ordinary package tests passed |
 | `go vet ./...` | Passed |
-| `MIER_LSP_SMOKE_TOOLS="$(cat /tmp/mier-managed-lsp-protocol-root)" go test -race -timeout 3m -run '^TestReal' -count=1 -v .` | All six actual PHP/TypeScript/Vue tests passed, including PHP navigation after fetching a missing PR commit through an SCP-style remote |
+| `MIER_LSP_SMOKE_TOOLS="$(cat /tmp/mier-managed-lsp-protocol-root)" go test -race -timeout 3m -run '^TestReal' -count=1 -v .` | All seven actual PHP/TypeScript/Vue tests passed, including PHP navigation after fetching a missing PR commit and into installed vendor dependencies above the former 128 MiB cap |
 | `MIER_LSP_INSTALL_SMOKE=1 MIER_LSP_INSTALL_TOOLS=/tmp/mier-managed-lsp-installation go test -race ./internal/lspclient -run '^TestRealManagedToolInstallation$' -count=1 -timeout 10m -v` | Official Phpactor, TypeScript, and Vue downloads installed, verified, and activated; no repository/global package installation |
 | Five real-server tests rerun against the newly managed packages | All five passed with the race detector |
 | `node --test scripts/release.test.mjs` | 10 passed |
@@ -65,6 +65,8 @@ Managed-tool backend regressions cover persisted installations, correct Vue comp
 
 Actual language-server checks exercised PHP cross-file signatures/definitions, staged/working signatures, TypeScript commit and SDK definitions, Vue/TypeScript cooperation, and monorepo workspace links bound to the selected revision.
 
+Large dependency regressions first reproduced **Capture vendor source: Installed dependency source exceeds the 128 MiB analysis limit** with 130 MiB of PHP source. PHP now captures its vendor source/configuration independently of JS/Vue's node modules, with a 1 GiB dependency budget per captured revision/family. Tests cover switching and reusing both families for one commit, freezing large dependency copies, retaining/rebasing Composer metadata above the ordinary 4 MiB file limit, budget rejection before copying, and cancellation removing a partial file. The real Phpactor regression uses a Composer-compatible autoloader, resolves an installed method's signature/definition with 130 MiB of vendor PHP source, and reads the frozen grant after the original dependency changes, while preserving dirty tracked code and Git state.
+
 ## Native and CI evidence
 
 The Linux production binary opened through the native folder dialog in a disposable Git repository. Its comparison dialog displayed the committed branch change while the working file remained dirty. Creating and selecting a new branch from the UI preserved that dirty work. Native staging and commit actions then produced a clean working tree; history displayed the committed change. [The native comparison screenshot](validation/native-comparison.png) records the actual GTK/WebKit window.
@@ -72,6 +74,8 @@ The Linux production binary opened through the native folder dialog in a disposa
 The managed-tool desktop check used a real installed TypeScript language server 6.0.1 in isolated configuration. Settings discovered 6.0.2 and displayed [the pending update](validation/native-lsp-update-pending.png). Clicking **Update** installed and activated 6.0.2, retained the 6.0.1 directory, and displayed [Up to date](validation/native-lsp-update-ready.png). Clicking **Install** for Phpactor and Vue installed their current official versions; Vue included its SDK, matching plugin, and TypeScript companion. These checks used the native GTK/WebKit window through T3's browser and noVNC, without opening or modifying a user repository.
 
 The SSH fix was also checked in the production desktop binary through T3/noVNC, with a disposable PHP repository and isolated application configuration. Clicking **Fetch** contacted `git@github.com:Noah-Wilderom/mier.git` through the existing SSH setup and created `origin/master` at `250f169`. No application GitHub account was connected in that profile. Native [PHP hover](validation/native-ssh-php-hover.png) displayed the actual method signature, and [Go to definition](validation/native-ssh-php-definition.png) opened `src/Greeter.php` in the read-only reader. The working change remained intact. The separate real-server regression validates the missing PR commit path end to end; no remote repository was written during these checks.
+
+The large-vendor fix was checked in another isolated native profile with **130 MiB of PHP vendor source**. Hover completed, and Go to definition opened [the installed method](validation/native-large-vendor-definition.png) with a Dependency file label. The captured cache contained all 67 vendor files (130 MiB), with no node modules copied, and the original tracked working change remained intact. This is a size-limit and dependency-navigation fixture, rather than a benchmark of a full Symfony/Laravel project.
 
 The final feature commit `de9bf12` passed [CI run 38487224237](https://github.com/Noah-Wilderom/mier/actions/runs/38487224237) on **2026-10-14**: the retained browser regression job and native Linux, macOS, and Windows tests/builds all succeeded. Linux built and inspected DEB/RPM/Arch/AppImage packages. Canonical source scope and Composer metadata fixes had also passed [the preceding cross-platform run](https://github.com/Noah-Wilderom/mier/actions/runs/38482044287).
 

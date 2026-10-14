@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"os"
 	"os/exec"
@@ -206,6 +207,84 @@ func TestRealPHPReviewFetchesMissingCommitThroughSCPRemote(t *testing.T) {
 	}
 	if git(review, "status", "--porcelain=v2", "--branch") != before || git(review, "show-ref") != refs {
 		t.Fatal("PHP code navigation modified the checkout or its refs")
+	}
+}
+
+func TestRealPHPHoverAndDependencyDefinitionWithLargeVendor(t *testing.T) {
+	m, root, _ := realLSPFixture(t)
+	phar := filepath.Join(os.Getenv("MIER_LSP_SMOKE_TOOLS"), "phpactor.phar")
+	if _, err := os.Stat(phar); err != nil {
+		t.Skip("Download the official Phpactor PHAR into MIER_LSP_SMOKE_TOOLS for PHP smoke testing")
+	}
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	if err := m.Configure(context.Background(), "php", lspclient.ServerConfiguration{Command: "php", Args: []string{phar, "language-server"}}); err != nil {
+		t.Fatal(err)
+	}
+	write := func(path, text string) {
+		t.Helper()
+		file := filepath.Join(root, path)
+		if err := os.MkdirAll(filepath.Dir(file), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(file, []byte(text), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	git := func(args ...string) string {
+		t.Helper()
+		command := exec.Command("git", args...)
+		command.Dir = root
+		output, err := command.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v %s", args, err, output)
+		}
+		return strings.TrimSpace(string(output))
+	}
+	line := "$message = (new Greeter())->greet('PHP');"
+	write("src/use.php", "<?php\nuse Installed\\Greeter;\n"+line+"\n")
+	git("commit", "--all", "--quiet", "-m", "Installed dependency call")
+	sha := git("rev-parse", "HEAD")
+	// A real Composer-compatible loader exercises dependency lookup. The
+	// absolute base path must be rebased to the reviewed snapshot.
+	base := strings.ReplaceAll(filepath.ToSlash(root), "'", "\\'")
+	write("vendor/autoload.php", "<?php\n$baseDir = '"+base+"';\n$loader = new \\Composer\\Autoload\\ClassLoader();\n$loader->addPsr4('Installed\\\\', $baseDir . '/vendor/fixture/library/src');\n$loader->register();\nreturn $loader;\n")
+	write("vendor/fixture/library/src/Greeter.php", "<?php\nnamespace Installed;\nclass Greeter {\n    public function greet(string $name): string { return 'Dependency ' . $name; }\n}\n")
+	large := "<?php /*" + strings.Repeat(" ", 2*1024*1024) + "*/\n"
+	for index := 0; index < 65; index++ {
+		write(fmt.Sprintf("vendor/fixture/library/fixtures/Source%02d.php", index), large)
+	}
+	write("vendor/fixture/library/assets/frontend.js", "export const unusedByPHP = true;\n")
+	// The checkout's local code intentionally differs from the reviewed SHA.
+	write("src/use.php", "<?php LOCAL_DIRTY_CODE;\n")
+	before := git("status", "--porcelain=v2", "--branch")
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	request := lspclient.CodePositionRequest{Root: root, Revision: sha, Path: "src/use.php", Line: 2, Character: strings.Index(line, "greet(") + 2, LineText: &line}
+	hover, err := m.Hover(ctx, request)
+	warmup := time.Now().Add(12 * time.Second)
+	for err == nil && !strings.Contains(hover.Contents, "string") && time.Now().Before(warmup) {
+		select {
+		case <-ctx.Done():
+			t.Fatal(ctx.Err())
+		case <-time.After(500 * time.Millisecond):
+		}
+		hover, err = m.Hover(ctx, request)
+	}
+	if err != nil || hover.Revision != sha || !strings.Contains(hover.Contents, "greet") || !strings.Contains(hover.Contents, "string") {
+		t.Fatalf("PHP hover failed with >128 MiB vendor source: %+v %v", hover, err)
+	}
+	targets, err := m.Definition(ctx, request)
+	if err != nil || len(targets) != 1 || !targets[0].External || targets[0].Path != "vendor/fixture/library/src/Greeter.php" {
+		t.Fatalf("Large vendor dependency definition failed: %+v %v", targets, err)
+	}
+	write("vendor/fixture/library/src/Greeter.php", "<?php CHANGED_AFTER_ANALYSIS;\n")
+	document, err := m.ReadDefinition(ctx, lspclient.ReadDefinitionRequest{Root: root, Revision: targets[0].Revision, Target: targets[0].URI})
+	if err != nil || !strings.Contains(document.Text, "public function greet") {
+		t.Fatalf("Large vendor definition was not frozen: %+v %v", document, err)
+	}
+	if git("status", "--porcelain=v2", "--branch") != before {
+		t.Fatal("Dependency analysis modified tracked source or Git state")
 	}
 }
 

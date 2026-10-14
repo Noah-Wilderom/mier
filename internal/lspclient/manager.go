@@ -266,8 +266,12 @@ func (m *Manager) prepare(ctx context.Context, request CodePositionRequest) (*wo
 		if language == "" {
 			return nil, nil, "", "", "", nil, errors.New("Code intelligence currently supports PHP, TypeScript, JavaScript, and Vue files")
 		}
-		alias := root + "\x00" + request.Revision + "\x00" + request.ComparisonHead
-		key := root + "\x00" + request.Revision
+		// PHP and JS/Vue need different installed dependency trees. Separate
+		// captures prevent a frontend installation from blocking a PHP review,
+		// and give each family its own frozen source and resource budget.
+		kind := dependencyKind(language)
+		alias := root + "\x00" + request.Revision + "\x00" + request.ComparisonHead + "\x00" + kind
+		key := root + "\x00" + request.Revision + "\x00" + kind
 		if request.ComparisonHead != "" {
 			key = m.aliases[alias]
 		}
@@ -286,7 +290,7 @@ func (m *Manager) prepare(ctx context.Context, request CodePositionRequest) (*wo
 			if !mutable && request.ComparisonHead == "" && !strings.EqualFold(archive.Revision, request.Revision) {
 				return nil, nil, "", "", "", nil, errors.New("Git snapshot does not match the selected commit")
 			}
-			key = root + "\x00" + strings.ToLower(archive.Revision)
+			key = root + "\x00" + strings.ToLower(archive.Revision) + "\x00" + kind
 			w = m.workspaces[key]
 			if w == nil {
 				if err = m.evictWorkspace(); err != nil {
@@ -304,7 +308,7 @@ func (m *Manager) prepare(ctx context.Context, request CodePositionRequest) (*wo
 						return nil, nil, "", "", "", nil, err
 					}
 				}
-				w, err = extractWorkspace(ctx, root, m.cacheDirectory, archive)
+				w, err = extractWorkspace(ctx, root, m.cacheDirectory, archive, kind)
 				if err != nil {
 					return nil, nil, "", "", "", nil, err
 				}

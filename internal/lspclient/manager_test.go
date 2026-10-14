@@ -144,8 +144,8 @@ func TestManagerRejectsTraversalAndUnsafeServerDefinitionTargets(t *testing.T) {
 }
 
 func TestDependencyDefinitionsAreConfinedAndFrozenWhenGranted(t *testing.T) {
-	m, root := managerHarness(t, map[string]string{"use.php": "<?php use Dependency;\n", "package.json": "{}"})
-	dependency := filepath.Join(root, "node_modules", "package", "definition.php")
+	m, root := managerHarness(t, map[string]string{"use.php": "<?php use Dependency;\n", "composer.json": "{}"})
+	dependency := filepath.Join(root, "vendor", "package", "definition.php")
 	original := "<?php class Dependency {}\n"
 	writeTestFile(t, dependency, original)
 	t.Setenv("MIER_LSP_DEFINITION_URI", fileURI(dependency))
@@ -160,7 +160,7 @@ func TestDependencyDefinitionsAreConfinedAndFrozenWhenGranted(t *testing.T) {
 	}
 	outside := filepath.Join(t.TempDir(), "secret.php")
 	writeTestFile(t, outside, "<?php SECRET;\n")
-	link := filepath.Join(root, "node_modules", "package", "escaped.php")
+	link := filepath.Join(root, "vendor", "package", "escaped.php")
 	if err := os.Symlink(outside, link); err != nil {
 		t.Skip("Symlinks unavailable")
 	}
@@ -171,6 +171,37 @@ func TestDependencyDefinitionsAreConfinedAndFrozenWhenGranted(t *testing.T) {
 	}
 	if _, err = m.Definition(context.Background(), requestFor(root, "use.php")); err == nil {
 		t.Fatal("Dependency symlink escaped its allowed root")
+	}
+}
+
+func TestPHPAndJavaScriptCaptureOnlyTheirOwnDependencies(t *testing.T) {
+	m, root := managerHarness(t, map[string]string{"use.php": "<?php use Dependency;\n", "use.ts": "export const selected = true;\n", "composer.json": "{}", "package.json": "{}"})
+	writeTestFile(t, filepath.Join(root, "vendor", "library", "Dependency.php"), "<?php class Dependency {}\n")
+	writeTestFile(t, filepath.Join(root, "vendor", "library", "frontend.js"), "export const irrelevant = true;\n")
+	writeTestFile(t, filepath.Join(root, "node_modules", "library", "index.ts"), "export const dependency = true;\n")
+	sdk := filepath.Join(t.TempDir(), "typescript", "lib")
+	writeTestFile(t, filepath.Join(sdk, "tsserver.js"), "// SDK detection fixture\n")
+	command := fakeCommand(t, false)
+	if err := m.Configure(context.Background(), "typescript", ServerConfiguration{Command: command.Command, Args: command.Args, TypeScriptSDKPath: sdk}); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"use.php", "use.ts", "use.php", "use.ts"} {
+		if _, err := m.Hover(context.Background(), requestFor(root, path)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(m.workspaces) != 2 {
+		t.Fatalf("Expected reusable PHP and JS snapshots, got %d", len(m.workspaces))
+	}
+	for _, w := range m.workspaces {
+		php := existingFile(filepath.Join(w.directory, "vendor", "library", "Dependency.php"))
+		js := existingFile(filepath.Join(w.directory, "node_modules", "library", "index.ts"))
+		if php == js {
+			t.Fatal("Snapshot copied both dependency families or omitted its required source")
+		}
+		if php && existingFile(filepath.Join(w.directory, "vendor", "library", "frontend.js")) {
+			t.Fatal("PHP capture included unrelated frontend source from vendor")
+		}
 	}
 }
 

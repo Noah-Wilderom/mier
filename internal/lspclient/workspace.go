@@ -73,7 +73,7 @@ func pathFromURI(value string) (string, error) {
 	}
 	return filepath.Clean(path), nil
 }
-func extractWorkspace(ctx context.Context, root, cache string, archive ArchiveResult) (*workspace, error) {
+func extractWorkspace(ctx context.Context, root, cache string, archive ArchiveResult, dependencyKinds ...string) (*workspace, error) {
 	// Temporary directories can have aliases (/var on macOS and 8.3 paths on
 	// Windows). Every scope must use the same canonical spelling as read(), or
 	// valid source files and monorepo dependency links appear to be outside it.
@@ -168,9 +168,12 @@ func extractWorkspace(ctx context.Context, root, cache string, archive ArchiveRe
 	}
 	w := &workspace{root: root, revision: archive.Revision, directory: directory, scopes: []fileScope{{directory: directory, label: "", root: confined}}, sessions: map[string]*session{}}
 	captured = w
+	if len(dependencyKinds) == 0 {
+		dependencyKinds = []string{"node_modules", "vendor"}
+	}
 	for _, project := range projectDirectories(directory) {
 		relative, _ := filepath.Rel(directory, project)
-		for _, kind := range []string{"node_modules", "vendor"} {
+		for _, kind := range dependencyKinds {
 			source := filepath.Join(root, relative, kind)
 			resolved, err := filepath.EvalSymlinks(source)
 			if err != nil || !existingDirectory(resolved) {
