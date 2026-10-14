@@ -38,6 +38,110 @@ export type CodePositionRequest = lspclient$0.CodePositionRequest;
 
 export type DefinitionDocument = lspclient$0.DefinitionDocument;
 
+export interface JiraAppConfiguration {
+    "clientId": string;
+    "clientSecret": string;
+    "callbackPort": number;
+}
+
+export interface JiraComment {
+    "id": string;
+    "author": string;
+    "createdAt": string;
+    "body": any;
+}
+
+export interface JiraIssue {
+    "id": string;
+    "key": string;
+    "summary": string;
+    "url": string;
+    "type": string;
+    "status": string;
+    "statusCategory": string;
+    "assignee": string;
+    "priority": string;
+    "labels": string[] | null;
+    "parentKey": string;
+    "description": any;
+    "acceptanceCriteria": any;
+    "comments": JiraComment[] | null;
+    "commentsError": string;
+    "updatedAt": string;
+}
+
+export interface JiraIssueRequest {
+    "repository": JiraRepository;
+    "key": string;
+    "refresh": boolean;
+}
+
+export interface JiraPullRequest {
+    "repository": JiraRepository;
+    "number": number;
+    "branch": string;
+    "title": string;
+    "body": string;
+    "refresh": boolean;
+}
+
+export interface JiraRepository {
+    "host": string;
+    "owner": string;
+    "repo": string;
+}
+
+export interface JiraRepositoryPreferences {
+    "siteId": string;
+    "projects": string[] | null;
+    "acceptanceField": string;
+}
+
+export interface JiraSearchRequest {
+    "repository": JiraRepository;
+    "query": string;
+}
+
+export interface JiraSite {
+    "id": string;
+    "name": string;
+    "url": string;
+}
+
+export interface JiraStatus {
+    "configured": boolean;
+    "connected": boolean;
+    "clientId": string;
+    "callbackPort": number;
+    "callbackUrl": string;
+    "scopes": string[] | null;
+    "state": string;
+    "error": string;
+    "sites": JiraSite[] | null;
+    "defaultSiteId": string;
+}
+
+export interface JiraTicket {
+    "key": string;
+    "sources": string[] | null;
+    "issue": JiraIssue | null;
+    "error": string;
+}
+
+export interface JiraTicketSelection {
+    "pullRequest": JiraPullRequest;
+    "key": string;
+    "action": string;
+}
+
+export interface JiraTickets {
+    "site": JiraSite;
+    "preferences": JiraRepositoryPreferences;
+    "tickets": JiraTicket[] | null;
+    "hidden": string[] | null;
+    "truncated": boolean;
+}
+
 export type LSPServerConfiguration = lspclient$0.ServerConfiguration;
 
 export type LSPServerStatus = lspclient$0.ServerStatus;

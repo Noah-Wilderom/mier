@@ -73,6 +73,7 @@ export async function desktopFixture(page: Page) {
         case 'main.PRNotificationService.GetPreferences': result = { toastsEnabled: true, desktopEnabled: false, opened: true, closed: true, merged: true, reviewRequested: true }; break
         case 'main.LSPService.Servers': case 'main.LSPService.CheckServerUpdates': result = []; break
         case 'main.LSPService.Warmup': result = null; break
+        case 'main.IntegrationService.GetJiraStatus': result = { configured: false, connected: false, clientId: '', callbackPort: 43827, callbackUrl: 'http://localhost:43827/oauth/jira/callback', scopes: ['read:jira-work', 'offline_access'], state: 'idle', error: '', sites: [], defaultSiteId: '' }; break
         case 'main.GitHubService.ListPullRequestsPage': {
           const query = args[3], pageSize = query.pageSize || 25, start = Number(query.cursor || 0)
           const items = fixture.prs.filter(pr => {

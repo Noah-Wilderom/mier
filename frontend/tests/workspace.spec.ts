@@ -162,11 +162,11 @@ test('repository switches isolate pending requests and commit drafts', async ({ 
   await expect(page.getByLabel('Commit message')).toHaveValue('Draft for the first repository')
 })
 
-test('settings clearly mark Jira unavailable and recover invalid appearance preferences', async ({ page }) => {
+test('browser settings require the desktop app for Jira and recover invalid appearance preferences', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('mag-ik-een-review.appearance', 'invalid'))
   await page.goto('/')
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Coming soon', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Configure Jira', exact: true })).toBeDisabled()
   await expect(page.locator('html')).toHaveAttribute('data-theme', /^(light|dark)$/)
 })
 

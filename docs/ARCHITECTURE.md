@@ -8,7 +8,7 @@ The Go application owns filesystem access, Git, credentials, provider requests, 
 
 `main.go` registers services and the `workspace:updated`, `notifications:pr`, and `lsp:changed` Wails events, embeds `frontend/dist`, and creates the native window and menu. The project pins Go Wails and CLI `v3.0.0-alpha2.117` and npm runtime `3.0.0-beta.29`. The active application service namespace is `main.*`. Do not derive binding names from the module slug or upgrade one runtime independently without checking transport and generated bindings.
 
-`frontend/src/services.ts` is the typed RPC boundary, including cancellation for LSP calls. `native.ts` owns native commands, browser opening, full screen, and the runtime handshake. Native availability requires an actual Wails OS environment. Importing the runtime in a normal browser does not create a live backend.
+`frontend/src/services.ts` is the typed RPC boundary, including cancellation for LSP and Jira calls. `native.ts` owns native commands, browser opening, full screen, and the runtime handshake. Native availability requires an actual Wails OS environment. Importing the runtime in a normal browser does not create a live backend.
 
 ## Module map
 
@@ -24,7 +24,7 @@ The Go application owns filesystem access, Git, credentials, provider requests, 
 | Language intelligence | `lspservice.go`, `internal/lspclient/`, Git snapshot APIs | `CodeIntelligence.tsx`, `LanguageServerSettings.tsx` |
 | Notifications | `prnotificationservice.go`, `desktopnotificationservice.go` | `NotificationSettings.tsx`, `NotificationToasts.tsx` |
 | Editor launching | `editorservice.go` | `EditorActions.tsx` |
-| Planned Jira integration | `integrationservice.go` rejects unavailable installation | `JiraIntegration.tsx` displays Coming soon |
+| Jira Cloud tickets | `integrationservice.go`, `jira_oauth.go`, `jira_tickets.go` | `JiraIntegration.tsx`, `JiraTickets.tsx`, `JiraRichText.tsx`, `useJiraConnection.ts` |
 
 ## Git and provider execution
 
@@ -58,13 +58,19 @@ Managed language tools live in the user configuration directory's `mag-ik-een-re
 
 ## Preferences and delivery
 
-OS configuration lives below the platform's user configuration directory in `mag-ik-een-review/`: `accounts.json`, `workspace.json`, `notifications.json`, `editor.json`, and `language-servers.json`. Secrets live separately in the OS credential store. Configuration writers use atomic replacement and private file permissions where supported. LSP session data uses the OS user cache directory.
+OS configuration lives below the platform's user configuration directory in `mag-ik-een-review/`: `accounts.json`, `workspace.json`, `notifications.json`, `editor.json`, `language-servers.json`, and `jira.json`. Secrets live separately in the OS credential store. Configuration writers use atomic replacement and private file permissions where supported. LSP session data uses the OS user cache directory.
 
 Frontend storage includes `mag-ik-een-review.appearance`, `mier.code-review.preferences.v1`, `mag-ik-een-review.review-drafts.v1`, `mier.commit-draft.v1:<root>`, and `mier.pull-request-draft.v1:<identity>`. Demo draft keys are separate. Do not merge demo state into live repository state or erase saved drafts when changing appearance or navigation.
 
 Notification preferences key by normalized remote identity, so different local clones share one policy. The first snapshot establishes a silent baseline; missing PRs do not imply closes. Older provider timestamps cannot undo a newer baseline and duplicate events. Event types/toasts default on; desktop delivery defaults off. The native notification backend initializes only when requested and handles permission separately from in-app toast delivery.
 
-The editor split button remembers successful editor launches; selecting a menu item cannot be overwritten by a late preference response. The GitHub browser action is independent. Jira installation is unavailable in both the frontend and backend. `ErrorBoundary.tsx` offers workspace reload recovery for render failures.
+The editor split button remembers successful editor launches; selecting a menu item cannot be overwritten by a late preference response. The GitHub browser action is independent. `ErrorBoundary.tsx` offers workspace reload recovery for render failures.
+
+## Jira Cloud
+
+`IntegrationService` stores locally supplied app credentials and account tokens in the OS keychain. `jira.json` holds only configuration, authorized site metadata, normalized repository mappings, and personal PR selections. App-owned OAuth attempts have random state, a loopback listener, a five-minute deadline, explicit cancellation, and shutdown cleanup. Only verified token/site discovery completes a connection; saving credentials alone does not. Rotating refreshes serialize and persist their replacement tokens, retaining an unsaved rotation in memory for keychain recovery. API requests use fixed Atlassian hosts, deny redirects, bound responses and contexts, and honor rate-limit cooldowns.
+
+Branch/title/body references and personal additions are deduplicated and filtered by repository projects, then fetched with four summary workers. Full ticket content loads on selection; summary and detail caches remain separate, bounded, and memory-only. Account/configuration epochs discard late responses. Each missing ticket has an independent error; comment failures can retain the description. React cancels obsolete requests, preserves cards during same-context refresh failures, and keeps the reader outside the PR tabs so navigation does not discard the review. Atlassian Document Format renders as safe React elements with bounded traversal and existing web-link validation. See [Jira setup](JIRA.md) for the chosen credentials model and live-account qualification limits.
 
 ## Scope and next seams
 

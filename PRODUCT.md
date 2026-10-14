@@ -26,7 +26,9 @@ Local and PR code share grammar highlighting, configurable font size, and four s
 
 Five inboxes distinguish all PRs, the user's PRs, requested reviews, assigned PRs, and drafts. Comments show account pictures, Bot badges, and Author badges. Editor launch actions support VSCode, PhpStorm, and Zed with remembered selection and a separate GitHub browser action.
 
-Repository notification preferences cover opened, closed, merged, and review-requested events. In-app toasts and all event types default on; desktop notifications default off. The initial imported snapshot establishes a silent baseline. Settings marks Jira as coming soon; installation is disabled until a real integration exists.
+Repository notification preferences cover opened, closed, merged, and review-requested events. In-app toasts and all event types default on; desktop notifications default off. The initial imported snapshot establishes a silent baseline.
+
+Optional Jira Cloud setup accepts locally supplied OAuth app credentials. PR ticket discovery scans branch, title, and description references; repository mappings scope Jira sites/projects, and personal selections add or hide tickets. A separate reader displays descriptions, configured acceptance criteria, and recent comments while the GitHub review remains open. Jira operations are read-only. See [Jira setup and qualification limits](docs/JIRA.md).
 
 ## Review Continuity
 

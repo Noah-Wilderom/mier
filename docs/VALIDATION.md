@@ -1,6 +1,6 @@
 # Validation record
 
-Workspace, managed language tools, SSH remote handling, large PHP dependency capture, and symbol preparation/rendering verified through **2026-10-14**. The earlier documentation handoff is preserved in [the historical record](validation/handoff-2026-10-13.md); its temporary QA paths and Jira simulation are historical, not the current test suite.
+Workspace, managed language tools, SSH remote handling, large PHP dependency capture, symbol preparation/rendering, and Jira configuration/ticket fixtures verified through **2026-10-14**. The earlier documentation handoff is preserved in [the historical record](validation/handoff-2026-10-13.md); its temporary QA paths and Jira simulation are historical, not the current test suite.
 
 ## Environment
 
@@ -26,8 +26,9 @@ The managed installer also downloaded and verified all three current servers int
 | Check | Result |
 | --- | --- |
 | `npm --prefix frontend test` | 48 passed, zero failed or skipped |
-| `npm --prefix frontend run test:ui -- --project=chromium` | 30 passed; includes TypeScript checking of the harness |
-| `npm --prefix frontend run test:ui -- --project=webkit` | 30 passed; each browser engine ran separately |
+| `npm --prefix frontend run test:ui -- --project=chromium` | 34 passed; includes TypeScript checking of the harness and four Jira cases |
+| `npm --prefix frontend run test:ui -- --project=webkit` | 34 passed; each browser engine ran separately |
+| `npm --prefix frontend run test:ui -- tests/jira.spec.ts` | All eight Jira cases across both engines passed after the final setup recovery and mapping changes |
 | Modal focus regression after the final focus change | Both browser projects passed |
 | `npm --prefix frontend run build` | TypeScript and production frontend build passed |
 | `go test -race ./...` | All ordinary package tests passed |
@@ -37,7 +38,7 @@ The managed installer also downloaded and verified all three current servers int
 | Five real-server tests rerun against the newly managed packages | All five passed with the race detector |
 | `node --test scripts/release.test.mjs` | 10 passed |
 | `actionlint .github/workflows/test.yml .github/workflows/release.yml` | Passed |
-| `wails3 build` | Binding generation and Linux production build passed; 9 bound RPC services, 62 methods, 52 models, 3 events |
+| `wails3 build` | Binding generation and Linux production build passed; 9 bound RPC services, 73 methods, 65 models, 3 events |
 
 Go embeds `frontend/dist`, so frontend builds and Go checks were sequenced with the Wails watcher stopped. The native app was launched from the production binary, rather than Vite's standalone demo.
 
@@ -72,6 +73,10 @@ Preparation regressions verify that cancelling a waiter preserves the shared ini
 
 ## Native and CI evidence
 
+Jira's retained backend tests exercised actual loopback HTTP callbacks with a fake Atlassian transport and credential store. They verified state validation, denied consent, duplicate authorization, occupied callback ports, secure storage/restart, corrupt configuration recovery, rotating-token concurrency and keychain recovery, revoked grants, credential-bearing redirect rejection, cancellation, rate-limit cooldowns, reference matching, project/site mapping, cached summaries, detail/comments, personal hide/restore, and obsolete account response rejection. These checks do not use a real Jira account.
+
+The Chromium and WebKit Jira cases cover app credential entry and failed-save recovery, browser authorization state, site selection, disconnect, automatic ticket cards, reader accessibility and safe rich text, manual search/pin, hide/restore, repository preferences, and failed refresh/dismissed-response handling. Ticket details remain available while the Changes tab and its review workspace are mounted. The Linux production binary was also launched with isolated configuration through T3/noVNC; Settings opened before importing a repository, and the native registration guide in [light](validation/native-jira-registration.png) and [dark](validation/native-jira-registration-dark.png) displayed the callback URL, permissions, and credential fields. Expanding the callback controls displayed port 43827; changing it to 43828 updated the form. Saving with an empty client ID triggered required-field validation. Cancelling retained the original unconfigured state, without saving credentials or starting consent; reopening the form displayed the original callback URL.
+
 The Linux production binary opened through the native folder dialog in a disposable Git repository. Its comparison dialog displayed the committed branch change while the working file remained dirty. Creating and selecting a new branch from the UI preserved that dirty work. Native staging and commit actions then produced a clean working tree; history displayed the committed change. [The native comparison screenshot](validation/native-comparison.png) records the actual GTK/WebKit window.
 
 The managed-tool desktop check used a real installed TypeScript language server 6.0.1 in isolated configuration. Settings discovered 6.0.2 and displayed [the pending update](validation/native-lsp-update-pending.png). Clicking **Update** installed and activated 6.0.2, retained the 6.0.1 directory, and displayed [Up to date](validation/native-lsp-update-ready.png). Clicking **Install** for Phpactor and Vue installed their current official versions; Vue included its SDK, matching plugin, and TypeScript companion. These checks used the native GTK/WebKit window through T3's browser and noVNC, without opening or modifying a user repository.
@@ -86,7 +91,7 @@ The final feature commit `de9bf12` passed [CI run 38487224237](https://github.co
 
 ## Limits
 
-Provider writes, OS keychain operations, external editor launching, OS notification delivery, macOS/Windows native interaction, six-target installation, and a real previous-version updater migration still require release qualification. HTTP fixtures and native compilation do not establish those outcomes. Installers remain unsigned initially, as requested.
+Provider writes, live Jira OAuth consent and account access, OS keychain operations, external editor launching, OS notification delivery, macOS/Windows native interaction, six-target installation, and a real previous-version updater migration still require release qualification. HTTP fixtures and native compilation do not establish those outcomes. Installers remain unsigned initially, as requested. [Jira setup](JIRA.md) also records Atlassian's public distribution requirement for the requested credentials model.
 
 Managed LSP installation was exercised on Linux amd64. macOS/Windows native installation interaction is not established by these checks. Managed Phpactor needs PHP's POSIX extension and is unavailable with native Windows PHP; TypeScript/Vue have Windows runtime/CLI paths.
 

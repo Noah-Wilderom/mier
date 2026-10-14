@@ -76,7 +76,7 @@ PR analysis uses an isolated snapshot of the displayed commit (and the merge bas
 
 **Settings → Notifications** configures each GitHub repository independently. Pull request opened, closed, merged, and review requested events default on. In-app toasts default on; desktop notifications default off and request OS permission when enabled. The first recent page establishes a silent baseline. Subsequent background refreshes read recently updated PRs back to the previous successful refresh, without scanning unchanged history. An old PR appearing in that window establishes its baseline; it does not trigger an opened or review-requested notification based solely on its existing state. Missing rows never imply a close.
 
-**Settings → Apps** marks Jira as **Coming soon**. Installation stays disabled until account connection and issue linking are implemented; backend calls also return an explicit unavailable error.
+**Settings → Apps → Configure Jira** accepts your own Jira Cloud OAuth app credentials, guides callback/permission registration, and starts browser consent. Related tickets are discovered from PR branch/title/description references, with optional repository site/project mappings, manual search, and personal hide/restore. A reader displays descriptions, configured acceptance criteria, and recent comments while keeping the review open. Credentials and refresh tokens stay in the OS keychain. See [Jira setup](JIRA.md) for registration, storage, recovery, and live-account qualification limits.
 
 ## Live updates during a review
 

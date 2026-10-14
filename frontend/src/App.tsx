@@ -30,6 +30,7 @@ import RepositorySelector, {repositoryName} from "./RepositorySelector";
 import {InboxSkeleton, RepositorySkeleton, ReviewSkeleton} from "./Loading";
 import HistoryGraph from "./HistoryGraph";
 import {JiraIntegration} from "./JiraIntegration";
+import {JiraTickets} from "./JiraTickets";
 import NotificationSettings from "./NotificationSettings";
 import EditorActions from "./EditorActions";
 import {Avatar, ActorName, personLabel} from "./Avatar";
@@ -956,6 +957,7 @@ export default function App() {
                 notify={reviewNotify}
                 busy={live.busy}
               />
+              {live.enabled && pr.provider && <JiraTickets key={`${pr.provider.host}/${pr.provider.owner}/${pr.provider.repo}#${pr.number}`} pr={pr} onOpenSettings={() => navigate('settings')}/>}
               {live.enabled && pr.provider?.hasNewCommits && <div className="new-commits-banner" role="status"><Icon name="git-commit"/><div><strong>New commits are available</strong><span>Your current diff and draft comments are preserved.</span></div><button className="btn" disabled={live.busy} onClick={()=>void live.acceptNewCommits().catch(()=>{})}>Refresh changes</button></div>}
               {live.enabled && live.error && <div className="live-error" role="status"><Icon name="alert-circle"/><span>{live.error}</span><button className="btn btn-ghost" onClick={()=>void live.refresh()}>Retry</button></div>}
               <div

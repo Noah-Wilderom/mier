@@ -9,7 +9,7 @@
 .jira-integration .jira-integration-status { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
 .jira-integration .jira-integration-status:empty { display: none; }
 .jira-integration .jira-integration-error { margin: 6px 0 0; color: var(--red); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
-.jira-install-action { align-self: center; cursor: default; }
+.jira-install-action { align-self: start; display: flex; flex-direction: column; gap: 7px; cursor: default; }
 .jira-integration .jira-install-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 120px; min-height: 30px; font-size: 12px; white-space: nowrap; cursor: pointer; }
 .jira-integration .jira-install-button.is-disabled, .jira-integration .jira-install-button:disabled, .jira-integration .jira-install-button[aria-disabled="true"] { pointer-events: none; cursor: default; opacity: .55; }
 .jira-integration .jira-install-button.is-installing { opacity: .75; }
@@ -20,3 +20,67 @@
   .jira-install-action { grid-column: 2; justify-self: start; }
 }
 @media (prefers-reduced-motion: reduce) { .jira-install-spinner { animation: none; border-style: dotted; } }
+
+.jira-site-setting, .jira-setup-form label, .jira-repository-form label, .jira-ticket-search label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--muted); }
+.jira-site-setting { margin-top: 12px; }
+.jira-site-setting select, .jira-setup-form input, .jira-repository-form :is(input,select), .jira-ticket-search input { border: 1px solid var(--border); border-radius: 5px; padding: 7px 9px; background: var(--bg); color: var(--text); min-width: 0; }
+.jira-setup-form { display: flex; flex-direction: column; gap: 13px; margin-top: 17px; max-width: 620px; }
+.jira-setup-form > strong, .jira-registration-guide > strong { font-size: 13px; font-weight: 600; }
+.jira-registration-guide { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); }
+.jira-registration-guide p, .jira-setup-form details p, .jira-disconnect-confirm p { margin: 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.jira-registration-guide a { display: inline-flex; align-items: center; gap: 4px; color: var(--blue); font-size: 12px; }
+.jira-scopes { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 12px; }
+.jira-scopes code { padding: 3px 5px; border-radius: 4px; background: var(--surface); font-family: var(--mono); }
+.jira-setup-actions, .jira-repository-form > div { display: flex; gap: 7px; }
+.jira-setup-form details summary { cursor: pointer; font-size: 12px; color: var(--muted); }
+.jira-setup-form details label { margin: 10px 0; }
+.jira-authorization-status { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; margin: 12px 0; color: var(--muted); font-size: 12px; }
+.jira-disconnect-confirm { margin-top: 13px; padding: 12px; border: 1px solid var(--border); border-radius: 5px; }
+.jira-disconnect-confirm p { margin-bottom: 10px; }
+.detail-pane { position: relative; }
+.jira-pr-tickets { flex-shrink: 0; min-width: 0; background: var(--surface); border-bottom: 1px solid var(--border); }
+.jira-ticket-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 5px 15px; min-height: 32px; font-size: 12px; }
+.jira-ticket-toolbar > strong, .jira-ticket-toolbar > div { display: flex; align-items: center; gap: 7px; }
+.jira-ticket-toolbar > strong { font-weight: 500; }
+.jira-ticket-toolbar .btn-ghost { font-size: 12px; }
+.jira-ticket-list { display: grid; gap: 6px; padding: 0 15px 9px; max-height: 190px; overflow: auto; }
+.jira-ticket-card { padding: 7px 9px; border: 1px solid var(--border); border-radius: 5px; background: var(--panel); }
+.jira-ticket-open { display: flex; align-items: center; gap: 9px; width: 100%; padding: 0; background: none; border: 0; color: var(--text); text-align: left; cursor: pointer; font-size: 12px; }
+.jira-ticket-open > code { color: var(--blue); white-space: nowrap; font-family: var(--mono); }
+.jira-ticket-summary { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.jira-ticket-card-meta { display: flex; align-items: center; gap: 12px; margin-top: 3px; color: var(--muted); font-size: 11px; }
+.jira-ticket-card-meta .btn-ghost { margin-left: auto; font-size: 11px; padding: 1px 4px; }
+.jira-status-done { color: var(--green); background: var(--green-soft); }
+.jira-status-indeterminate { color: var(--blue); background: var(--blue-soft); }
+.jira-ticket-error, .jira-no-tickets, .jira-ticket-loading { margin: 0; padding: 6px 15px 10px; font-size: 12px; line-height: 1.6; }
+.jira-ticket-error { color: var(--red); overflow-wrap: anywhere; }
+.jira-ticket-error button { margin-left: 7px; }
+.jira-no-tickets, .jira-ticket-loading { color: var(--muted); }
+.jira-ticket-search, .jira-repository-form { margin: 0 15px 10px; padding: 12px; border: 1px solid var(--border); border-radius: 5px; }
+.jira-ticket-search > p { font-size: 12px; margin: 7px 0; }
+.jira-ticket-search > ul { list-style: none; margin: 6px 0 0; padding: 0; max-height: 190px; overflow: auto; }
+.jira-ticket-search li button { display: flex; align-items: center; gap: 9px; width: 100%; padding: 8px 4px; border: 0; background: none; color: var(--text); font-size: 12px; cursor: pointer; text-align: left; }
+.jira-ticket-search li button:hover { background: var(--hover); }
+.jira-ticket-search li button code { color: var(--blue); }
+.jira-ticket-search li button span { flex: 1; }
+.jira-repository-form { display: grid; gap: 10px; }
+.jira-hidden-tickets { margin: 0 15px 8px; font-size: 11px; color: var(--muted); }
+.jira-hidden-tickets summary { cursor: pointer; }
+.jira-ticket-reader { position: absolute; z-index: 85; right: 0; top: 0; bottom: 0; width: min(430px, 100%); display: flex; flex-direction: column; background: var(--surface); border-left: 1px solid var(--border); box-shadow: -8px 0 25px rgb(0 0 0 / 12%); }
+.jira-ticket-reader > header { display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 9px 15px; border-bottom: 1px solid var(--border); }
+.jira-ticket-reader > header strong { font-family: var(--mono); font-size: 13px; color: var(--blue); }
+.jira-ticket-reader-scroll { flex: 1; min-height: 0; overflow: auto; padding: 15px; }
+.jira-ticket-reader-scroll h2 { font-size: 17px; line-height: 1.5; margin: 0 0 12px; }
+.jira-ticket-reader-scroll > h3 { font-size: 12px; font-weight: 600; margin: 20px 0 9px; }
+.jira-issue-metadata { display: flex; flex-wrap: wrap; gap: 7px 12px; color: var(--muted); font-size: 12px; }
+.jira-rich-text, .jira-plain-text { font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
+.jira-plain-text { white-space: pre-wrap; }
+.jira-rich-text :is(h2,h3,h4) { font-size: 14px; }
+.jira-adf-panel { padding: 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--panel); }
+.jira-task-list { list-style: none; padding-left: 0; }
+.jira-mention { color: var(--blue); }
+.jira-issue-labels { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 15px; }
+.jira-issue-comment { padding: 12px 0; border-top: 1px solid var(--border); font-size: 12px; }
+.jira-issue-comment > time { display: block; color: var(--muted); font-size: 11px; margin: 3px 0 9px; }
+.jira-ticket-reader > footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 15px; border-top: 1px solid var(--border); }
+@media (max-width: 760px) { .jira-ticket-site { display: none; } .jira-ticket-toolbar { padding: 5px 10px; } .jira-ticket-card-meta { gap: 6px; flex-wrap: wrap; } }
