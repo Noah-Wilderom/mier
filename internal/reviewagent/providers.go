@@ -143,8 +143,14 @@ func RunCodex(ctx context.Context, binary, directory, version, model, prompt str
 	}, 1)
 	var textMu sync.Mutex
 	finalText := ""
+	reviewThread := ""
 	client, err := NewCodex(ctx, binary, directory, version, func(method string, params json.RawMessage) {
 		switch method {
+		case "thread/tokenUsage/updated":
+			textMu.Lock()
+			id := reviewThread
+			textMu.Unlock()
+			run.recordCodexUsage(params, id)
 		case "turn/completed":
 			var event struct {
 				Turn struct {
@@ -189,6 +195,9 @@ func RunCodex(ctx context.Context, binary, directory, version, model, prompt str
 	if thread.Thread.ID == "" {
 		return errors.New("Codex did not create a review thread")
 	}
+	textMu.Lock()
+	reviewThread = thread.Thread.ID
+	textMu.Unlock()
 	run.Progress("Reviewing captured pull request changes")
 	var turn struct{ Turn struct{ ID string } }
 	turnParams := map[string]any{"threadId": thread.Thread.ID, "input": []map[string]string{{"type": "text", "text": prompt}}}
@@ -288,6 +297,20 @@ func RunCopilot(ctx context.Context, binary, directory, token, model, prompt str
 		return err
 	}
 	defer session.Disconnect()
+	unsubscribe := session.On(run.recordCopilotEvent)
+	defer unsubscribe()
+	defer func() {
+		// Experimental on some CLI versions. Missing metrics must not turn a
+		// successful review into a failure or fabricate a zero cost.
+		if ctx.Err() != nil {
+			return
+		}
+		usageCtx, stop := context.WithTimeout(ctx, 2*time.Second)
+		defer stop()
+		if metrics, err := session.RPC.Usage.GetMetrics(usageCtx); err == nil {
+			run.recordCopilotMetrics(metrics)
+		}
+	}()
 	run.Progress("Reviewing captured pull request changes")
 	response, err := session.SendAndWait(ctx, copilot.MessageOptions{Prompt: prompt})
 	if ctx.Err() != nil {

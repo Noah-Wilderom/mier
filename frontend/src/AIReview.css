@@ -386,6 +386,162 @@
 .ai-findings {
   margin-top: 14px;
 }
+.ai-findings > h3 {
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.ai-findings > p {
+  line-height: 1.6;
+}
+.ai-finding-batch,
+.ai-finding-actions {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.ai-finding-batch {
+  justify-content: space-between;
+  padding: 8px 0;
+}
+.ai-finding-batch > label {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 11px;
+}
+.ai-findings input[type="checkbox"] {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: var(--blue);
+}
+.ai-finding-location {
+  color: var(--muted);
+  min-width: 0;
+  font-size: 11px;
+}
+.ai-finding-actions {
+  margin-top: 10px;
+}
+.ai-finding-actions .btn {
+  padding: 4px 7px;
+  min-height: 26px;
+  font-size: 11px;
+}
+.ai-finding-state {
+  color: var(--green);
+  font-size: 11px;
+}
+.ai-finding-edit {
+  margin-top: 10px;
+}
+.ai-finding-edit > label {
+  font-size: 11px;
+  color: var(--muted);
+}
+.ai-finding-edit > textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 110px;
+  font-size: 12px;
+}
+.ai-dismissed-findings {
+  border-top: 1px solid var(--border);
+  margin-top: 10px;
+  padding-top: 10px;
+}
+.ai-dismissed-findings summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.ai-dismissed-findings > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+.ai-activity {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  margin: 12px 0;
+}
+.ai-activity > summary {
+  cursor: pointer;
+  padding: 9px;
+  font-size: 11px;
+}
+.ai-activity > summary > span {
+  display: block;
+  color: var(--muted);
+  margin: 4px 0 0 13px;
+}
+.ai-usage-metrics {
+  margin: 0;
+  padding: 0 10px;
+  font-size: 11px;
+}
+.ai-usage-metrics > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding: 6px 0;
+}
+.ai-usage-metrics dt {
+  color: var(--muted);
+}
+.ai-usage-metrics dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.ai-usage-note,
+.ai-activity-totals,
+.ai-activity > p {
+  margin: 9px 10px;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.ai-tool-activity {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+}
+.ai-tool-activity > li {
+  border-top: 1px solid var(--border);
+  padding: 9px;
+  font-size: 11px;
+}
+.ai-tool-activity > li > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 5px;
+}
+.ai-tool-activity > li > div > span {
+  color: var(--muted);
+  font-size: 10px;
+}
+.ai-tool-activity code {
+  display: block;
+  margin: 6px 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: 10px;
+}
+.ai-tool-activity > li[data-state="running"] {
+  border-left: 2px solid var(--blue);
+}
+.ai-tool-activity > li[data-state="failed"],
+.ai-tool-activity > li[data-state="cancelled"] {
+  border-left: 2px solid var(--red);
+}
 .ai-findings > article {
   padding: 12px 0;
   border-top: 1px solid var(--border);

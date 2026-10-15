@@ -526,7 +526,7 @@ func (s *AIService) execute(ctx context.Context, request AIReviewRequest, task *
 	if directory != "" {
 		defer os.RemoveAll(directory)
 	}
-	prompt := "Review the captured pull request using the mier MCP tools. Start with get_review_context. Add actionable comments with add_review_comment and record a summary with finish_review."
+	prompt := "Review the captured pull request using the mier MCP tools. Start with get_review_context. Propose actionable findings with add_review_comment for the human to accept or dismiss, and record a summary with finish_review."
 	prompt += "\n" + reviewagent.IntensityInstructions(request.Intensity)
 	if request.Instructions != "" {
 		prompt += "\nAdditional reviewer focus: " + request.Instructions

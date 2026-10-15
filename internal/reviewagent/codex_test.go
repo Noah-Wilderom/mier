@@ -103,6 +103,9 @@ func fakeCodex() {
 			continue
 		case "":
 			if message.ID == "approval-1" && message.Result["decision"] == "decline" {
+				for i := 0; i < 2; i++ {
+					write(map[string]any{"method": "thread/tokenUsage/updated", "params": map[string]any{"threadId": "thread-1", "turnId": "turn-1", "tokenUsage": map[string]any{"total": map[string]int64{"inputTokens": 1000, "cachedInputTokens": 400, "outputTokens": 200, "reasoningOutputTokens": 50, "totalTokens": 1200}, "last": map[string]int64{"totalTokens": 800}, "modelContextWindow": 128000}}})
+				}
 				write(map[string]any{"method": "turn/completed", "params": map[string]any{"turn": map[string]string{"status": "completed"}}})
 				continue
 			}
@@ -132,6 +135,12 @@ func TestCodexHarnessUsesMCPAndRejectsWriteApproval(t *testing.T) {
 	}
 	if !run.HasContext() || len(run.Snapshot().Findings) != 1 || run.Snapshot().Summary == "" {
 		t.Fatal("native review tools were not used")
+	}
+	if usage := run.Snapshot().Usage; usage.TotalTokens == nil || *usage.TotalTokens != 1200 {
+		t.Fatal("provider usage notifications were missed or counted twice", usage)
+	}
+	if run.Snapshot().ActivityTotals.ToolCalls != 3 {
+		t.Fatal("executed MCP calls were not tracked")
 	}
 }
 func TestCodexCancellationTerminatesOwnedProcess(t *testing.T) {

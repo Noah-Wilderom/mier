@@ -141,7 +141,7 @@ test("model logos and all three intensities reach native reviews through the cha
   }
 });
 
-test("reviews use the captured revision and add native private drafts without duplicates or GitHub writes", async ({
+test("findings require explicit acceptance, support editing and preserve human drafts without GitHub writes", async ({
   desktop,
   page,
 }) => {
@@ -191,8 +191,40 @@ test("reviews use the captured revision and add native private drafts without du
     name: "Pending comment on line 1",
     exact: true,
   });
-  await expect(pending).toContainText("AI suggestion · bug");
-  await expect(pending).toContainText("Return after success");
+  const proposal = page.getByRole("article", {
+    name: "AI finding at src/feature.ts:1",
+  });
+  await expect(proposal).toContainText("Return after success");
+  await expect(pending).toHaveCount(0);
+  await expect(
+    proposal.getByRole("button", { name: "Add to review", exact: true }),
+  ).toHaveCount(0);
+  await proposal
+    .getByRole("button", { name: "View code", exact: true })
+    .click();
+  const target = page.locator(".review-diff-cell.is-review-target");
+  await expect(target).toHaveCount(1);
+  expect(
+    await target.evaluate((element) => {
+      const probe = document.createElement("div");
+      probe.style.background = "var(--blue-soft)";
+      element.append(probe);
+      const matches =
+        getComputedStyle(element).backgroundColor ===
+        getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return matches;
+    }),
+  ).toBe(true);
+  current = review({
+    state: "completed",
+    findings: [finding],
+    summary: "One actionable concern; tests were not run.",
+  });
+  await expect(
+    proposal.getByRole("button", { name: "Edit comment", exact: true }),
+  ).toBeEnabled();
+  await expect(pending).toHaveCount(0);
   await page
     .getByRole("button", {
       name: "Comment on changed line 1 in src/feature.ts",
@@ -203,15 +235,35 @@ test("reviews use the captured revision and add native private drafts without du
     .locator("#new-review-comment")
     .fill("Please keep my human question as well.");
   await page
+    .locator(".review-inline-composer")
     .getByRole("button", { name: "Add to review", exact: true })
     .click();
+  await expect(pending).toHaveCount(1);
+  await proposal
+    .getByRole("button", { name: "Edit comment", exact: true })
+    .click();
+  await proposal
+    .getByLabel("Review comment", { exact: true })
+    .fill(
+      "Please return after the successful write to avoid duplicate writes.",
+    );
+  await proposal
+    .getByRole("button", { name: "Add edited comment", exact: true })
+    .evaluate((button) => {
+      (button as HTMLButtonElement).click();
+      (button as HTMLButtonElement).click();
+    });
   await expect(pending).toHaveCount(2);
-  await page
+  const aiPending = pending.filter({ hasText: "AI suggestion · bug" });
+  await expect(aiPending).toContainText(
+    "Please return after the successful write",
+  );
+  await expect(aiPending).not.toContainText("This change repeats");
+  await aiPending
     .getByRole("button", {
       name: "Delete pending comment on line 1",
       exact: true,
     })
-    .first()
     .click();
   await expect(pending).toHaveCount(1);
   await page
@@ -221,23 +273,234 @@ test("reviews use the captured revision and add native private drafts without du
     .getByRole("button", { name: "Review with AI", exact: true })
     .click();
   await expect(pending).toHaveCount(1);
-  await page
-    .getByRole("button", { name: "Add suggestion back", exact: true })
+  await proposal
+    .getByRole("button", { name: "Add to review", exact: true })
     .click();
   await expect(pending).toHaveCount(2);
-  current = review({
-    state: "completed",
-    findings: [finding],
-    summary: "One actionable concern; tests were not run.",
-  });
-  await expect(
-    page.getByRole("complementary", { name: "AI reviewer" }),
-  ).toContainText(current.summary);
+  await expect(proposal).toContainText("Added to your pending review");
   expect(
     desktop.calls.some((call) =>
       /SubmitReview|CreateReviewComment/.test(call.name),
     ),
   ).toBe(false);
+});
+
+test("findings support explicit batch selection, dismissal and restoration across navigation", async ({
+  desktop,
+  page,
+}) => {
+  const second = {
+    ...finding,
+    id: "finding-b",
+    severity: "warning" as const,
+    body: "A second concern requiring manual approval.",
+  };
+  let current = review({
+    state: "completed",
+    findings: [finding, second],
+    summary: "Two proposed findings.",
+  });
+  desktop.handlers.set("main.AIService.StartReview", () => current);
+  desktop.handlers.set("main.AIService.GetReview", () => current);
+  desktop.handlers.set("main.AIService.SavePreferences", () => null);
+  await openReview(desktop);
+  await page
+    .getByRole("button", { name: "Start AI review", exact: true })
+    .click();
+  const findings = page.getByRole("region", {
+    name: "AI findings",
+    exact: true,
+  });
+  const pending = page.getByRole("region", {
+    name: "Pending comment on line 1",
+    exact: true,
+  });
+  await expect(
+    findings.getByLabel("Select all findings", { exact: true }),
+  ).not.toBeChecked();
+  await expect(
+    findings.getByRole("button", { name: "Add selected (0)", exact: true }),
+  ).toBeDisabled();
+  await expect(pending).toHaveCount(0);
+  await findings
+    .getByRole("button", { name: "Dismiss", exact: true })
+    .first()
+    .click();
+  await expect(findings.locator("article")).toHaveCount(1);
+  await findings.getByLabel("Select all findings", { exact: true }).check();
+  await findings
+    .getByRole("button", { name: "Add selected (1)", exact: true })
+    .click();
+  await expect(pending).toHaveCount(1);
+  await expect(pending).toContainText(second.body);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page
+    .locator(".sidebar")
+    .getByRole("button", { name: "Inbox", exact: true })
+    .click();
+  await page.locator(".pr-list-item").first().click();
+  await page
+    .getByRole("button", { name: "Review with AI", exact: true })
+    .click();
+  await expect(findings.locator("article")).toHaveCount(1);
+  await findings.locator(".ai-dismissed-findings > summary").click();
+  await findings
+    .getByRole("button", { name: "Restore finding", exact: true })
+    .click();
+  await expect(findings.locator("article")).toHaveCount(2);
+  await expect(pending).toHaveCount(1);
+  expect(
+    await page.evaluate(() =>
+      JSON.stringify(
+        Object.fromEntries(
+          Object.entries(localStorage).filter(([key]) =>
+            key.startsWith("mier.ai-review."),
+          ),
+        ),
+      ),
+    ),
+  ).not.toContain(finding.body);
+  current = review({
+    id: "review-next",
+    state: "completed",
+    findings: [finding],
+  });
+  await page
+    .getByRole("button", { name: "Run a new review", exact: true })
+    .click();
+  await expect(findings.locator("article")).toHaveCount(1);
+  await expect(
+    findings.getByLabel("Select all findings", { exact: true }),
+  ).not.toBeChecked();
+  await expect(pending).toHaveCount(1);
+});
+
+test("activity shows actual tool outcomes, file reads and provider usage without inventing dollar costs", async ({
+  desktop,
+  page,
+}) => {
+  let current = review({
+    activityTotals: {
+      toolCalls: 4,
+      failedCalls: 1,
+      fileReads: 1,
+      filesRead: 1,
+      linesRead: 12,
+      bytesRead: 1250,
+      omitted: 1,
+    },
+    activity: [
+      {
+        id: "tool-2",
+        tool: "read_review_file",
+        state: "completed",
+        path: "src/feature.ts",
+        side: "new",
+        startLine: 1,
+        endLine: 20,
+        lines: 12,
+        bytes: 1250,
+        startedAt: "2026-10-14T12:00:00Z",
+        finishedAt: "2026-10-14T12:00:01Z",
+        durationMs: 1000,
+      },
+      {
+        id: "tool-3",
+        tool: "read_review_file",
+        state: "failed",
+        path: "src/missing.ts",
+        lines: 0,
+        bytes: 0,
+        startedAt: "2026-10-14T12:00:01Z",
+        finishedAt: "2026-10-14T12:00:01Z",
+        durationMs: 10,
+      },
+      {
+        id: "tool-4",
+        tool: "finish_review",
+        state: "running",
+        lines: 0,
+        bytes: 0,
+        startedAt: "2026-10-14T12:00:02Z",
+        durationMs: 0,
+      },
+    ],
+    usage: {
+      source: "copilot-events",
+      partial: true,
+      inputTokens: 1250,
+      outputTokens: 250,
+      cachedInputTokens: 500,
+      premiumRequests: 0,
+      nanoAiu: 44.5,
+      billingStatus: "partial",
+    },
+  });
+  desktop.handlers.set("main.AIService.StartReview", () => current);
+  desktop.handlers.set("main.AIService.GetReview", () => current);
+  desktop.handlers.set("main.AIService.SavePreferences", () => null);
+  await openReview(desktop);
+  await page
+    .getByRole("button", { name: "Start AI review", exact: true })
+    .click();
+  const activity = page.getByRole("group", {
+    name: "Review activity and usage",
+    exact: true,
+  });
+  await activity.locator("summary").click();
+  const metric = (name: string) =>
+    activity
+      .locator("dt")
+      .filter({ hasText: new RegExp(`^${name}$`) })
+      .locator("..")
+      .locator("dd");
+  await expect(metric("Input tokens")).toHaveText("1,250");
+  await expect(metric("Dollar cost")).toHaveText("Not reported");
+  await expect(metric("Premium requests")).toHaveText("0");
+  await expect(activity).toContainText("Nano-AI units (subtotal)");
+  await expect(activity).toContainText("Provider-reported subtotals");
+  await expect(activity).toContainText("src/feature.ts:1–20 · Changed");
+  await expect(activity).toContainText("12 lines returned · 1,250 bytes");
+  await expect(activity).toContainText("1 unique file · 12 source lines");
+  await expect(activity.locator('li[data-state="failed"]')).toContainText(
+    "src/missing.ts",
+  );
+  await expect(activity.locator('li[data-state="running"]')).toContainText(
+    "Write summary",
+  );
+  await expect(activity).toContainText("1 earlier call omitted");
+  current = {
+    ...current,
+    state: "completed",
+    finishedAt: "2026-10-14T12:00:03Z",
+    activity: current.activity!.map((call) => ({
+      ...call,
+      state: "completed",
+      durationMs: 1000,
+    })),
+    usage: {
+      ...current.usage!,
+      source: "copilot-session",
+      partial: false,
+      premiumRequests: 0.5,
+    },
+  };
+  await expect(metric("Premium requests")).toHaveText("0.5");
+  await expect(metric("Review time")).toHaveText("3.0 s");
+  await expect(activity.locator('li[data-state="running"]')).toHaveCount(0);
+  current = review({
+    id: "without-usage",
+    state: "completed",
+    provider: "external",
+    findings: [],
+  });
+  await page
+    .getByRole("button", { name: "Run a new review", exact: true })
+    .click();
+  await expect(metric("Input tokens")).toHaveText("Not reported");
+  await expect(metric("Dollar cost")).toHaveText("Not reported");
+  await expect(activity).toContainText("Tool activity is unavailable");
+  await expect(metric("Premium requests")).toHaveCount(0);
 });
 
 test("the AI pane sits beside the editor and stacks at narrow sizes while preserving the code", async ({
@@ -305,11 +568,15 @@ test("stopping preserves partial suggestions and provider failures remain retrya
       name: "Pending comment on line 1",
       exact: true,
     }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await page.getByRole("button", { name: "Stop review", exact: true }).click();
   await expect(
     page.getByRole("complementary", { name: "AI reviewer" }),
   ).toContainText("cancelled");
+  await page
+    .getByRole("article", { name: "AI finding at src/feature.ts:1" })
+    .getByRole("button", { name: "Add to review", exact: true })
+    .click();
   await expect(
     page.getByRole("region", {
       name: "Pending comment on line 1",
@@ -454,6 +721,11 @@ test("late review starts survive navigation and older findings become outdated a
   await expect(
     page.getByRole("complementary", { name: "AI reviewer" }),
   ).toContainText("earlier commit");
+  await expect(page.locator(".review-outdated-comment")).toHaveCount(0);
+  await page
+    .getByRole("article", { name: "AI finding at src/feature.ts:1" })
+    .getByRole("button", { name: "Add to review", exact: true })
+    .click();
   await expect(page.locator(".review-outdated-comment")).toContainText(
     "Return after success",
   );

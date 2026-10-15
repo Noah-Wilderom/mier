@@ -17,10 +17,11 @@ type ReviewProps = {
   busy?: boolean
 }
 
+export type ReviewLocation = { path: string; threadId?: string; line?: number; side?: 'old' | 'new' }
 export type ReviewWorkspaceProps = ReviewProps & {
   focusMode: boolean
   onToggleFocus: () => void
-  requestedLocation?: { path: string; threadId: string }
+  requestedLocation?: ReviewLocation
 }
 
 type LineLocation = { line: number; side: 'old' | 'new' }
@@ -264,19 +265,22 @@ export default function ReviewWorkspace({ pr, onUpdate, onNotify, focusMode, onT
     if (requestedLocation && pr.files.some(item => item.path === requestedLocation.path)) {
       setActivePath(requestedLocation.path)
       setQuery('')
+      if (requestedLocation.line !== undefined) setIgnoreWhitespace(false)
     }
-  }, [requestedLocation?.path, requestedLocation?.threadId, pr.number])
+  }, [requestedLocation, pr.number])
 
   useEffect(() => {
     if (!requestedScrollPending.current || !requestedLocation || activePath !== requestedLocation.path) return
     const viewport = diffScrollRef.current
-    const thread = document.getElementById(`review-thread-${requestedLocation.threadId}`)
+    const thread = requestedLocation.threadId
+      ? document.getElementById(`review-thread-${requestedLocation.threadId}`)
+      : viewport?.querySelector(`[data-code-line="${requestedLocation.line}"][data-code-side="${requestedLocation.side}"]`) ?? viewport?.querySelector(`[data-review-${requestedLocation.side}-line="${requestedLocation.line}"]`)
     if (!viewport || !thread || !viewport.contains(thread)) return
     const viewportRect = viewport.getBoundingClientRect()
     const threadRect = thread.getBoundingClientRect()
     viewport.scrollTo({ top: Math.max(0, viewport.scrollTop + threadRect.top - viewportRect.top - Math.max(12, (viewport.clientHeight - threadRect.height) / 2)) })
     requestedScrollPending.current = false
-  }, [activePath, requestedLocation?.path, requestedLocation?.threadId, pr.number])
+  }, [activePath, requestedLocation, pr.number, diffMode, file])
 
   const selectAdjacent = (offset: number) => {
     const index = navigableFiles.findIndex(item => item.path === file?.path)
@@ -355,7 +359,8 @@ export default function ReviewWorkspace({ pr, onUpdate, onNotify, focusMode, onT
 
   const renderCell = (line: DiffLine | undefined, side: 'old' | 'new') => {
     const number = side === 'old' ? line?.oldLine : line?.newLine
-    return <div className={`review-diff-cell ${line ? `diff-${line.kind}` : 'diff-empty'}`}>
+    const targeted = requestedLocation?.path === file?.path && requestedLocation?.line === number && requestedLocation?.side === side
+    return <div className={`review-diff-cell ${line ? `diff-${line.kind}` : 'diff-empty'}${targeted ? ' is-review-target' : ''}`}>
       <span className="review-line-number" aria-hidden="true">{number ?? ''}</span>
       <span className="review-line-marker" aria-hidden="true">{line?.kind === 'add' ? '+' : line?.kind === 'remove' ? '−' : ''}</span>
       <code className="review-code-text" data-code-path={number !== undefined ? side === 'old' ? file?.previousPath || file?.path : file?.path : undefined} data-code-line={number} data-code-side={number !== undefined ? side : undefined}>{line ? tokenLine(syntax?.[side].get(syntaxLineKey(line, side)), line.text) : ''}</code>
@@ -433,7 +438,7 @@ export default function ReviewWorkspace({ pr, onUpdate, onNotify, focusMode, onT
                 {unifiedLines.map((line, index) => {
                   const side = line.kind === 'remove' ? 'old' : 'new'
                   const number = side === 'old' ? line.oldLine : line.newLine
-                  return <div className="review-diff-row-block" key={`${line.kind}-${index}`}>{index > 0 && line.hunk !== undefined && line.hunk !== unifiedLines[index - 1].hunk && <div className="review-hunk-label"><span>{hunkHeaders[line.hunk]}</span><span>Next changed section</span></div>}<div className={`review-unified-row diff-${line.kind}`}><span className="review-line-number" aria-hidden="true">{line.oldLine ?? ''}</span><span className="review-line-number" aria-hidden="true">{line.newLine ?? ''}</span><span className="review-line-marker" aria-hidden="true">{line.kind === 'add' ? '+' : line.kind === 'remove' ? '−' : ''}</span><code className="review-code-text" data-code-path={number !== undefined ? side === 'old' ? file.previousPath || file.path : file.path : undefined} data-code-line={number} data-code-side={number !== undefined ? side : undefined}>{tokenLine(syntax?.[side].get(syntaxLineKey(line, side)), line.text)}</code>{number !== undefined && editable && <button className="review-add-comment" disabled={busy || saving} aria-label={`Comment on line ${number} in ${file.path}`} title={`Comment on line ${number}`} onClick={() => beginComment({ line: number, side })}><Icon name="plus" size={12} /></button>}</div>{renderDiscussion([...(line.oldLine !== undefined ? [{ line: line.oldLine, side: 'old' as const }] : []), ...(line.newLine !== undefined ? [{ line: line.newLine, side: 'new' as const }] : [])])}</div>
+                  return <div className="review-diff-row-block" key={`${line.kind}-${index}`}>{index > 0 && line.hunk !== undefined && line.hunk !== unifiedLines[index - 1].hunk && <div className="review-hunk-label"><span>{hunkHeaders[line.hunk]}</span><span>Next changed section</span></div>}<div className={`review-unified-row diff-${line.kind}${requestedLocation?.path === file.path && (requestedLocation.side === "old" ? line.oldLine : line.newLine) === requestedLocation.line && requestedLocation.line !== undefined ? " is-review-target" : ""}`} data-review-old-line={line.oldLine} data-review-new-line={line.newLine}><span className="review-line-number" aria-hidden="true">{line.oldLine ?? ''}</span><span className="review-line-number" aria-hidden="true">{line.newLine ?? ''}</span><span className="review-line-marker" aria-hidden="true">{line.kind === 'add' ? '+' : line.kind === 'remove' ? '−' : ''}</span><code className="review-code-text" data-code-path={number !== undefined ? side === 'old' ? file.previousPath || file.path : file.path : undefined} data-code-line={number} data-code-side={number !== undefined ? side : undefined}>{tokenLine(syntax?.[side].get(syntaxLineKey(line, side)), line.text)}</code>{number !== undefined && editable && <button className="review-add-comment" disabled={busy || saving} aria-label={`Comment on line ${number} in ${file.path}`} title={`Comment on line ${number}`} onClick={() => beginComment({ line: number, side })}><Icon name="plus" size={12} /></button>}</div>{renderDiscussion([...(line.oldLine !== undefined ? [{ line: line.oldLine, side: 'old' as const }] : []), ...(line.newLine !== undefined ? [{ line: line.newLine, side: 'new' as const }] : [])])}</div>
                 })}
               </>}
               <div className="review-diff-end"><Icon name="check" size={13} />End of file<button className="btn-ghost review-text-button" disabled={busy || saving} onClick={async () => { const wasViewed = pr.viewedFiles.includes(file.path); const saved = await setViewed(file.path, !wasViewed); if (saved && !wasViewed) selectAdjacent(1) }}>{pr.viewedFiles.includes(file.path) ? 'Mark as not viewed' : activeIndex < navigableFiles.length - 1 ? 'Mark viewed and next file' : 'Mark as viewed'}<Icon name="arrow-right" size={12} /></button></div>

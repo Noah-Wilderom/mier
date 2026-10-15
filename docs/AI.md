@@ -36,14 +36,29 @@ Both providers need their CLIs available to the desktop application. **Settings 
 
 ## Suggestions and review control
 
-- Findings become native **private pending comments**, with provider attribution and severity. Inspect them, delete them, or add a removed suggestion back from the assistant.
-- Human and AI comments share the existing draft store. Receiving a suggestion does not replace your own pending comments.
+- Findings stay in the assistant. After completion, cancellation or failure, choose **View code**, **Edit comment**, **Add to review**, or **Dismiss**. Check individual findings or **Select all**, then **Add selected** for a batch. Selection starts empty. Dismissed findings can be restored; rerunning starts a fresh set of decisions.
+- Only findings you explicitly accept become native **private pending comments**, with provider attribution and severity. An edited comment retains its original finding ID and captured revision. Deleting an accepted comment never silently adds it again. **Go to comment** opens an accepted draft; **View code** highlights a current-revision location in blue. Earlier-revision findings can be added as outdated drafts.
+- Human and AI comments share the existing draft store. Accepting a finding does not replace your own pending comments.
 - Only your existing **Finish review** action publishes comments to GitHub, under your account. The agent has no publishing, merge, shell, or file-edit tool.
 - A review captures immutable head, base and merge-base commits. Old-side source comes from the merge base; a fork's new-side source comes from that fork. Findings must reference real lines in the captured diff. Comments from an earlier head remain outdated drafts after you accept new commits.
 - **Stop review** terminates the provider session and revokes its local tools. Partial suggestions are retained. Provider errors and quota failures are shown explicitly.
-- Reviews continue while you navigate inside the app. Reopening that PR restores status and suggestions. Quitting stops active reviews; already imported comments persist as normal review drafts. Provider session history and MCP credentials are not persisted by M.I.E.R.
+- Reviews continue while you navigate inside the app. Reopening that PR restores status and suggestions. Quitting stops active reviews; already accepted comments persist as normal review drafts. Provider session history and MCP credentials are not persisted by M.I.E.R.
 
 Reviews are bounded to 64 files, 384 KiB of patch, 50 comments, 100 source reads and 30 minutes. Each source read returns at most 250 lines and 64 KiB; files larger than 2 MiB and binary content are excluded. Missing/truncated patches and scope limits are reported for manual review. Up to four reviews can run at once, with one reviewer per captured PR revision. Reviewers inspect code; they cannot execute tests or validate a working checkout.
+
+See [manual finding actions in dark appearance](../art/mier-ai-actions-dark.png) and [activity and usage in light appearance](../art/mier-ai-activity-light.png). These use a sample PR and simulated provider telemetry; real-provider validation is described below.
+
+## Activity and usage
+
+Expand **Activity and usage** in a review to see executed review tools, running/completed/failed/cancelled states, durations, repository paths and requested line ranges. Successful source reads report the actual returned lines and bytes. Aggregate counts include all calls; the timeline retains the latest 200. File-read totals count successful reads, not the patches returned with PR context. Raw tool arguments/results, source text, provider logs and credentials are excluded from telemetry.
+
+Token and billing values come from each provider rather than estimates:
+
+- Codex's [`thread/tokenUsage/updated`](https://learn.chatgpt.com/docs/app-server) supplies cumulative input, output, total, cache and reasoning tokens. Cache and reasoning counts are not added to the total again. Repeated notifications replace cumulative values.
+- [Copilot usage events and session metrics](https://docs.github.com/en/copilot/how-tos/copilot-sdk/features/usage-and-billing) supply input/output/cache tokens, model calls, API time and premium request units or nano-AI units when available. Per-call events are deduplicated; final session metrics replace the observed subtotals. Missing or unsupported final metrics leave the event values labelled as subtotals. Partial AI-unit billing remains labelled as a subtotal even when token totals are available. These billing units are not dollars.
+- **Dollar cost: Not reported** is intentional: these subscription connections do not supply a dollar charge for an individual review. Missing token/cost fields, including external MCP client usage, remain **Not reported**. A provider-reported zero is displayed as zero. M.I.E.R. does not infer API prices or subscription overage charges.
+
+Activity and usage stay in memory with the review while the app is running. Browser storage contains only the session ID and dismissed finding IDs. Explicitly accepted comments use the normal persisted draft store. Quitting removes the activity timeline and unaccepted proposals.
 
 ## Connect an external MCP client
 
@@ -53,15 +68,15 @@ In a PR's assistant choose **Connect an MCP client… → Create MCP connection*
 | --- | --- |
 | `get_review_context` | Captured PR metadata and patches |
 | `read_review_file` | Bounded source at captured revisions |
-| `add_review_comment` | Add an anchored, private draft suggestion |
+| `add_review_comment` | Stage an anchored finding in the assistant for human approval |
 | `finish_review` | Record a summary and finish the external review |
 
-The loopback endpoint and bearer are unique to that review. Keep the connection configuration private: it permits reading that repository's captured source and adding draft suggestions until **Stop review**, completion, app exit, or the 30-minute expiry. Reopening the pane restores the same active connection. Tokens stay in memory and are not saved to browser storage. This is a local review server, not a remotely reachable general workspace server.
+The loopback endpoint and bearer are unique to that review. Keep the connection configuration private: it permits reading that repository's captured source and proposing findings until **Stop review**, completion, app exit, or the 30-minute expiry. Reopening the pane restores the same active connection. Tokens stay in memory and are not saved to browser storage. This is a local review server, not a remotely reachable general workspace server.
 
-Codex consumes the MCP bridge directly. The Copilot SDK registers these four capabilities as explicitly allowed custom tools, forwarding their calls through an authenticated MCP client. Copilot's built-in MCP servers, commands, filesystem tools, repository instructions, plugins and remote session export are disabled for this reviewer. Starting a review authorizes only these additive private draft tools.
+Codex consumes the MCP bridge directly. The Copilot SDK registers these four capabilities as explicitly allowed custom tools, forwarding their calls through an authenticated MCP client. Copilot's built-in MCP servers, commands, filesystem tools, repository instructions, plugins and remote session export are disabled for this reviewer. Starting a review authorizes only these scoped proposal tools; it does not authorize importing findings or publishing comments.
 
 ## Integration references and validation
 
 This local CLI approach follows the official [Codex app-server](https://learn.chatgpt.com/docs/app-server) and [authentication](https://learn.chatgpt.com/docs/auth) documentation, the [Copilot SDK authentication guide](https://docs.github.com/en/copilot/how-tos/copilot-sdk/auth/authenticate), and the official [Go MCP SDK](https://github.com/modelcontextprotocol/go-sdk). T3 Code's [Codex adapter](https://github.com/pingdotgg/t3code/blob/main/apps/server/src/orchestration-v2/Adapters/CodexAdapterV2.ts) informed the long-lived control connection and per-review tool scoping. Hosted/commercial deployments need to evaluate OpenAI's current [Sign in with ChatGPT integration requirements](https://developers.openai.com/siwc/token-sharing-open-source/codex-app-server) before reusing this local-desktop flow.
 
-Real Linux provider smoke reviews passed with Codex 0.162.1 and Copilot CLI 1.0.98 / Go SDK 1.0.22: both read a disposable diff, found its retry bug, and added a native comment and summary. CI uses deterministic fake-provider protocol tests and real local MCP transports; it does not require subscriptions or send repository code to an AI service. macOS/Windows provider runtime interaction requires separate native qualification.
+Real Linux provider smoke reviews passed with Codex 0.162.1 and Copilot CLI 1.0.98 / Go SDK 1.0.22: both read a disposable diff, found its retry bug, and proposed a finding and summary through the scoped tools. CI uses deterministic fake-provider protocol tests and real local MCP transports; it does not require subscriptions or send repository code to an AI service. macOS/Windows provider runtime interaction requires separate native qualification.

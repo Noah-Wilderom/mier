@@ -25,6 +25,8 @@ import {
 } from "./aiTypes";
 import "./AIReview.css";
 import { AIModelLogo, AIModelPicker } from "./AIModelPicker";
+import { AIReviewFindings } from "./AIReviewFindings";
+import { AIReviewActivity } from "./AIReviewActivity";
 const AIReviewChat = lazy(async () => ({
   default: (await import("./AIReviewChat")).AIReviewChat,
 }));
@@ -38,6 +40,7 @@ type Props = {
   expanded: boolean;
   onExpand: () => void;
   onOpenComment: (id: string, path: string) => void;
+  onInspect: (finding: AIFinding) => void;
 };
 export default function ReviewAssistant(props: Props) {
   return props.enabled && props.pr.provider ? (
@@ -46,19 +49,24 @@ export default function ReviewAssistant(props: Props) {
     <>{props.children}</>
   );
 }
-type Saved = { id: string; seen: string[] };
+type Saved = { id: string; dismissed: string[] };
 const storagePrefix = "mier.ai-review.";
 const read = (key: string): Saved | undefined => {
   try {
     const value = JSON.parse(
       localStorage.getItem(storagePrefix + key) ?? "null",
     );
-    if (
-      typeof value?.id === "string" &&
-      Array.isArray(value.seen) &&
-      value.seen.every((id: unknown) => typeof id === "string")
-    )
-      return value;
+    if (typeof value?.id === "string" && value.id.length <= 128)
+      return {
+        id: value.id,
+        dismissed: Array.isArray(value.dismissed)
+          ? value.dismissed
+              .filter(
+                (id: unknown) => typeof id === "string" && id.length <= 128,
+              )
+              .slice(0, 50)
+          : [],
+      };
   } catch {
     /* keep code review usable */
   }
@@ -71,6 +79,7 @@ function LiveAssistant({
   expanded,
   onExpand,
   onOpenComment,
+  onInspect,
 }: Props) {
   const identity = pr.provider!;
   const scope = JSON.stringify([
@@ -99,9 +108,6 @@ function LiveAssistant({
     [retry, setRetry] = useState(0);
   const [confirmExternal, setConfirmExternal] = useState(false),
     [copied, setCopied] = useState(false);
-  const seen = useRef(new Set(saved?.seen ?? []));
-  const importRef = useRef(onImport);
-  importRef.current = onImport;
   const guard = useRef(false);
   const preferencesLoaded = useRef(false);
   const mounted = useRef(true);
@@ -168,15 +174,6 @@ function LiveAssistant({
         const value = await services.ai.get(saved.id);
         if (stale) return;
         setRun(value);
-        const additions = (value.findings ?? []).filter(
-          (finding) => !seen.current.has(finding.id),
-        );
-        if (additions.length) {
-          await importRef.current(value, additions);
-          if (stale) return;
-          for (const finding of additions) seen.current.add(finding.id);
-          persist({ id: value.id, seen: [...seen.current] });
-        }
         if (aiReviewActive(value) && !stale)
           timer = setTimeout(() => void poll(), document.hidden ? 2500 : 800);
       } catch (issue) {
@@ -242,15 +239,14 @@ function LiveAssistant({
       try {
         localStorage.setItem(
           storagePrefix + scope,
-          JSON.stringify({ id: review.id, seen: [] }),
+          JSON.stringify({ id: review.id, dismissed: [] }),
         );
       } catch {
         /* session metadata is best-effort */
       }
       if (!mounted.current) return true;
-      seen.current = new Set();
       setRun(review);
-      persist({ id: review.id, seen: [] });
+      persist({ id: review.id, dismissed: [] });
       setConfirmExternal(false);
       setConnection(external ? (next as AIConnection) : undefined);
       if (!external)
@@ -303,7 +299,6 @@ function LiveAssistant({
     setRun(undefined);
     setConnection(undefined);
     setPollError("");
-    seen.current.clear();
     try {
       localStorage.removeItem(storagePrefix + scope);
     } catch {}
@@ -319,8 +314,8 @@ function LiveAssistant({
           {active
             ? run?.progress || "Reviewing…"
             : run
-              ? `${run.findings?.length ?? 0} suggestions · ${run.state}`
-              : "Private draft suggestions"}
+              ? `${run.findings?.length ?? 0} ${run.findings?.length === 1 ? "finding" : "findings"} · ${run.state}`
+              : "Findings for you to review"}
         </span>
         {open && !expanded && (
           <button className="btn btn-ghost" onClick={onExpand}>
@@ -410,8 +405,8 @@ function LiveAssistant({
                         </code>
                         {run.headSha !== pr.headSha && (
                           <p className="ai-review-error">
-                            This review targets an earlier commit. Its comments
-                            are retained as outdated drafts.
+                            This review targets an earlier commit. Findings you
+                            choose to add will be marked as outdated drafts.
                           </p>
                         )}
                         {active && (
@@ -429,66 +424,30 @@ function LiveAssistant({
                             {warning}
                           </p>
                         ))}
-                        {!!run.findings?.length && (
-                          <div className="ai-findings">
-                            {run.findings.map((finding) => {
-                              const id = `ai:${run.id}:${finding.id}`,
-                                added = pr.pendingComments.some(
-                                  (comment) => comment.id === id,
-                                );
-                              return (
-                                <article key={finding.id}>
-                                  <header>
-                                    <span
-                                      className={`ai-severity ai-severity-${finding.severity}`}
-                                    >
-                                      {finding.severity}
-                                    </span>
-                                    <button
-                                      className="btn-ghost"
-                                      onClick={() =>
-                                        onOpenComment(id, finding.path)
-                                      }
-                                    >
-                                      {finding.path.split("/").pop()}:
-                                      {finding.line}
-                                    </button>
-                                  </header>
-                                  <Markdown>{finding.body}</Markdown>
-                                  <span className="muted">
-                                    {added
-                                      ? "Added to your pending review"
-                                      : "Removed from pending review"}
-                                  </span>
-                                  {!added && (
-                                    <button
-                                      className="btn-ghost"
-                                      disabled={busy}
-                                      onClick={() =>
-                                        void importRef
-                                          .current(run, [finding])
-                                          .catch((issue) =>
-                                            setError(String(issue)),
-                                          )
-                                      }
-                                    >
-                                      Add suggestion back
-                                    </button>
-                                  )}
-                                </article>
-                              );
-                            })}
-                          </div>
-                        )}
+                        <AIReviewActivity run={run} />
                         {!!run.summary && (
                           <div className="ai-review-summary">
                             <h3>Review summary</h3>
                             <Markdown>{run.summary}</Markdown>
                           </div>
                         )}
+                        <AIReviewFindings
+                          key={run.id}
+                          run={run}
+                          pr={pr}
+                          dismissed={
+                            saved?.id === run.id ? saved.dismissed : []
+                          }
+                          onDismiss={(dismissed) =>
+                            persist({ id: run.id, dismissed })
+                          }
+                          onImport={onImport}
+                          onInspect={onInspect}
+                          onOpenComment={onOpenComment}
+                        />
                         {run.state === "completed" && !run.findings?.length && (
                           <p className="muted">
-                            No inline suggestions were added. Read the summary
+                            No inline findings were proposed. Read the summary
                             for the review’s scope and limitations.
                           </p>
                         )}
@@ -599,9 +558,9 @@ function LiveAssistant({
                       <p className="ai-review-disclosure">
                         Starting sends this PR’s changes and requested source
                         files to {aiProviderName(preferences.provider)} using
-                        your account. Suggestions stay private until you submit
-                        your review. Each message starts a new review of this
-                        PR.
+                        your account. Findings stay in this assistant until you
+                        choose to add them to your pending review. Each message
+                        starts a new review of this PR.
                       </p>
                       {connection && active && (
                         <div className="ai-mcp-connection">
@@ -649,8 +608,8 @@ function LiveAssistant({
                             <div className="ai-mcp-confirm">
                               <p>
                                 Create a temporary local connection so your own
-                                agent can read this PR and add private review
-                                comments?
+                                agent can read this PR and propose findings for
+                                you to review?
                               </p>
                               <button
                                 className="btn"

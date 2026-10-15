@@ -58,6 +58,49 @@ export interface AIReview {
   createdAt: string;
   finishedAt: string;
   warnings: string[];
+  activity?: AIToolActivity[];
+  activityTotals?: AIActivityTotals;
+  usage?: AIUsage;
+}
+export interface AIToolActivity {
+  id: string;
+  tool: string;
+  state: "running" | "completed" | "failed" | "cancelled";
+  path?: string;
+  side?: "old" | "new";
+  startLine?: number;
+  endLine?: number;
+  lines: number;
+  bytes: number;
+  startedAt: string;
+  finishedAt?: string;
+  durationMs: number;
+}
+export interface AIActivityTotals {
+  toolCalls: number;
+  failedCalls: number;
+  fileReads: number;
+  filesRead: number;
+  linesRead: number;
+  bytesRead: number;
+  omitted: number;
+}
+export interface AIUsage {
+  source?: string;
+  partial: boolean;
+  inputTokens?: number;
+  outputTokens?: number;
+  cachedInputTokens?: number;
+  cacheWriteTokens?: number;
+  reasoningTokens?: number;
+  totalTokens?: number;
+  contextTokens?: number;
+  contextWindow?: number;
+  modelCalls?: number;
+  apiDurationMs?: number;
+  premiumRequests?: number;
+  nanoAiu?: number;
+  billingStatus?: "complete" | "partial" | "unavailable";
 }
 export interface AIReviewRequest {
   host: string;
