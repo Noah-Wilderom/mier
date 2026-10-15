@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { advanceMacOSRelease, readMacOSCheckpoint } from './macos-notarization.mjs';
 import { macOSReleasePaths } from './release.mjs';
 
@@ -15,7 +15,7 @@ function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'mier-deferred-notary-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const calls = [];
-  const state = { app: 'In Progress', dmg: 'In Progress', failInfo: false, failGatekeeper: false, failStapleValidation: false, entries: 'MIER.app/\nMIER.app/Contents/\n' };
+  const state = { app: 'In Progress', dmg: 'In Progress', failInfo: false, failDMGSubmit: false, failGatekeeper: false, failStapleValidation: false, entries: 'MIER.app/\nMIER.app/Contents/\n' };
   const appBundle = join(root, 'Source.app');
   mkdirSync(join(appBundle, 'Contents'), { recursive: true });
   writeFileSync(join(appBundle, 'Contents/source'), 'captured application');
@@ -33,7 +33,8 @@ function fixture(t) {
   signing.tool = (command, args, options = {}) => {
     calls.push({ command, args, options });
     if (command === 'xcrun' && args[0] === 'notarytool') {
-      if (args[1] === 'submit') return { status: 0, stdout: JSON.stringify({ id: args[2].endsWith('app.zip') ? appID : dmgID }) };
+      if (args[1] === 'submit') return state.failDMGSubmit && args[2].endsWith('.dmg') ? { status: 1, diagnostic: 'temporary DMG upload failure' } :
+        { status: 0, stdout: JSON.stringify({ id: args[2].endsWith('app.zip') ? appID : dmgID }) };
       if (args[1] === 'info') return state.failInfo ? { status: null, diagnostic: 'status request timed out' } :
         { status: 0, stdout: JSON.stringify({ id: args[2], status: args[2] === appID ? state.app : state.dmg }) };
       if (args[1] === 'log') return { status: 0, stdout: 'Apple rejection details' };
@@ -65,7 +66,12 @@ function fixture(t) {
 test('pending uploads survive fresh runners and complete app and DMG without rebuilding or waiting', t => {
   const f = fixture(t);
   assert.equal(advanceMacOSRelease(f.options), false);
-  assert.equal(readMacOSCheckpoint(f.options).phase, 'app');
+  const initial = readMacOSCheckpoint(f.options);
+  assert.equal(initial.phase, 'app');
+  assert.equal(initial.archiveHash, initial.appHash);
+  assert.equal(readFileSync(f.options.archive, 'utf8'), readFileSync(join(dirname(f.options.checkpoint), 'app.zip'), 'utf8'));
+  assert.ok(existsSync(f.options.dmg));
+  assert.match(readFileSync(f.signing.summaryPath, 'utf8'), /downloads can publish now/);
   assert.equal(f.submissions().length, 1);
   f.freshRunner();
   assert.equal(advanceMacOSRelease(f.options, true), false);
@@ -110,12 +116,65 @@ test('transient status failures retain the existing submission and never reuploa
   assert.equal(f.submissions().length, 1);
 });
 
-test('a rejected app never creates an updater ZIP or a DMG', t => {
+test('a rejected app fails packaging before publication can run', t => {
   const f = fixture(t);
   f.state.app = 'Invalid';
   assert.throws(() => advanceMacOSRelease(f.options), /Apple rejected/);
-  assert.ok(!existsSync(f.options.archive) && !existsSync(f.options.dmg));
+  assert.equal(readMacOSCheckpoint(f.options).phase, 'app');
   assert.equal(f.submissions().length, 1);
+});
+
+test('pending downloads are verified by their saved checksums before publication or resume', t => {
+  const f = fixture(t);
+  advanceMacOSRelease(f.options);
+  for (const file of [f.options.archive, f.options.dmg]) {
+    const original = readFileSync(file);
+    writeFileSync(file, 'modified pending download');
+    f.calls.length = 0;
+    assert.throws(() => readMacOSCheckpoint(f.options), /checksum/);
+    assert.throws(() => advanceMacOSRelease(f.options, true), /checksum/);
+    assert.equal(f.calls.length, 0);
+    writeFileSync(file, original);
+  }
+});
+
+test('a failed DMG submission retains the published ZIP and DMG for a fresh-runner retry', t => {
+  const f = fixture(t);
+  advanceMacOSRelease(f.options);
+  const archive = readFileSync(f.options.archive);
+  const dmg = readFileSync(f.options.dmg);
+  f.state.app = 'Accepted';
+  f.state.failDMGSubmit = true;
+  assert.throws(() => advanceMacOSRelease(f.options, true), /temporary DMG upload failure/);
+  assert.equal(readMacOSCheckpoint(f.options).phase, 'app');
+  assert.deepEqual(readFileSync(f.options.archive), archive);
+  assert.deepEqual(readFileSync(f.options.dmg), dmg);
+  f.state.failDMGSubmit = false;
+  f.freshRunner();
+  assert.equal(advanceMacOSRelease(f.options, true), false);
+  assert.equal(readMacOSCheckpoint(f.options).phase, 'dmg');
+  assert.equal(f.submissions().filter(call => call.args[2].endsWith('app.zip')).length, 1);
+});
+
+test('an interrupted file replacement restores the exact files already submitted to Apple', t => {
+  const f = fixture(t);
+  f.state.app = 'Accepted';
+  advanceMacOSRelease(f.options);
+  const next = join(dirname(f.options.checkpoint), 'next');
+  mkdirSync(next);
+  const expected = [f.options.archive, f.options.dmg].map(file => {
+    const bytes = readFileSync(file);
+    copyFileSync(file, join(next, basename(file)));
+    writeFileSync(file, 'old published file');
+    return bytes;
+  });
+  assert.equal(readMacOSCheckpoint(f.options).phase, 'dmg');
+  for (const [index, file] of [f.options.archive, f.options.dmg].entries()) {
+    assert.deepEqual(readFileSync(file), expected[index]);
+  }
+  f.freshRunner();
+  assert.equal(advanceMacOSRelease(f.options, true), false);
+  assert.equal(f.submissions().length, 2);
 });
 
 test('a rejected DMG never marks the checkpoint ready', t => {

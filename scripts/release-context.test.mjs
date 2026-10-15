@@ -1,11 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
-import { macOSReleasePaths } from './release.mjs';
-import { releaseReady, validateReleaseContext, validateResumeContext, validateResumeParent, validateSourceRun, validateUnpublishedRelease } from './release-context.mjs';
+import { validateReleaseContext, validateResumableRelease, validateResumeContext, validateResumeParent, validateSourceRun } from './release-context.mjs';
 
 const repository = 'example/mier';
 const commit = 'a'.repeat(40);
@@ -43,33 +38,20 @@ test('resuming an older parent points to the newer checkpoints instead of duplic
 });
 
 test('deleted or already published releases cannot start billed Mac resume jobs', () => {
-  assert.doesNotThrow(() => validateUnpublishedRelease({ tag_name: context.tag, assets: [] }, context));
-  assert.throws(() => validateUnpublishedRelease({ tag_name: context.tag, assets: [{ name: 'manifest.json' }] }, context), /already complete/);
-  assert.throws(() => validateUnpublishedRelease({ tag_name: 'v0.2.0', assets: [] }, context), /no longer exists/);
+  assert.doesNotThrow(() => validateResumableRelease({ tag_name: context.tag, assets: [] }, context));
+  assert.throws(() => validateResumableRelease({ tag_name: context.tag, assets: [{ name: 'manifest.json' }] }, context), /already complete/);
+  assert.throws(() => validateResumableRelease({ tag_name: 'v0.2.0', assets: [] }, context), /no longer exists/);
 });
 
-test('both Mac checkpoints and their exact archives are required before publication', t => {
-  const root = mkdtempSync(join(tmpdir(), 'mier-release-ready-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
-  const summary = join(root, 'summary.md');
-  const sha = file => createHash('sha256').update(readFileSync(file)).digest('hex');
-  for (const arch of ['amd64', 'arm64']) {
-    const paths = macOSReleasePaths(arch, context.version, commit, root);
-    for (const path of [paths.archive, paths.dmg, paths.checkpoint]) mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(paths.archive, 'fixture ZIP ' + arch);
-    writeFileSync(paths.dmg, 'fixture DMG ' + arch);
-    const state = { format: 1, version: context.version, commit, arch, phase: arch === 'amd64' ? 'ready' : 'dmg', appSubmissionID: '01234567-89ab-cdef-0123-456789abcdef', dmgSubmissionID: 'fedcba98-7654-3210-fedc-ba9876543210', archiveHash: sha(paths.archive), dmgHash: sha(paths.dmg) };
-    writeFileSync(paths.checkpoint, JSON.stringify(state));
+test('an already published release can resume only with matching pending notarization metadata', () => {
+  const release = { tag_name: context.tag, assets: [{ name: 'manifest.json' }, { name: 'notarization.json' }] };
+  const mac = { status: 'pending', phase: 'app', appSubmissionID: '01234567-89ab-cdef-0123-456789abcdef', archiveSHA256: 'a'.repeat(64), dmgSHA256: 'b'.repeat(64) };
+  const publication = { ...context, sourceRun: '123', complete: false, macos: { amd64: mac, arm64: mac } };
+  assert.doesNotThrow(() => validateResumableRelease(release, context, publication));
+  assert.throws(() => validateResumableRelease(release, context), /already complete/);
+  for (const change of [{ commit: 'b'.repeat(40) }, { baseRun: '456' }, { complete: true }, { macos: {} }]) {
+    assert.throws(() => validateResumableRelease(release, context, { ...publication, ...change }));
   }
-  assert.equal(releaseReady(context.version, commit, root, summary), false);
-  assert.match(readFileSync(summary, 'utf8'), /No assets or update feed were published/);
-  const arm = macOSReleasePaths('arm64', context.version, commit, root);
-  const state = JSON.parse(readFileSync(arm.checkpoint, 'utf8'));
-  writeFileSync(arm.checkpoint, JSON.stringify({ ...state, phase: 'ready' }));
-  assert.equal(releaseReady(context.version, commit, root), true);
-  writeFileSync(arm.archive, 'tampered archive');
-  assert.throws(() => releaseReady(context.version, commit, root), /checksum/);
-  assert.throws(() => releaseReady(context.version, 'b'.repeat(40), root), /captured release/);
-  rmSync(arm.checkpoint);
-  assert.throws(() => releaseReady(context.version, commit, root), /ENOENT/);
+  const accepted = { ...mac, status: 'notarized', phase: 'ready', dmgSubmissionID: 'fedcba98-7654-3210-fedc-ba9876543210' };
+  assert.throws(() => validateResumableRelease(release, context, { ...publication, complete: true, macos: { amd64: accepted, arm64: accepted } }), /already complete/);
 });

@@ -2,8 +2,8 @@ import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { macOSReleasePaths, parseTag } from './release.mjs';
-import { readMacOSCheckpoint } from './macos-notarization.mjs';
+import { parseTag } from './release.mjs';
+import { renderReleaseNotes, releasePublication, validatePublicationStatus, validatePublicationTransition } from './release-publication.mjs';
 
 export function validateReleaseContext(context) {
   if (context?.format !== 1 || !/^[a-f0-9]{40}$/.test(context.commit || '') || !/^[1-9][0-9]*$/.test(context.baseRun || '') ||
@@ -35,9 +35,15 @@ export function validateResumeParent(sourceID, currentID, runs) {
   if (child) throw new Error('This source has newer saved checkpoints. Resume run ' + child.id + ' instead.');
 }
 
-export function validateUnpublishedRelease(release, context) {
+export function validateResumableRelease(release, context, publication) {
   if (release?.tag_name !== context.tag || !Array.isArray(release.assets)) throw new Error('Saved release no longer exists.');
-  if (release.assets.some(asset => asset.name === 'manifest.json')) throw new Error('This release is already complete; no resume is needed.');
+  if (release.assets.some(asset => asset.name === 'manifest.json')) {
+    if (!release.assets.some(asset => asset.name === 'notarization.json') || !publication) {
+      throw new Error('This release is already complete; no resume is needed.');
+    }
+    validatePublicationStatus(publication, context);
+    if (publication.complete) throw new Error('This release is already complete; no resume is needed.');
+  }
 }
 
 function github(path) {
@@ -50,6 +56,14 @@ function repository() {
   const value = process.env.GITHUB_REPOSITORY;
   if (!/^[\w.-]+\/[\w.-]+$/.test(value || '')) throw new Error('Missing GitHub repository.');
   return value;
+}
+
+function publishedNotarization(release) {
+  if (!release.assets.some(asset => asset.name === 'notarization.json')) return;
+  const result = spawnSync('gh', ['release', 'download', release.tag_name, '--repo', repository(), '--pattern', 'notarization.json', '--output', '-'],
+    { encoding: 'utf8', timeout: 30_000, maxBuffer: 128 * 1024 });
+  if (result.status !== 0) throw new Error('Could not read published notarization status: ' + (result.stderr || 'request failed'));
+  return JSON.parse(result.stdout);
 }
 
 function sourceRun(id) {
@@ -66,18 +80,6 @@ function validateTag(context) {
   let object = github('repos/' + repository() + '/git/ref/tags/' + encodeURIComponent(context.tag)).object;
   for (let depth = 0; object?.type === 'tag' && depth < 5; depth++) object = github('repos/' + repository() + '/git/tags/' + object.sha).object;
   if (object?.type !== 'commit' || object.sha !== context.commit) throw new Error('Release tag moved or no longer matches the saved build.');
-}
-
-export function releaseReady(version, commit, root = 'dist', summaryPath) {
-  const phases = ['amd64', 'arm64'].map(arch => readMacOSCheckpoint(macOSReleasePaths(arch, version, commit, root)).phase);
-  const ready = phases.every(phase => phase === 'ready');
-  if (!ready) {
-    const message = 'Release is saved, awaiting Apple: amd64=' + phases[0] + ', arm64=' + phases[1] +
-      '. No assets or update feed were published. Run Resume release later using source run ' + (process.env.GITHUB_RUN_ID || 'this run') + '.';
-    console.log(message);
-    if (summaryPath) appendFileSync(summaryPath, '\n' + message + '\n');
-  }
-  return ready;
 }
 
 function main(args) {
@@ -97,17 +99,32 @@ function main(args) {
     const base = sourceRun(context.baseRun);
     validateResumeContext(source, base, context);
     validateTag(context);
-    validateUnpublishedRelease(github('repos/' + repository() + '/releases/tags/' + encodeURIComponent(context.tag)), context);
+    const release = github('repos/' + repository() + '/releases/tags/' + encodeURIComponent(context.tag));
+    validateResumableRelease(release, context, publishedNotarization(release));
     output(context);
-  } else if (args[0] === 'ready') {
-    const ready = releaseReady(args[1], args[2], 'dist', process.env.GITHUB_STEP_SUMMARY);
-    if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, 'ready=' + ready + '\n');
+  } else if (args[0] === 'prepare-publication') {
+    const context = validateReleaseContext({ format: 1, tag: args[1], version: parseTag(args[1]).version, commit: args[2], baseRun: args[3] });
+    validateTag(context);
+    const publication = releasePublication(context);
+    const release = github('repos/' + repository() + '/releases/tags/' + encodeURIComponent(context.tag));
+    const previous = publishedNotarization(release);
+    if (previous) validatePublicationTransition(previous, publication, context);
+    const notesFile = process.env.MIER_RELEASE_NOTES_FILE;
+    if (!notesFile) throw new Error('Missing release notes output file.');
+    mkdirSync(dirname(notesFile), { recursive: true });
+    writeFileSync(notesFile, renderReleaseNotes(release.body || '', publication));
+    writeFileSync('dist/notarization.json', JSON.stringify(publication, null, 2) + '\n');
+    const message = 'Publishing signed downloads and updates for all six targets. macOS notarization: amd64=' + publication.macos.amd64.status +
+      ', arm64=' + publication.macos.arm64.status + '. ' + (publication.complete ? 'Both Mac downloads are stapled and verified.' :
+        'Gatekeeper may block pending Mac downloads. Run Resume release later using source run ' + publication.sourceRun + '; no runner is polling.');
+    console.log(message);
+    if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n' + message + '\n');
   } else if (args[0] === 'validate-tag') {
     parseTag(args[1]);
     if (!/^[a-f0-9]{40}$/.test(args[2] || '')) throw new Error('Invalid release commit.');
     validateTag({ tag: args[1], commit: args[2] });
   } else {
-    throw new Error('Usage: release-context.mjs create TAG COMMIT RUN_ID FILE | validate-run RUN_ID | resume RUN_ID FILE | ready VERSION COMMIT | validate-tag TAG COMMIT');
+    throw new Error('Usage: release-context.mjs create TAG COMMIT RUN_ID FILE | validate-run RUN_ID | resume RUN_ID FILE | prepare-publication TAG COMMIT BASE_RUN | validate-tag TAG COMMIT');
   }
 }
 

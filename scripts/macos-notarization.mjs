@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
-import { appendFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { appendFileSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import { completeNotarization, createMacOSDMG, stageMacOSApp, submitNotarization, verifyMacOSApp, verifyMacOSDMG, writeMacOSArchive } from './macos-sign.mjs';
 
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
@@ -12,6 +12,11 @@ function hash(file) {
   return createHash('sha256').update(readFileSync(file)).digest('hex');
 }
 
+function matches(file, expected) {
+  try { return hash(file) === expected; }
+  catch { return false; }
+}
+
 export function readMacOSCheckpoint(options) {
   const { checkpoint, version, arch, commit, archive, dmg } = options;
   if (lstatSync(checkpoint).size > 8192) throw new Error('Invalid notarization checkpoint size.');
@@ -20,10 +25,26 @@ export function readMacOSCheckpoint(options) {
       !['app', 'dmg', 'ready'].includes(state.phase) || !uuid.test(state.appSubmissionID || '')) {
     throw new Error('Notarization checkpoint does not match the captured release.');
   }
-  const files = state.phase === 'app' ? [[join(dirname(checkpoint), 'app.zip'), state.appHash]] : [[archive, state.archiveHash], [dmg, state.dmgHash]];
+  const files = [[archive, state.archiveHash], [dmg, state.dmgHash]];
+  if (state.phase === 'app') {
+    if (state.appHash !== state.archiveHash) throw new Error('Pending updater ZIP does not match the submitted app.');
+    files.push([join(dirname(checkpoint), 'app.zip'), state.appHash]);
+  }
   if (state.phase !== 'app' && !uuid.test(state.dmgSubmissionID || '')) throw new Error('Missing DMG notarization submission.');
   for (const [file, expected] of files) {
-    if (!digest.test(expected || '') || hash(file) !== expected) throw new Error('Notarization artifact checksum does not match its checkpoint.');
+    if (!digest.test(expected || '')) throw new Error('Invalid notarization artifact checksum.');
+    if (!matches(file, expected)) {
+      // The new submission is saved before replacing published files. Recover
+      // an interrupted replacement only from its checksum-bound staged copy.
+      const staged = join(dirname(checkpoint), 'next', basename(file));
+      if (state.phase === 'app' || !matches(staged, expected)) throw new Error('Notarization artifact checksum does not match its checkpoint.');
+      mkdirSync(dirname(file), { recursive: true });
+      copyFileSync(staged, file);
+    }
+  }
+  if (state.phase !== 'app') {
+    rmSync(join(dirname(checkpoint), 'next'), { recursive: true, force: true });
+    rmSync(join(dirname(checkpoint), 'app.zip'), { force: true });
   }
   return state;
 }
@@ -50,6 +71,7 @@ function extractApp(archive, signing) {
 
 function pending(state, signing) {
   const message = 'macOS/' + state.arch + ' is waiting for Apple (' + state.phase + '). Files and submission IDs are saved. ' +
+    'Signed ZIP and DMG downloads can publish now with notarization marked as pending. ' +
     'Run Resume release with source run ' + (process.env.GITHUB_RUN_ID || 'this run') + ' later; no runner is polling.';
   console.log(message);
   if (signing.summaryPath) appendFileSync(signing.summaryPath, '\n' + message + '\n');
@@ -70,17 +92,28 @@ export function advanceMacOSRelease(options, resume = false) {
     if (existsSync(checkpoint)) throw new Error('A notarization checkpoint already exists; resume it instead of rebuilding.');
     const app = stageMacOSApp(appBundle, signing);
     writeMacOSArchive(app, payload, signing);
-    state = { format: 1, version, arch, commit, phase: 'app', appHash: hash(payload), appSubmissionID: submitNotarization(payload, signing) };
+    mkdirSync(dirname(archive), { recursive: true });
+    copyFileSync(payload, archive);
+    createMacOSDMG(app, dmg, signing);
+    verifyMacOSDMG(dmg, signing);
+    state = { format: 1, version, arch, commit, phase: 'app', appHash: hash(payload), archiveHash: hash(archive), dmgHash: hash(dmg),
+      appSubmissionID: submitNotarization(payload, signing) };
     save(checkpoint, state);
   }
   if (state.phase === 'app') {
     const app = extractApp(payload, signing);
     if (!completeNotarization(state.appSubmissionID, app, signing)) return pending(state, signing);
     verifyMacOSApp(app, signing, true);
-    writeMacOSArchive(app, archive, signing, true);
-    createMacOSDMG(app, dmg, signing);
-    state = { ...state, phase: 'dmg', archiveHash: hash(archive), dmgHash: hash(dmg), dmgSubmissionID: submitNotarization(dmg, signing) };
+    const next = join(dirname(checkpoint), 'next');
+    const nextArchive = join(next, basename(archive));
+    const nextDMG = join(next, basename(dmg));
+    writeMacOSArchive(app, nextArchive, signing, true);
+    createMacOSDMG(app, nextDMG, signing);
+    state = { ...state, phase: 'dmg', archiveHash: hash(nextArchive), dmgHash: hash(nextDMG), dmgSubmissionID: submitNotarization(nextDMG, signing) };
     save(checkpoint, state);
+    copyFileSync(nextArchive, archive);
+    copyFileSync(nextDMG, dmg);
+    rmSync(next, { recursive: true, force: true });
     rmSync(payload, { force: true });
   }
   if (state.phase === 'dmg') {

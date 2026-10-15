@@ -21,7 +21,7 @@ The maintainer has chosen to keep M.I.E.R. unlicensed for now. There is no proje
 3. Exercise first installation and an actual previous-version update on supported OS/architecture pairs. Test GitHub login/keychains, repository opening and Git writes, real provider reviews/merges in a disposable repository, editor discovery, notifications, and process cleanup.
 4. Publish the generated `mier-bin` recipe to the AUR after licensing/package review to enable `omarchy pkg aur add mier-bin`. Release assets alone do not register an AUR or Omarchy package.
 
-Installers initially remain unsigned, as requested. Developer ID signing/notarization and Windows Authenticode are later release work; updater signatures are already a separate requirement. Native CI compilation is evidence of a build, and does not substitute for keychain, installation, or upgrade testing.
+macOS downloads use Developer ID signatures and publish while notarization is pending, with that state identified in the release notes and `notarization.json`. A later resume staples and verifies accepted Mac builds and replaces their downloads. Windows installers remain unsigned. Updater signatures are a separate requirement. Native CI compilation is evidence of a build, and does not substitute for keychain, installation, or upgrade testing.
 
 ## Current boundaries
 

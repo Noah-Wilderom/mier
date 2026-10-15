@@ -1,4 +1,4 @@
-name: Publish completed release
+name: Publish signed release assets
 
 on:
   workflow_call:
@@ -35,6 +35,9 @@ jobs:
     name: Sign updates and attach release assets
     runs-on: ubuntu-26.04
     timeout-minutes: 20
+    concurrency:
+      group: publish-release-${{ inputs.release_tag }}
+      cancel-in-progress: false
     permissions:
       contents: write
       actions: read
@@ -42,6 +45,7 @@ jobs:
       RELEASE_TAG: ${{ inputs.release_tag }}
       APP_VERSION: ${{ inputs.version }}
       RELEASE_COMMIT: ${{ inputs.commit }}
+      BASE_RUN: ${{ inputs.base_run }}
       MIER_RELEASE_NOTES_FILE: dist/release-notes.md
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -59,11 +63,7 @@ jobs:
           merge-multiple: true
           run-id: ${{ inputs.macos_run }}
           github-token: ${{ github.token }}
-      - name: Check notarization checkpoints before preparing publication
-        id: readiness
-        run: node scripts/release-context.mjs ready "$APP_VERSION" "$RELEASE_COMMIT"
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        if: steps.readiness.outputs.ready == 'true'
         with:
           pattern: release-{linux,windows}-*
           path: dist
@@ -71,19 +71,13 @@ jobs:
           run-id: ${{ inputs.base_run }}
           github-token: ${{ github.token }}
       - uses: ./.github/actions/setup-desktop
-        if: steps.readiness.outputs.ready == 'true'
-      - name: Verify release tag and preserve its notes
-        if: steps.readiness.outputs.ready == 'true'
-        run: |
-          node scripts/release-context.mjs validate-tag "$RELEASE_TAG" "$RELEASE_COMMIT"
-          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json body --jq '.body' > "$MIER_RELEASE_NOTES_FILE"
+      - name: Verify release files and label pending macOS notarization
+        run: node scripts/release-context.mjs prepare-publication "$RELEASE_TAG" "$RELEASE_COMMIT" "$BASE_RUN"
       - name: Sign and verify all six update archives
-        if: steps.readiness.outputs.ready == 'true'
         env:
           UPDATER_PRIVATE_KEY: ${{ secrets.UPDATER_PRIVATE_KEY }}
         run: node scripts/release.mjs manifest "$RELEASE_TAG"
       - name: Validate the AUR recipe with makepkg
-        if: steps.readiness.outputs.ready == 'true'
         run: |
           docker run --rm \
             -v "$PWD/dist/aur:/recipe:ro" \
@@ -102,8 +96,8 @@ jobs:
               su builder -c "makepkg --nodeps --noconfirm"
             '
       - name: Upload installers, update archives, and checksums
-        if: steps.readiness.outputs.ready == 'true'
-        run: gh release upload "$RELEASE_TAG" dist/updates/* dist/installers/* dist/SHA256SUMS --clobber --repo "$GITHUB_REPOSITORY"
+        run: gh release upload "$RELEASE_TAG" dist/updates/* dist/installers/* dist/SHA256SUMS dist/notarization.json --clobber --repo "$GITHUB_REPOSITORY"
       - name: Publish the update feed after the downloads are available
-        if: steps.readiness.outputs.ready == 'true'
         run: gh release upload "$RELEASE_TAG" dist/manifest.json --clobber --repo "$GITHUB_REPOSITORY"
+      - name: Update the release notarization notice
+        run: gh release edit "$RELEASE_TAG" --notes-file "$MIER_RELEASE_NOTES_FILE" --repo "$GITHUB_REPOSITORY"

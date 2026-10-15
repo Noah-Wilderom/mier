@@ -42,22 +42,22 @@ chmod 600 "$HOME/.config/mier/release/updater.key"
 
 Wails writes the public key alongside it as `updater.key.pub`. Copy that public file to `build/updater.key.pub` and commit it before tagging a release; add the corresponding private file as `UPDATER_PRIVATE_KEY`. For this repository, use the already generated key instead. If it is lost, the public key cannot reconstruct it; restore a backup or plan a key migration before generating a replacement. The CLI refuses to overwrite an existing key unless explicitly forced. [Wails updater documentation](https://v3.wails.io/guides/updater/).
 
-macOS release apps and DMGs are signed with Developer ID, notarized by Apple, and stapled before publication. The updater ZIP contains the signed and stapled app; both archives are unpacked and checked before upload. Development builds retain Wails' ad hoc signing. Windows installers have no Authenticode signature. Updater artifacts are separately signed with the local Ed25519 key; operating system signing is independent of update verification.
+macOS release apps and DMGs are signed with Developer ID and published immediately, including while Apple notarization is pending. Release notes identify the pending architectures, and `notarization.json` records their submission IDs, saved revision, file checksums, and current phase. Gatekeeper may prevent pending Mac downloads from opening until Apple approves them. Development builds retain Wails' ad hoc signing. Windows installers have no Authenticode signature. Updater artifacts are separately signed with the local Ed25519 key; operating system signing is independent of update verification.
 
 Apple certificate and account setup is maintained outside this repository. The release workflow requires that setup and stops if credentials, signing, or notarization fail. Windows certificate, Linux package-signing, and AUR credentials are not required. A personal access token is not required for uploading assets to this repository's release. [GitHub's automatic workflow token](https://docs.github.com/en/actions/concepts/security/github_token) and [repository secret setup](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets).
 
-Apple notarization runs without polling or idle runner time. Each macOS job signs the app, submits its ZIP, checks its status once, and saves the files, checksums, captured revision, and submission ID as Actions artifacts. If Apple reports `In Progress`, the job exits successfully with an awaiting-Apple summary. The release assets and update feed remain unpublished until both Mac architectures are accepted, stapled, and verified. The initial macOS build job has a 30-minute limit; resume jobs have a 15-minute limit for productive packaging/upload work. There are no scheduled checks.
+Apple notarization runs without polling or idle runner time. Each macOS job signs and verifies the app, creates the downloadable ZIP and DMG, submits the app ZIP, checks its status once, and saves the files, checksums, captured revision, and submission ID as Actions artifacts. If Apple reports `In Progress`, the job exits successfully with an awaiting-Apple summary. Once all six builds pass, publication uploads every platform's installers, signed update archives, checksums, notarization status, and update feed. Pending macOS notarization does not block publication. The initial macOS build job has a 30-minute limit; resume jobs have a 15-minute limit for productive packaging/upload work. There are no scheduled checks.
 
 Use **Actions → Apple notarization status → Run workflow** to check up to ten existing submission IDs, separated by spaces or commas. This reads Apple's status without uploading a new artifact, importing a signing certificate, or publishing release assets. Apple may continue processing after the packaging job stops. Some submissions receive additional analysis and take longer; see [Apple's explanation](https://developer.apple.com/forums/thread/811968).
 
-## Completing a queued release
+## Completing pending macOS notarization
 
 1. Open **Actions → Resume release → Run workflow**, leaving the branch on `master`.
 2. Enter the numeric ID of the most recent release or Resume release run, as shown in its URL and job summary.
-3. The workflow restores its saved macOS files and checks Apple once. If the app is accepted, it staples and verifies the app, creates the updater ZIP and signed DMG, and submits that DMG without waiting. A pending DMG is saved for another resume.
-4. Once the DMG is accepted, the workflow staples and verifies it, then publishes all six platforms' update archives, installers, checksums, and update feed. Linux and Windows files come from the original build; they are never rebuilt during a resume. Release notes are read from the existing release.
+3. The workflow restores its saved macOS files and checks Apple once. If the app is accepted, it staples and verifies the app, replaces its updater ZIP and signed DMG, and submits that DMG without waiting. A pending DMG is saved for another resume. Publication replaces the available Mac files, regenerates checksums and update signatures, and retains a pending notice for any architecture that is not finished.
+4. Once the DMG is accepted, the workflow staples and verifies it, replaces the downloads and update feed, and updates the release notice to confirm that both Mac builds are notarized and stapled. Linux and Windows files come from the original build; they are never rebuilt during a resume. User-written release notes are preserved.
 
-If Apple is still processing, resume later using the newest run ID. Always follow the newest saved checkpoints: resuming a parent that already has a successful continuation is rejected to avoid duplicate submissions. A pending run is successful but has not published downloads. Real rejections, authentication failures, corrupt artifacts, and verification errors still fail the run. The original tag must still point to the captured commit; retagged releases and unrelated or PR workflow artifacts are rejected.
+If Apple is still processing, resume later using the newest run ID, also recorded as `sourceRun` in the published `notarization.json`. Always follow the newest saved checkpoints: resuming a parent that already has a successful continuation is rejected to avoid duplicate submissions. An existing update feed does not prevent resuming a release whose matching notarization metadata is still pending. Completed releases, foreign metadata, older notarization phases, and replacement of already notarized files are rejected. Publication is serialized per tag. Real rejections, authentication failures, corrupt artifacts, and verification errors still fail the run. The original tag must still point to the captured commit; retagged releases and unrelated or PR workflow artifacts are rejected.
 
 Saved artifacts expire after **7 days**, including the original Linux and Windows builds. Finish within that window; expired or pre-checkpoint release runs require a new build. The older `v0.1.2-alpha.1` runs that waited inside the runner did not save resumable Mac files. Re-running those commits does not acquire this behavior; the first release using it must contain the checkpoint scripts and workflows.
 
@@ -81,11 +81,11 @@ Each release contains:
 - Windows: a ZIP containing one executable and an NSIS setup EXE for each architecture.
 - Linux: a `tar.gz` containing one executable, a DEB, RPM, Arch `.pkg.tar.zst`, and AppImage for each architecture.
 - An AUR recipe archive containing `PKGBUILD` and `.SRCINFO`, with checksums pinned to both architecture downloads.
-- `SHA256SUMS` for the downloads and `manifest.json` for the updater.
+- `SHA256SUMS` for the downloads, `manifest.json` for the updater, and `notarization.json` for macOS status.
 
 DMGs and setup installers are for first installation. Wails updates use the ZIP or `tar.gz` archives, because its updater does not install DMGs or NSIS packages. Windows setup installs for the current user, allowing the updater to replace the executable without elevation. Linux needs the GTK 4 and WebKitGTK 6 runtime libraries; its archive does not bundle them. All six targets now use a matching native runner architecture. Linux releases build in a pinned Ubuntu 24.04 container on Ubuntu 26.04 hosts to retain the glibc 2.39 compatibility baseline; the native test matrix also tests Ubuntu 26.04 directly.
 
-All six archives must exist before the workflow signs the feed. It verifies every archive with the pinned public key, uploads the downloads, then uploads the manifest last. Release version metadata is written into the executable, macOS bundle, and Windows installer.
+All six archives must exist before the workflow signs the feed, including signed Mac archives while notarization is pending. It verifies every archive with the pinned public key, uploads the downloads and status, then uploads the manifest last. A notarization resume regenerates checksums and signatures after stapling changes the Mac files. Release version metadata is written into the executable, macOS bundle, and Windows installer.
 
 ## Command-line installation
 
@@ -120,10 +120,10 @@ npm --prefix frontend ci
 npm --prefix frontend test
 npx --prefix frontend playwright install --with-deps chromium webkit
 npm --prefix frontend run test:ui
-node --test scripts/release.test.mjs
+node --test scripts/release*.test.mjs scripts/macos*.test.mjs
 node --test scripts/install.test.mjs
 shellcheck install.sh
-actionlint .github/workflows/test.yml .github/workflows/release.yml
+actionlint .github/workflows/*.yml
 npm --prefix frontend run build
 go test ./...
 go vet ./...
