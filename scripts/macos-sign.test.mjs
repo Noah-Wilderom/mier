@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync,
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  checkNotarizationStatus, cleanupMacOSSigning, createMacOSTool, macOSSecrets, notarizeAndStaple, packageMacOSRelease,
+  checkNotarizationStatus, cleanupMacOSSigning, createMacOSTool, macOSSecrets, completeNotarization, submitNotarization, packageMacOSRelease,
   parseKeychains, selectSigningIdentity, validateMacOSCredentials, verifyMacOSApp, withMacOSSigning, withoutSigningSecrets,
 } from './macos-sign.mjs';
 
@@ -170,95 +170,32 @@ test('malformed cleanup state cannot point deletion at another keychain', t => {
   assert.equal(readFileSync(other, 'utf8'), 'keep this file');
 });
 
-test('only an accepted notarization submission may staple the application', () => {
+test('notarization uploads once without waiting and only staples an accepted submission', () => {
   const calls = [];
-  const signing = {
-    keychain: '/tmp/signing.keychain-db', profile: 'release',
-    tool: (command, args, options) => {
-      calls.push({ command, args, options });
-      return { status: 0, stdout: JSON.stringify({ status: args[1] === 'submit' ? 'In Progress' : 'Accepted', id: submissionID }), stderr: '' };
-    },
-  };
-  notarizeAndStaple('/tmp/app.zip', '/tmp/MIER.app', signing);
-  assert.deepEqual(calls.slice(2).map(call => call.args), [
-    ['stapler', 'staple', '/tmp/MIER.app'], ['stapler', 'validate', '/tmp/MIER.app'],
-  ]);
-  assert.equal(calls[0].args[1], 'submit');
-  assert.ok(!calls[0].args.includes('--wait'));
-  assert.deepEqual(calls[1].args.slice(0, 3), ['notarytool', 'wait', submissionID]);
-  assert.ok(calls[1].args.includes('15m'));
-  assert.ok(calls[1].options.timeout > 15 * 60_000);
-});
-
-test('an Apple queue timeout keeps waiting on the original submission without uploading again', () => {
-  const calls = [];
-  let waits = 0;
-  const signing = { keychain: '/tmp/signing.keychain-db', profile: 'release', tool: (command, args) => {
-    calls.push({ command, args });
-    if (args[1] === 'submit' || args[1] === 'info') {
-      return { status: 0, stdout: JSON.stringify({ id: submissionID, status: 'In Progress' }) };
-    }
-    if (args[1] === 'wait' && ++waits === 1) {
-      return { status: 69, stdout: JSON.stringify({ id: submissionID, message: 'Timeout of 900 second(s) was reached before processing completed.' }) };
-    }
-    return { status: 0, stdout: JSON.stringify({ id: submissionID, status: 'Accepted' }) };
-  } };
-  assert.doesNotThrow(() => notarizeAndStaple('/tmp/app.zip', '/tmp/MIER.app', signing));
-  assert.equal(calls.filter(call => call.args[1] === 'submit').length, 1);
-  assert.equal(waits, 2);
-  assert.ok(calls.filter(call => ['wait', 'info'].includes(call.args[1])).every(call => call.args[2] === submissionID));
-  assert.ok(!calls.some(call => call.args[1] === 'log'));
-  assert.deepEqual(calls.slice(-2).map(call => call.args), [
-    ['stapler', 'staple', '/tmp/MIER.app'], ['stapler', 'validate', '/tmp/MIER.app'],
-  ]);
-});
-
-test('Apple acceptance between a wait timeout and status check still permits stapling', () => {
-  const calls = [];
-  notarizeAndStaple('/tmp/app.zip', '/tmp/MIER.app', { keychain: '/tmp/keychain', profile: 'release', tool: (command, args) => {
+  let status = 'In Progress';
+  const signing = { keychain: '/tmp/keychain', profile: 'release', tool: (command, args) => {
     calls.push(args);
-    if (args[1] === 'wait') return { status: 69, stdout: JSON.stringify({ id: submissionID, message: 'Timeout reached.' }) };
-    return { status: 0, stdout: JSON.stringify({ id: submissionID, status: args[1] === 'submit' ? 'In Progress' : 'Accepted' }) };
-  } });
-  assert.equal(calls.filter(args => args[1] === 'wait').length, 1);
-  assert.equal(calls.filter(args => args[1] === 'info').length, 1);
-  assert.ok(calls.some(args => args[0] === 'stapler' && args[1] === 'staple'));
-});
-
-test('a bounded pending submission records its ID and never fetches a rejection log or staples', t => {
-  const calls = [];
-  const summaryPath = join(temporaryDirectory(t), 'summary.md');
-  assert.throws(() => notarizeAndStaple('/tmp/app.zip', '/tmp/MIER.app', {
-    keychain: '/tmp/keychain', profile: 'release', summaryPath, tool: (command, args) => {
-      calls.push(args);
-      if (args[1] === 'wait') return { status: 69, stdout: JSON.stringify({ id: submissionID, message: 'Timeout reached.' }) };
-      return { status: 0, stdout: JSON.stringify({ id: submissionID, status: 'In Progress' }) };
-    },
-  }), error => {
-    assert.match(error.message, /still In Progress/);
-    assert.match(error.message, /not been rejected/);
-    assert.ok(error.message.includes(submissionID));
-    return true;
-  });
+    return { status: 0, stdout: JSON.stringify({ id: submissionID, status }) };
+  } };
+  assert.equal(submitNotarization('/tmp/app.zip', signing), submissionID);
+  assert.equal(completeNotarization(submissionID, '/tmp/MIER.app', signing), false);
+  assert.ok(!calls.some(args => args[0] === 'stapler' || args[1] === 'wait' || args.includes('--wait')));
+  status = 'Accepted';
+  assert.equal(completeNotarization(submissionID, '/tmp/MIER.app', signing), true);
   assert.equal(calls.filter(args => args[1] === 'submit').length, 1);
-  assert.equal(calls.filter(args => args[1] === 'wait').length, 4);
-  assert.equal(calls.filter(args => args[1] === 'info').length, 4);
-  assert.ok(!calls.some(args => args[1] === 'log' || args[0] === 'stapler'));
-  assert.match(readFileSync(summaryPath, 'utf8'), new RegExp(submissionID + ': In Progress'));
+  assert.deepEqual(calls.slice(-2), [['stapler', 'staple', '/tmp/MIER.app'], ['stapler', 'validate', '/tmp/MIER.app']]);
 });
 
 test('only a terminal rejection fetches the Apple rejection log', () => {
   for (const status of ['Invalid', 'Rejected']) {
     const calls = [];
-    assert.throws(() => notarizeAndStaple('/tmp/app.zip', '/tmp/MIER.app', {
-      keychain: '/tmp/keychain', profile: 'release', tool: (command, args) => {
-        calls.push(args);
-        return { status: 0, stdout: JSON.stringify({ id: submissionID, status: args[1] === 'submit' ? 'In Progress' : status }) };
-      },
-    }), /Apple rejected/);
+    const signing = { keychain: '/tmp/keychain', profile: 'release', tool: (command, args) => {
+      calls.push(args);
+      return { status: 0, stdout: JSON.stringify({ id: submissionID, status }) };
+    } };
+    assert.throws(() => completeNotarization(submissionID, '/tmp/MIER.app', signing), /Apple rejected/);
     assert.equal(calls.filter(args => args[1] === 'log').length, 1);
-    assert.equal(calls.filter(args => args[1] === 'wait').length, 1);
-    assert.ok(!calls.some(args => args[0] === 'stapler'));
+    assert.ok(!calls.some(args => args[0] === 'stapler' || args[1] === 'wait'));
   }
 });
 
@@ -300,23 +237,12 @@ test('status lookup rejects another submission, unknown statuses, and command fa
   ]) assert.throws(() => checkNotarizationStatus([submissionID], { env: credentials(), tool: () => response }), /Could not check/);
 });
 
-test('rejected, incomplete, timed-out, and malformed notarization responses cannot publish', () => {
+test('failed or malformed submissions cannot advance notarization', () => {
   for (const result of [
-    { status: 0, stdout: JSON.stringify({ status: 'Invalid', id: submissionID }) },
-    { status: 0, stdout: JSON.stringify({ status: 'In Progress', id: submissionID }) },
-    { status: 1, stdout: JSON.stringify({ status: 'Accepted', id: submissionID }) },
+    { status: 1, stdout: JSON.stringify({ id: submissionID }) },
     { status: 0, stdout: JSON.stringify({ status: 'Accepted' }) },
     { status: null, stdout: '' }, { status: 0, stdout: 'not JSON' },
-  ]) {
-    const calls = [];
-    const signing = { keychain: '/tmp/keychain', profile: 'release', tool: (command, args) => {
-      calls.push(args);
-      if (args[1] === 'log') return { stdout: 'simulated notary rejection details' };
-      return result;
-    } };
-    assert.throws(() => notarizeAndStaple('/tmp/app.zip', '/tmp/MIER.app', signing), /notarization|Apple rejected/);
-    assert.ok(!calls.some(args => args[0] === 'stapler'));
-  }
+  ]) assert.throws(() => submitNotarization('/tmp/app.zip', { keychain: '/tmp/keychain', profile: 'release', tool: () => result }), /Could not submit/);
 });
 
 test('verification rejects missing runtime protection and an unexpected signing team', () => {

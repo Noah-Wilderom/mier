@@ -46,9 +46,20 @@ macOS release apps and DMGs are signed with Developer ID, notarized by Apple, an
 
 Apple certificate and account setup is maintained outside this repository. The release workflow requires that setup and stops if credentials, signing, or notarization fail. Windows certificate, Linux package-signing, and AUR credentials are not required. A personal access token is not required for uploading assets to this repository's release. [GitHub's automatic workflow token](https://docs.github.com/en/actions/concepts/security/github_token) and [repository secret setup](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets).
 
-Apple notarization submits each artifact once, then waits on that submission ID in four 15-minute intervals. A wait timeout is followed by a status check; `In Progress` is pending, not a rejection. The ID and status are written to the job log and summary. Publication requires an explicit `Accepted` response, stapling, and verification. The macOS job allows three hours for the build and the separate app and DMG submissions; other platform jobs retain their 90-minute limit.
+Apple notarization runs without polling or idle runner time. Each macOS job signs the app, submits its ZIP, checks its status once, and saves the files, checksums, captured revision, and submission ID as Actions artifacts. If Apple reports `In Progress`, the job exits successfully with an awaiting-Apple summary. The release assets and update feed remain unpublished until both Mac architectures are accepted, stapled, and verified. The initial macOS build job has a 30-minute limit; resume jobs have a 15-minute limit for productive packaging/upload work. There are no scheduled checks.
 
 Use **Actions → Apple notarization status → Run workflow** to check up to ten existing submission IDs, separated by spaces or commas. This reads Apple's status without uploading a new artifact, importing a signing certificate, or publishing release assets. Apple may continue processing after the packaging job stops. Some submissions receive additional analysis and take longer; see [Apple's explanation](https://developer.apple.com/forums/thread/811968).
+
+## Completing a queued release
+
+1. Open **Actions → Resume release → Run workflow**, leaving the branch on `master`.
+2. Enter the numeric ID of the most recent release or Resume release run, as shown in its URL and job summary.
+3. The workflow restores its saved macOS files and checks Apple once. If the app is accepted, it staples and verifies the app, creates the updater ZIP and signed DMG, and submits that DMG without waiting. A pending DMG is saved for another resume.
+4. Once the DMG is accepted, the workflow staples and verifies it, then publishes all six platforms' update archives, installers, checksums, and update feed. Linux and Windows files come from the original build; they are never rebuilt during a resume. Release notes are read from the existing release.
+
+If Apple is still processing, resume later using the newest run ID. Always follow the newest saved checkpoints: resuming a parent that already has a successful continuation is rejected to avoid duplicate submissions. A pending run is successful but has not published downloads. Real rejections, authentication failures, corrupt artifacts, and verification errors still fail the run. The original tag must still point to the captured commit; retagged releases and unrelated or PR workflow artifacts are rejected.
+
+Saved artifacts expire after **7 days**, including the original Linux and Windows builds. Finish within that window; expired or pre-checkpoint release runs require a new build. The older `v0.1.2-alpha.1` runs that waited inside the runner did not save resumable Mac files. Re-running those commits does not acquire this behavior; the first release using it must contain the checkpoint scripts and workflows.
 
 ## Retrying a failed release
 

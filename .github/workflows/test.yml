@@ -69,7 +69,7 @@ jobs:
         working-directory: frontend
       - run: npm test
         working-directory: frontend
-      - run: node --test scripts/release.test.mjs scripts/macos-sign.test.mjs
+      - run: node --test scripts/release*.test.mjs scripts/macos*.test.mjs
       - name: Installer regression tests
         if: runner.os != 'Windows'
         run: node --test scripts/install.test.mjs

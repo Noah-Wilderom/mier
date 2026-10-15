@@ -1,0 +1,129 @@
+name: Resume release
+run-name: Resume release from run ${{ inputs.source_run }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run:
+        description: Most recent release or Resume release run ID (saved artifacts expire after 7 days)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: resume-release-${{ inputs.source_run }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  prepare:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_RUN: ${{ inputs.source_run }}
+    outputs:
+      tag: ${{ steps.context.outputs.tag }}
+      version: ${{ steps.context.outputs.version }}
+      commit: ${{ steps.context.outputs.commit }}
+      baseRun: ${{ steps.context.outputs.baseRun }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Validate source run before reading artifacts
+        run: node scripts/release-context.mjs validate-run "$SOURCE_RUN"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-context
+          path: dist
+          run-id: ${{ inputs.source_run }}
+          github-token: ${{ github.token }}
+      - name: Validate release lineage and unchanged tag
+        id: context
+        run: node scripts/release-context.mjs resume "$SOURCE_RUN" dist/release-context.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-context
+          path: dist/release-context.json
+          if-no-files-found: error
+          archive: true
+          retention-days: 7
+
+  macos:
+    name: Resume macOS ${{ matrix.arch }}
+    needs: prepare
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: amd64, runner: macos-26-intel }
+          - { arch: arm64, runner: macos-26 }
+    env:
+      APP_VERSION: ${{ needs.prepare.outputs.version }}
+      RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-darwin-${{ matrix.arch }}
+          path: dist
+          run-id: ${{ inputs.source_run }}
+          github-token: ${{ github.token }}
+      - name: Check Apple once and advance accepted artifacts
+        env:
+          TARGET_ARCH: ${{ matrix.arch }}
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: node scripts/release.mjs resume-macos "$TARGET_ARCH" "$APP_VERSION"
+      - name: Remove temporary macOS signing credentials
+        if: always()
+        run: node scripts/macos-sign.mjs cleanup
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: release-darwin-${{ matrix.arch }}
+          path: |
+            dist/updates/*
+            dist/installers/*
+            dist/notarization/**
+          if-no-files-found: error
+          archive: true
+          compression-level: 0
+          retention-days: 7
+
+  publish:
+    needs: [prepare, macos]
+    permissions:
+      contents: write
+      actions: read
+    uses: ./.github/workflows/publish-release.yml
+    with:
+      release_tag: ${{ needs.prepare.outputs.tag }}
+      version: ${{ needs.prepare.outputs.version }}
+      commit: ${{ needs.prepare.outputs.commit }}
+      base_run: ${{ needs.prepare.outputs.baseRun }}
+      macos_run: ${{ github.run_id }}
+    secrets:
+      UPDATER_PRIVATE_KEY: ${{ secrets.UPDATER_PRIVATE_KEY }}

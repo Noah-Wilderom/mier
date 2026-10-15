@@ -1,0 +1,109 @@
+name: Publish completed release
+
+on:
+  workflow_call:
+    inputs:
+      release_tag:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+      commit:
+        required: true
+        type: string
+      base_run:
+        required: true
+        type: string
+      macos_run:
+        required: true
+        type: string
+    secrets:
+      UPDATER_PRIVATE_KEY:
+        required: true
+
+permissions:
+  contents: write
+  actions: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  publish:
+    name: Sign updates and attach release assets
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      actions: read
+    env:
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      APP_VERSION: ${{ inputs.version }}
+      RELEASE_COMMIT: ${{ inputs.commit }}
+      MIER_RELEASE_NOTES_FILE: dist/release-notes.md
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: release-darwin-*
+          path: dist
+          merge-multiple: true
+          run-id: ${{ inputs.macos_run }}
+          github-token: ${{ github.token }}
+      - name: Check notarization checkpoints before preparing publication
+        id: readiness
+        run: node scripts/release-context.mjs ready "$APP_VERSION" "$RELEASE_COMMIT"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: steps.readiness.outputs.ready == 'true'
+        with:
+          pattern: release-{linux,windows}-*
+          path: dist
+          merge-multiple: true
+          run-id: ${{ inputs.base_run }}
+          github-token: ${{ github.token }}
+      - uses: ./.github/actions/setup-desktop
+        if: steps.readiness.outputs.ready == 'true'
+      - name: Verify release tag and preserve its notes
+        if: steps.readiness.outputs.ready == 'true'
+        run: |
+          node scripts/release-context.mjs validate-tag "$RELEASE_TAG" "$RELEASE_COMMIT"
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json body --jq '.body' > "$MIER_RELEASE_NOTES_FILE"
+      - name: Sign and verify all six update archives
+        if: steps.readiness.outputs.ready == 'true'
+        env:
+          UPDATER_PRIVATE_KEY: ${{ secrets.UPDATER_PRIVATE_KEY }}
+        run: node scripts/release.mjs manifest "$RELEASE_TAG"
+      - name: Validate the AUR recipe with makepkg
+        if: steps.readiness.outputs.ready == 'true'
+        run: |
+          docker run --rm \
+            -v "$PWD/dist/aur:/recipe:ro" \
+            -v "$PWD/dist/installers:/downloads:ro" \
+            archlinux:base-devel@sha256:061679925e5d5028f2df9395d441ce6c4b9accf0157ff3486c06b6962e014ef1 \
+            bash -c '
+              set -e
+              useradd --create-home builder
+              install -d -o builder -g builder /tmp/mier-aur
+              cp /recipe/PKGBUILD /recipe/.SRCINFO /tmp/mier-aur/
+              cp /downloads/*.pkg.tar.zst /tmp/mier-aur/
+              chown -R builder:builder /tmp/mier-aur
+              cd /tmp/mier-aur
+              su builder -c "makepkg --printsrcinfo > generated.SRCINFO"
+              diff -u <(sed "s/^[[:space:]]*//" .SRCINFO | sort) <(sed "s/^[[:space:]]*//" generated.SRCINFO | sort)
+              su builder -c "makepkg --nodeps --noconfirm"
+            '
+      - name: Upload installers, update archives, and checksums
+        if: steps.readiness.outputs.ready == 'true'
+        run: gh release upload "$RELEASE_TAG" dist/updates/* dist/installers/* dist/SHA256SUMS --clobber --repo "$GITHUB_REPOSITORY"
+      - name: Publish the update feed after the downloads are available
+        if: steps.readiness.outputs.ready == 'true'
+        run: gh release upload "$RELEASE_TAG" dist/manifest.json --clobber --repo "$GITHUB_REPOSITORY"

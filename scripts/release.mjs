@@ -3,7 +3,8 @@ import { appendFileSync, copyFileSync, mkdirSync, readFileSync, readdirSync, rmS
 import { basename, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { packageMacOSRelease, validateMacOSCredentials, withMacOSSigning, withoutSigningSecrets } from './macos-sign.mjs';
+import { validateMacOSCredentials, withMacOSSigning, withoutSigningSecrets } from './macos-sign.mjs';
+import { advanceMacOSRelease } from './macos-notarization.mjs';
 
 export const targets = ['darwin-amd64', 'darwin-arm64', 'linux-amd64', 'linux-arm64', 'windows-amd64', 'windows-arm64'];
 const appName = 'mag-ik-een-review';
@@ -107,11 +108,19 @@ function packageTarget(platform, arch, version) {
     });
     copyFileSync(`bin/${appName}-${arch}-installer.exe`, `dist/installers/mier-${version}-windows-${arch}-setup.exe`);
   } else {
-    withMacOSSigning(signing => packageMacOSRelease({
-      appBundle: resolve('bin/' + appName + '.app'), archive,
-      dmg: resolve('dist/installers/mier-' + version + '-darwin-' + arch + '.dmg'), signing,
+    withMacOSSigning(signing => advanceMacOSRelease({
+      ...macOSReleasePaths(arch, version), appBundle: resolve('bin/' + appName + '.app'), signing,
     }));
   }
+}
+
+export function macOSReleasePaths(arch, version, commit = process.env.RELEASE_COMMIT, root = 'dist') {
+  const archive = archiveName(version, 'darwin', arch);
+  if (!/^[a-f0-9]{40}$/.test(commit || '')) throw new Error('Missing captured release commit.');
+  return {
+    arch, version, commit, checkpoint: resolve(root, 'notarization', 'darwin-' + arch, 'state.json'),
+    archive: resolve(root, 'updates', archive), dmg: resolve(root, 'installers', 'mier-' + version + '-darwin-' + arch + '.dmg'),
+  };
 }
 
 export function linuxPackageName(version, arch, format) {
@@ -243,7 +252,8 @@ function publishManifest(tag) {
   try {
     writeFileSync(privateKeyPath, privatePEM, { mode: 0o600 });
     const event = process.env.GITHUB_EVENT_PATH ? JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')) : {};
-    run('wails3', ['updater', 'manifest', '-version', version, '-channel', 'stable', '-name', `M.I.E.R. ${version}`, '-notes', event.release?.body || '', '-key', privateKeyPath, '-url-prefix', `https://github.com/${repository}/releases/download/${encodeURIComponent(tag)}/`, '-output', 'dist/manifest.json', 'dist/updates']);
+    const notes = process.env.MIER_RELEASE_NOTES_FILE ? readFileSync(process.env.MIER_RELEASE_NOTES_FILE, 'utf8') : event.release?.body || '';
+    run('wails3', ['updater', 'manifest', '-version', version, '-channel', 'stable', '-name', `M.I.E.R. ${version}`, '-notes', notes, '-key', privateKeyPath, '-url-prefix', `https://github.com/${repository}/releases/download/${encodeURIComponent(tag)}/`, '-output', 'dist/manifest.json', 'dist/updates']);
     run('wails3', ['updater', 'verify', '-manifest', 'dist/manifest.json', '-publickey', publicKeyPath, '-dir', 'dist/updates']);
     const files = ['updates', 'installers'].flatMap(dir => readdirSync(`dist/${dir}`).map(name => `dist/${dir}/${name}`)).sort();
     writeFileSync('dist/SHA256SUMS', files.map(file => `${createHash('sha256').update(readFileSync(file)).digest('hex')}  ${basename(file)}`).join('\n') + '\n');
@@ -261,6 +271,9 @@ function main(args) {
     console.log(`Release ${version} signing key matches the pinned public key.`);
   } else if (args[0] === 'package') {
     packageTarget(args[1], args[2], args[3]);
+  } else if (args[0] === 'resume-macos') {
+    if (process.platform !== 'darwin') throw new Error('Resuming macOS notarization requires a macOS runner.');
+    withMacOSSigning(signing => advanceMacOSRelease({ ...macOSReleasePaths(args[1], args[2]), signing }, true));
   } else if (args[0] === 'manifest') {
     publishManifest(args[1]);
   } else if (args[0] === 'linux-packages') {
@@ -271,7 +284,7 @@ function main(args) {
   } else if (args[0] === 'arch-package') {
     packageNativeLinux(args[1], args[2], 'archlinux', 'pkg.tar.zst');
   } else {
-    throw new Error('Usage: release.mjs validate TAG | package PLATFORM ARCH VERSION | linux-packages ARCH VERSION | aur TAG INSTALLERS OUTPUT | manifest TAG');
+    throw new Error('Usage: release.mjs validate TAG | package PLATFORM ARCH VERSION | resume-macos ARCH VERSION | linux-packages ARCH VERSION | aur TAG INSTALLERS OUTPUT | manifest TAG');
   }
 }
 

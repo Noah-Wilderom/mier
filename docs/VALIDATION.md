@@ -1,5 +1,13 @@
 # Validation record
 
+## Deferred Apple notarization without idle runners — 2026-10-15
+
+Replaced the long synchronous waits with durable `app`, `dmg`, and `ready` checkpoints. Initial jobs submit and query once, then save Actions artifacts and exit while Apple processes. A manual Resume release workflow restores those files on fresh Mac runners, reuses submission IDs, and avoids rebuilding Linux/Windows or installing Go/frontend dependencies. Publication uses the original non-Mac artifacts and current Mac checkpoints, and is blocked until both Mac targets are ready. No schedules or wait commands run. The old release run had already ended before this change: Intel succeeded and ARM remained pending after an hour.
+
+Regression coverage uses fresh temporary runner directories across both notarization phases; pending submissions, immediate acceptance, rejections, transient API failures, invalid archive paths, checksum/revision mismatches, and failures after DMG bytes change are exercised without uploads to Apple. Context tests reject foreign repositories, PR/unfinished runs, unrelated workflows, wrong release ancestry, and stale resume parents, and require both exact Mac artifacts before publication. Native ZIP/DMG and hardened runtime smoke checks remain in the macOS CI matrix. Apple account and certificate setup remains outside the repository.
+
+`node --test scripts/release*.test.mjs scripts/macos*.test.mjs` passed 42 cases on Linux with the one native macOS-only case skipped. Actionlint passed for all five workflows. A read-only GitHub tag lookup validated the existing release revision, and downloading the completed Intel artifact confirmed its `updates/` and `installers/` layout. These checks do not claim live acceptance of a new Apple submission or end-to-end publication through the new deferred workflow.
+
 ## Apple notarization queue handling — 2026-10-15
 
 The `v0.1.2-alpha.1` release run completed Developer ID signing for both macOS architectures but its combined upload/wait command timed out after 20 minutes. The timeout JSON contained a submission UUID and no rejection status. A regression reproduced the previous behavior: a pending response was treated as rejection. Packaging now submits once and waits on that ID, checking its status after timeouts and blocking publication unless Apple explicitly accepts it. Pending IDs are retained in the Actions summary; rejection logs are requested only for terminal rejections. A separate manual workflow reads existing submission statuses without uploading, importing a certificate, or publishing.

@@ -5,6 +5,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: release-${{ github.event.release.tag_name }}
@@ -21,6 +22,7 @@ jobs:
     outputs:
       version: ${{ steps.release.outputs.version }}
       commit: ${{ steps.release.outputs.commit }}
+      baseRun: ${{ steps.release.outputs.baseRun }}
     steps:
       - name: Check required signing secrets
         env:
@@ -72,7 +74,15 @@ jobs:
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
           node scripts/release.mjs validate "$RELEASE_TAG"
-          printf 'commit=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          node scripts/release-context.mjs create "$RELEASE_TAG" "$(git rev-parse HEAD)" "$GITHUB_RUN_ID" dist/release-context.json
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-context
+          path: dist/release-context.json
+          if-no-files-found: error
+          archive: true
+          retention-days: 7
 
   # Let GitHub append the matrix values to its default job name. A job skipped
   # before matrix expansion still has a readable name without raw expressions.
@@ -81,8 +91,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     # Preserve the Ubuntu 24.04 / glibc 2.39 release baseline on current hosts.
     container: ${{ matrix.platform == 'linux' && 'ubuntu:24.04@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55' || '' }}
-    # macOS notarizes the app and DMG separately, with a bounded hour for each.
-    timeout-minutes: ${{ matrix.platform == 'darwin' && 180 || 90 }}
+    # Only productive build/upload work runs on macOS; Apple processing is deferred.
+    timeout-minutes: ${{ matrix.platform == 'darwin' && 30 || 90 }}
     strategy:
       fail-fast: false
       matrix:
@@ -95,6 +105,7 @@ jobs:
           - { platform: windows, arch: arm64, runner: windows-11-vs2026-arm }
     env:
       APP_VERSION: ${{ needs.prepare.outputs.version }}
+      RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
       CGO_ENABLED: ${{ matrix.platform == 'windows' && '0' || '1' }}
     steps:
       - name: Bootstrap the Linux build container
@@ -111,7 +122,7 @@ jobs:
         working-directory: frontend
       - run: npm test
         working-directory: frontend
-      - run: node --test scripts/release.test.mjs scripts/macos-sign.test.mjs
+      - run: node --test scripts/release*.test.mjs scripts/macos*.test.mjs
       - name: Installer regression tests
         if: matrix.platform != 'windows'
         run: node --test scripts/install.test.mjs
@@ -130,7 +141,7 @@ jobs:
           TARGET_PLATFORM: ${{ matrix.platform }}
           TARGET_ARCH: ${{ matrix.arch }}
         run: node scripts/release.mjs package "$TARGET_PLATFORM" "$TARGET_ARCH" "$APP_VERSION"
-      - name: Sign and notarize macOS app and DMG
+      - name: Sign macOS app and advance notarization without waiting
         if: matrix.platform == 'darwin'
         env:
           TARGET_ARCH: ${{ matrix.arch }}
@@ -145,59 +156,30 @@ jobs:
         if: always() && matrix.platform == 'darwin'
         run: node scripts/macos-sign.mjs cleanup
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() && (success() || matrix.platform == 'darwin') }}
         with:
           name: release-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
             dist/updates/*
             dist/installers/*
+            dist/notarization/**
           if-no-files-found: error
           archive: true
+          compression-level: 0
           retention-days: 7
 
+
   publish:
-    name: Sign updates and attach release assets
     needs: [prepare, package]
-    runs-on: ubuntu-26.04
-    timeout-minutes: 20
     permissions:
       contents: write
-    env:
-      RELEASE_TAG: ${{ github.event.release.tag_name }}
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.prepare.outputs.commit }}
-          persist-credentials: false
-      - uses: ./.github/actions/setup-desktop
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          pattern: release-*
-          path: dist
-          merge-multiple: true
-      - name: Sign and verify all six update archives
-        env:
-          UPDATER_PRIVATE_KEY: ${{ secrets.UPDATER_PRIVATE_KEY }}
-        run: node scripts/release.mjs manifest "$RELEASE_TAG"
-      - name: Validate the AUR recipe with makepkg
-        run: |
-          docker run --rm \
-            -v "$PWD/dist/aur:/recipe:ro" \
-            -v "$PWD/dist/installers:/downloads:ro" \
-            archlinux:base-devel@sha256:061679925e5d5028f2df9395d441ce6c4b9accf0157ff3486c06b6962e014ef1 \
-            bash -c '
-              set -e
-              useradd --create-home builder
-              install -d -o builder -g builder /tmp/mier-aur
-              cp /recipe/PKGBUILD /recipe/.SRCINFO /tmp/mier-aur/
-              cp /downloads/*.pkg.tar.zst /tmp/mier-aur/
-              chown -R builder:builder /tmp/mier-aur
-              cd /tmp/mier-aur
-              su builder -c "makepkg --printsrcinfo > generated.SRCINFO"
-              diff -u <(sed "s/^[[:space:]]*//" .SRCINFO | sort) <(sed "s/^[[:space:]]*//" generated.SRCINFO | sort)
-              su builder -c "makepkg --nodeps --noconfirm"
-            '
-      - name: Upload installers, update archives, and checksums
-        run: gh release upload "$RELEASE_TAG" dist/updates/* dist/installers/* dist/SHA256SUMS --clobber --repo "$GITHUB_REPOSITORY"
-      - name: Publish the update feed after the downloads are available
-        run: gh release upload "$RELEASE_TAG" dist/manifest.json --clobber --repo "$GITHUB_REPOSITORY"
+      actions: read
+    uses: ./.github/workflows/publish-release.yml
+    with:
+      release_tag: ${{ github.event.release.tag_name }}
+      version: ${{ needs.prepare.outputs.version }}
+      commit: ${{ needs.prepare.outputs.commit }}
+      base_run: ${{ needs.prepare.outputs.baseRun }}
+      macos_run: ${{ github.run_id }}
+    secrets:
+      UPDATER_PRIVATE_KEY: ${{ secrets.UPDATER_PRIVATE_KEY }}

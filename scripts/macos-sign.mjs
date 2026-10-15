@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
-import { appendFileSync, chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -167,37 +167,32 @@ export function checkNotarizationStatus(ids, { env = process.env, tool = createM
   });
 }
 
-export function notarizeAndStaple(artifact, stapleTarget, signing) {
+export function submitNotarization(artifact, signing) {
   const { tool, keychain, profile, summaryPath } = signing;
   const authentication = ['--keychain-profile', profile, '--keychain', keychain];
   const result = tool('xcrun', ['notarytool', 'submit', artifact, ...authentication, '--output-format', 'json'],
     { allowFailure: true, timeout: 10 * 60_000 });
-  let response = notarizationResponse(result);
+  const response = notarizationResponse(result);
   if (!response) throw new Error('Could not submit ' + basename(artifact) + ' to Apple notarization: ' + (result.diagnostic || 'no valid submission response') + '.');
-  const id = response.id;
-  reportNotarization(id, 'Submitted ' + basename(artifact), summaryPath);
-  // A wait timeout does not cancel Apple's submission. Keep its ID and wait
-  // again; uploading the archive again would create another queued submission.
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const waiting = tool('xcrun', ['notarytool', 'wait', id, ...authentication,
-      '--timeout', '15m', '--output-format', 'json'], { allowFailure: true, timeout: 16 * 60_000 });
-    response = notarizationResponse(waiting, id);
-    if (!response || !notarizationStatuses.has(response.status)) response = readNotarizationStatus(id, tool, authentication);
-    reportNotarization(id, response.status, summaryPath);
-    if (response.status === 'Accepted') break;
-    if (response.status !== 'In Progress') {
-      const log = tool('xcrun', ['notarytool', 'log', id, ...authentication], { allowFailure: true });
-      console.error(log.diagnostic || log.stdout || log.stderr);
-      throw new Error('Apple rejected ' + basename(artifact) + ' (' + id + '): ' + response.status + '.');
-    }
-  }
+  reportNotarization(response.id, 'Submitted ' + basename(artifact), summaryPath);
+  return response.id;
+}
+
+export function completeNotarization(id, stapleTarget, signing) {
+  if (!submissionIDPattern.test(id)) throw new Error('Invalid Apple notarization submission UUID.');
+  const { tool, keychain, profile, summaryPath } = signing;
+  const authentication = ['--keychain-profile', profile, '--keychain', keychain];
+  const response = readNotarizationStatus(id, tool, authentication);
+  reportNotarization(id, response.status, summaryPath);
+  if (response.status === 'In Progress') return false;
   if (response.status !== 'Accepted') {
-    throw new Error('Apple notarization is still In Progress for ' + basename(artifact) + ' (' + id +
-      ') after four 15-minute waits. The submission has not been rejected; publication remains blocked. ' +
-      'Use the Apple notarization status workflow to check this existing ID.');
+    const log = tool('xcrun', ['notarytool', 'log', id, ...authentication], { allowFailure: true });
+    console.error(log.diagnostic || log.stdout || log.stderr);
+    throw new Error('Apple rejected ' + basename(stapleTarget) + ' (' + id + '): ' + response.status + '.');
   }
   tool('xcrun', ['stapler', 'staple', stapleTarget]);
   tool('xcrun', ['stapler', 'validate', stapleTarget]);
+  return true;
 }
 
 export function signMacOSApp(app, signing) {
@@ -223,49 +218,61 @@ export function verifyMacOSApp(app, signing, notarized = false) {
   }
 }
 
-export function packageMacOSRelease({ appBundle, archive, dmg, signing }) {
-  const { tool } = signing;
+export function stageMacOSApp(appBundle, signing) {
   const stage = join(signing.directory, 'stage');
   const app = join(stage, 'MIER.app');
-  const notarized = Boolean(signing.profile);
-  if (signing.identity !== '-' && (!notarized || !signing.teamID || !signing.keychain)) {
-    throw new Error('Developer ID release packaging requires a signing keychain, team ID, and notarization profile.');
-  }
-  rmSync(archive, { force: true });
-  rmSync(dmg, { force: true });
-  mkdirSync(stage);
+  mkdirSync(stage, { recursive: true });
   cpSync(appBundle, app, { recursive: true, dereference: false });
   signMacOSApp(app, signing);
-  if (notarized) {
-    const submission = join(signing.directory, 'app-notarization.zip');
-    tool('ditto', ['-c', '-k', '--keepParent', app, submission]);
-    notarizeAndStaple(submission, app, signing);
-    verifyMacOSApp(app, signing, true);
-  }
-  // Stapling adds a regular file to the bundle. This ZIP preserves modes and
-  // symlinks without __MACOSX sidecars, as required by Wails' app extractor.
-  tool('zip', ['-q', '-r', '-y', resolve(archive), 'MIER.app'], { cwd: stage, env: { COPYFILE_DISABLE: '1' } });
-  const extracted = join(signing.directory, 'extracted');
-  mkdirSync(extracted);
+  return app;
+}
+
+export function writeMacOSArchive(app, archive, signing, notarized = false) {
+  const { tool } = signing;
+  rmSync(archive, { force: true });
+  mkdirSync(resolve(archive, '..'), { recursive: true });
+  // Preserve modes and symlinks without __MACOSX sidecars for Wails' extractor.
+  tool('zip', ['-q', '-r', '-y', resolve(archive), 'MIER.app'], { cwd: resolve(app, '..'), env: { COPYFILE_DISABLE: '1' } });
+  const extracted = mkdtempSync(join(signing.directory, 'extracted-'));
   tool('ditto', ['-x', '-k', resolve(archive), extracted]);
   const entries = readdirSync(extracted);
   if (entries.length !== 1 || entries[0] !== 'MIER.app') throw new Error('The macOS updater ZIP must contain exactly one MIER.app bundle.');
   verifyMacOSApp(join(extracted, 'MIER.app'), signing, notarized);
-  symlinkSync('/Applications', join(stage, 'Applications'));
+}
+
+export function createMacOSDMG(app, dmg, signing) {
+  const { tool } = signing;
+  const stage = resolve(app, '..');
+  rmSync(dmg, { force: true });
+  mkdirSync(resolve(dmg, '..'), { recursive: true });
+  tool('ln', ['-s', '/Applications', join(stage, 'Applications')]);
   tool('hdiutil', ['create', '-volname', 'M.I.E.R.', '-srcfolder', stage, '-format', 'UDZO', '-ov', resolve(dmg)]);
   tool('codesign', ['--force', '--sign', signing.identity, ...(signing.keychain ? ['--keychain', signing.keychain] : []),
     signing.identity === '-' ? '--timestamp=none' : '--timestamp', resolve(dmg)]);
   tool('codesign', ['--verify', '--strict', '--verbose=2', resolve(dmg)]);
+}
+
+export function verifyMacOSDMG(dmg, signing, notarized = false) {
+  const { tool } = signing;
+  tool('codesign', ['--verify', '--strict', '--verbose=2', resolve(dmg)]);
   if (notarized) {
-    notarizeAndStaple(resolve(dmg), resolve(dmg), signing);
+    tool('xcrun', ['stapler', 'validate', resolve(dmg)]);
     tool('spctl', ['--assess', '--type', 'open', '--context', 'context:primary-signature', '--verbose=2', resolve(dmg)]);
   }
   tool('hdiutil', ['verify', resolve(dmg)]);
-  const mount = join(signing.directory, 'mounted');
-  mkdirSync(mount);
+  const mount = mkdtempSync(join(signing.directory, 'mounted-'));
   tool('hdiutil', ['attach', '-readonly', '-nobrowse', '-mountpoint', mount, resolve(dmg)]);
   try { verifyMacOSApp(join(mount, 'MIER.app'), signing, notarized); }
   finally { tool('hdiutil', ['detach', mount]); }
+}
+
+// Used for the credential-free native CI smoke check. Releases use checkpoints.
+export function packageMacOSRelease({ appBundle, archive, dmg, signing }) {
+  if (signing.identity !== '-') throw new Error('Developer ID release packaging requires resumable notarization checkpoints.');
+  const app = stageMacOSApp(appBundle, signing);
+  writeMacOSArchive(app, archive, signing);
+  createMacOSDMG(app, dmg, signing);
+  verifyMacOSDMG(dmg, signing);
 }
 
 async function smokeTest(appBundle) {
@@ -274,7 +281,8 @@ async function smokeTest(appBundle) {
     const signing = { identity: '-', directory, tool: createMacOSTool() };
     packageMacOSRelease({ appBundle, archive: join(directory, 'update.zip'), dmg: join(directory, 'installer.dmg'), signing });
     // Exercise the real Wails executable with hardened runtime on each Mac CPU.
-    const executable = join(directory, 'extracted/MIER.app/Contents/MacOS/mag-ik-een-review');
+    const extracted = readdirSync(directory).find(name => name.startsWith('extracted-'));
+    const executable = join(directory, extracted, 'MIER.app/Contents/MacOS/mag-ik-een-review');
     const child = spawn(executable, [], { env: withoutSigningSecrets(process.env), stdio: ['ignore', 'pipe', 'pipe'] });
     let output = '';
     const capture = chunk => { output = (output + chunk).slice(-65536); };
