@@ -129,6 +129,11 @@ export interface PullRequestPage {
     "resultLimit": number;
 }
 
+export interface PullRequestStack {
+    "nodes": StackNode[] | null;
+    "warnings": string[] | null;
+}
+
 export interface PullRequestSummary {
     "number": number;
     "nodeId": string;
@@ -159,6 +164,12 @@ export interface PullRequestSummary {
     "warnings": string[] | null;
 }
 
+export interface RetargetRequest {
+    "base": string;
+    "expectedBase": string;
+    "expectedHead": string;
+}
+
 export interface Review {
     "id": number;
     "nodeId": string;
@@ -183,6 +194,19 @@ export interface ReviewRequest {
     "body": string;
     "commitId": string;
     "comments": ReviewCommentRequest[] | null;
+}
+
+export interface StackNode {
+    "number": number;
+    "title": string;
+    "head": string;
+    "base": string;
+    "headSha": string;
+    "baseSha": string;
+    "url": string;
+    "status": string;
+    "parents": number[] | null;
+    "depth": number;
 }
 
 export interface Thread {

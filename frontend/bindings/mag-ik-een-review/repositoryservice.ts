@@ -38,6 +38,10 @@ export function BranchCommits(path: string, branch: string, expectedTip: string)
     return $Call.ByID(2260958381, path, branch, expectedTip);
 }
 
+export function BranchStacks(path: string): $CancellablePromise<gitclient$0.BranchStacks> {
+    return $Call.ByID(953718964, path);
+}
+
 export function Checkout(path: string, branch: string): $CancellablePromise<void> {
     return $Call.ByID(2509728233, path, branch);
 }
@@ -158,6 +162,10 @@ export function MutateRemote(path: string, request: gitclient$0.RemoteRequest): 
     return $Call.ByID(3227306969, path, request);
 }
 
+export function MutateStackBranch(path: string, request: gitclient$0.StackBranchRequest): $CancellablePromise<void> {
+    return $Call.ByID(2247877861, path, request);
+}
+
 export function MutateStash(path: string, request: gitclient$0.StashRequest): $CancellablePromise<void> {
     return $Call.ByID(3980221788, path, request);
 }
@@ -194,12 +202,20 @@ export function PreviewRebase(path: string, request: gitclient$0.RebasePreviewRe
     return $Call.ByID(954628067, path, request);
 }
 
+export function PreviewStackPush(path: string, request: gitclient$0.StackPushRequest): $CancellablePromise<gitclient$0.StackPushPreview> {
+    return $Call.ByID(1103291609, path, request);
+}
+
 export function Pull(path: string, remote: string): $CancellablePromise<void> {
     return $Call.ByID(3095647214, path, remote);
 }
 
 export function Push(path: string, remote: string): $CancellablePromise<void> {
     return $Call.ByID(3195577453, path, remote);
+}
+
+export function PushStackBranch(path: string, request: gitclient$0.StackPushRequest): $CancellablePromise<void> {
+    return $Call.ByID(2763482327, path, request);
 }
 
 export function Rebase(path: string, request: gitclient$0.RebaseRequest): $CancellablePromise<gitclient$0.OperationResult> {
@@ -252,6 +268,10 @@ export function SigningConfig(path: string): $CancellablePromise<gitclient$0.Sig
 
 export function Snapshot(path: string): $CancellablePromise<$models.RepositorySnapshot> {
     return $Call.ByID(2799497533, path);
+}
+
+export function StackForkPoint(path: string, parent: string): $CancellablePromise<string> {
+    return $Call.ByID(177358475, path, parent);
 }
 
 export function Stage(path: string, files: string[] | null): $CancellablePromise<void> {

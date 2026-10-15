@@ -21,7 +21,7 @@ An unchecked item is planned, not a supported capability. AI additions come last
 - [x] Patch import and export
 - [x] Gitflow and bisect
 - [x] Terminal and custom commands
-- [ ] Stacked pull requests
+- [x] Stacked pull requests
 - [ ] GitLab, Bitbucket, and Azure DevOps review providers
 - [ ] AI commit / PR writing and branch explanations (last)
 - [ ] Coding-agent worktrees (last)

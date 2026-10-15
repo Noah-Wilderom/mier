@@ -35,7 +35,7 @@ func TestBisectFindsFirstBadAndRestoresBranch(t *testing.T) {
 		if result.Operation == nil || result.Operation.Kind != "bisect" {
 			t.Fatal(result)
 		}
-		if strings.Contains(result.Operation.Message, "# first bad commit:") {
+		if result.Operation.BisectDone {
 			break
 		}
 		data, _ := os.ReadFile(filepath.Join(root, "probe.txt"))
@@ -52,8 +52,8 @@ func TestBisectFindsFirstBadAndRestoresBranch(t *testing.T) {
 			t.Fatal("stale mark accepted")
 		}
 	}
-	if result.Operation == nil || !strings.Contains(result.Operation.Message, "# first bad commit: ["+firstBad+"]") {
-		t.Fatal(result)
+	if result.Operation == nil || result.Operation.BisectResult != firstBad || result.HeadSHA != firstBad {
+		t.Fatalf("Unexpected bisect result: %+v, operation=%+v", result, result.Operation)
 	}
 	result, err = c.Bisect(ctx, root, BisectRequest{Action: "reset", Token: result.Operation.Token})
 	if err != nil || result.Operation != nil || result.HeadSHA != head {
@@ -61,6 +61,17 @@ func TestBisectFindsFirstBadAndRestoresBranch(t *testing.T) {
 	}
 	if state := snapshot(t, c, root); state.CurrentBranch != "main" || state.Detached {
 		t.Fatal(state)
+	}
+}
+func TestBisectLogSupportsOldAndNewGitAndCustomTerms(t *testing.T) {
+	sha := strings.Repeat("a", 40)
+	for _, term := range []string{"bad", "'bad'", "'new'", "'slow'"} {
+		if got := bisectResult("# bad: [other]\n# first " + term + " commit: [" + sha + "] Failure\n"); got != sha {
+			t.Fatal(term, got)
+		}
+	}
+	if got := bisectResult("# possible first 'bad' commit: [" + sha + "] Maybe"); got != "" {
+		t.Fatal("ambiguous result marked as exact", got)
 	}
 }
 func TestBisectPreservesDirtyTestEdits(t *testing.T) {

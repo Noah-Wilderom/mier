@@ -49,3 +49,5 @@
 .conflict-result-heading,.conflict-navigation { flex-wrap:wrap; }.conflict-shortcuts { color:var(--muted); font-size:11px; }
 @media(max-width:1000px) { .conflict-sources header { flex-wrap:wrap; } .conflict-sources header .btn { padding:4px 7px; } .conflict-heading { flex-wrap:wrap; } .conflict-result-heading { flex-wrap:wrap; } }
 .repository-tools { grid-column:2; grid-row:2; min-width:0; }
+
+.git-output { max-height: 260px; overflow: auto; padding: 12px; border: 1px solid var(--border); background: var(--surface); font-size: 12px; line-height: 1.6; white-space: pre; tab-size: 4; }

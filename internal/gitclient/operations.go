@@ -25,6 +25,8 @@ type Operation struct {
 	CanSkip       bool   `json:"canSkip"`
 	Empty         bool   `json:"empty"`
 	PausedForEdit bool   `json:"pausedForEdit,omitempty"`
+	BisectDone    bool   `json:"bisectDone,omitempty"`
+	BisectResult  string `json:"bisectResult,omitempty"`
 }
 
 type OperationResult struct {
@@ -125,6 +127,8 @@ func (c *Client) operation(ctx context.Context, root string, status RepositorySn
 		}
 		op.SourceLabel = "Test commit " + shortSHA(op.SourceSHA)
 		op.Message = read("BISECT_LOG")
+		op.BisectResult = bisectResult(op.Message)
+		op.BisectDone = op.BisectResult != "" || strings.Contains(op.Message, "# only skipped commits left to test")
 		op.CurrentLabel = read("BISECT_START")
 		identity = op.Message + "\x00" + op.CurrentLabel
 	default:
@@ -341,6 +345,11 @@ func (c *Client) ControlOperation(ctx context.Context, path, token, action strin
 			return err
 		}
 		if op.Kind == "rebase" && result.Operation == nil && planPath != "" {
+			if commandErr == nil && action != "abort" {
+				if err = c.finishSavedStackRebase(ctx, root, planPath); err != nil {
+					return err
+				}
+			}
 			_ = os.Remove(planPath)
 		}
 		// A new conflict in a sequenced operation is returned for immediate review.

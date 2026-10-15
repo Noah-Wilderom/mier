@@ -37,6 +37,10 @@ export function GetPullRequest(host: string, owner: string, repo: string, $numbe
     return $Call.ByID(2856222730, host, owner, repo, $number);
 }
 
+export function GetPullRequestStack(host: string, owner: string, repo: string, $number: number): $CancellablePromise<githubclient$0.PullRequestStack> {
+    return $Call.ByID(443589082, host, owner, repo, $number);
+}
+
 export function GetWorkflowDispatch(host: string, owner: string, repo: string, id: number, reference: string): $CancellablePromise<githubclient$0.WorkflowDispatch> {
     return $Call.ByID(3781403989, host, owner, repo, id, reference);
 }
@@ -87,6 +91,10 @@ export function RequestReviewers(host: string, owner: string, repo: string, $num
 
 export function ResolveThread(host: string, threadID: string, resolved: boolean): $CancellablePromise<void> {
     return $Call.ByID(3626316678, host, threadID, resolved);
+}
+
+export function RetargetPullRequest(host: string, owner: string, repo: string, $number: number, request: githubclient$0.RetargetRequest): $CancellablePromise<githubclient$0.PullRequestSummary> {
+    return $Call.ByID(2341071134, host, owner, repo, $number, request);
 }
 
 export function SetAssignees(host: string, owner: string, repo: string, $number: number, assignees: string[] | null): $CancellablePromise<void> {

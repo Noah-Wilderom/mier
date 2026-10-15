@@ -45,6 +45,11 @@ export interface Branch {
     "commitSha": string;
 }
 
+export interface BranchStacks {
+    "branches": StackBranch[] | null;
+    "token": string;
+}
+
 export interface ChangedFile {
     "path": string;
     "status": string;
@@ -294,6 +299,8 @@ export interface Operation {
     "canSkip": boolean;
     "empty": boolean;
     "pausedForEdit"?: boolean;
+    "bisectDone"?: boolean;
+    "bisectResult"?: string;
 }
 
 export interface OperationResult {
@@ -327,6 +334,7 @@ export interface RebaseRequest {
     "preview": RebasePreviewRequest;
     "token": string;
     "steps": RebaseStep[] | null;
+    "stackToken"?: string;
 }
 
 export interface RebaseStep {
@@ -419,6 +427,44 @@ export interface SigningConfig {
     "enabled": boolean;
     "format": string;
     "key": string;
+}
+
+export interface StackBranch {
+    "name": string;
+    "sha": string;
+    "parent": string;
+    "parentSha": string;
+    "baseSha": string;
+    "current": boolean;
+    "needsRestack": boolean;
+    "error": string;
+}
+
+export interface StackBranchRequest {
+    "action": string;
+    "name": string;
+    "parent": string;
+    "baseSha": string;
+    "expectedHead": string;
+    "expectedBranch": string;
+    "token": string;
+}
+
+export interface StackPushPreview {
+    "branch": string;
+    "localSha": string;
+    "remoteSha": string;
+    "url": string;
+    "rewrites": boolean;
+    "token": string;
+}
+
+export interface StackPushRequest {
+    "branch": string;
+    "remote": string;
+    "expectedHead": string;
+    "expectedBranch": string;
+    "token": string;
 }
 
 export interface StageHunkRequest {

@@ -9,6 +9,8 @@ export interface GitOperation {
   canSkip: boolean
   empty?: boolean
   pausedForEdit?:boolean
+  bisectDone?:boolean
+  bisectResult?:string
 }
 export interface GitOperationResult { headSha: string; operation?: GitOperation }
 export interface ConflictVersion { exists: boolean; sha: string; mode: string; content: string; binary: boolean }
@@ -44,8 +46,11 @@ export type GitMutation =
   | { kind:'gitflow';request:import('./repositoryToolTypes').FlowRequest }
   | { kind:'bisect';request:import('./repositoryToolTypes').BisectRequest }
   | { kind:'custom-command';id:string }
+  | { kind:'stack-branch';request:import('./repositoryToolTypes').StackBranchRequest }
+  | { kind:'stack-push';request:import('./repositoryToolTypes').StackPushRequest }
   | { kind: 'continue' | 'abort' | 'skip'; token: string }
 export const operationLabel = (kind: GitOperation['kind']) => ({ merge: 'Merge', 'cherry-pick': 'Cherry-pick', rebase: 'Rebase', revert: 'Revert', am: 'Apply patches',bisect:'Bisect' })[kind]
+export const bisectFinished=(operation:Pick<GitOperation,'message'|'bisectDone'>)=>operation.bisectDone??(/^# (?:first (?:'[^'\r\n]+'|[^\s]+) commit:|only skipped commits left to test)/m.test(operation.message))
 
 export interface ConflictChunk { before: string; current: string; incoming: string; base?: string; start: number; end: number }
 // Offsets retain CRLF and the last line's newline. Both regular and diff3/zdiff3

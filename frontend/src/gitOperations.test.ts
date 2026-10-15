@@ -1,6 +1,13 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { conflictChunks, containsConflictMarkers, resolveChunk } from './gitOperations.ts'
+import { bisectFinished, conflictChunks, containsConflictMarkers, resolveChunk } from './gitOperations.ts'
+
+test('bisect completion handles old Git, quoted terms, ambiguous results, and structured state',()=>{
+ for(const term of ['bad',"'bad'","'slow'"])assert.equal(bisectFinished({message:`# first ${term} commit: [${'a'.repeat(40)}] Failure`}),true)
+ assert.equal(bisectFinished({message:"# possible first 'bad' commit: [sha] Maybe"}),false)
+ assert.equal(bisectFinished({message:'# only skipped commits left to test'}),true)
+ assert.equal(bisectFinished({message:'',bisectDone:true}),true)
+})
 
 test('conflict choices preserve surrounding code, multiple sections, and CRLF',()=>{
   const source='before\r\n<<<<<<< HEAD\r\ncurrent\r\n=======\r\nincoming\r\n>>>>>>> feature\r\nafter\r\n<<<<<<< HEAD\r\nleft\r\n=======\r\nright\r\n>>>>>>> feature'

@@ -611,6 +611,8 @@ export const services = {
     listAccounts: async () => (await invoke<Account[] | null>("main.CredentialService.ListAccounts")) ?? [],
   },
   github: {
+    stack:(host:string,owner:string,repo:string,number:number)=>invoke<import('./repositoryToolTypes').PullRequestStack>('main.GitHubService.GetPullRequestStack',host,owner,repo,number),
+    retarget:(host:string,owner:string,repo:string,number:number,request:{base:string;expectedBase:string;expectedHead:string})=>invoke<PullRequestSummary>('main.GitHubService.RetargetPullRequest',host,owner,repo,number,request),
     getCommitDiff: (host: string, owner: string, repo: string, sha: string) => invoke<{sha:string; files:GitHubChangedFile[]; warnings:string[]}>("main.GitHubService.GetCommitDiff", host, owner, repo, sha),
     listPullRequests: async (host: string, owner: string, repo: string, state: "open" | "closed" | "all" = "open") => (await invoke<PullRequestSummary[] | null>("main.GitHubService.ListPullRequests", host, owner, repo, state)) ?? [],
     listPullRequestsPage: (host: string, owner: string, repo: string, request: PullRequestPageRequest) => invoke<PullRequestPage>("main.GitHubService.ListPullRequestsPage", host, owner, repo, request),
@@ -630,6 +632,11 @@ export const services = {
     setLabels: async (host: string, owner: string, repo: string, number: number, labels: string[]) => (await invoke<string[] | null>("main.GitHubService.SetLabels", host, owner, repo, number, labels)) ?? [],
   },
   repository: {
+    branchStacks:(root:string)=>invoke<import('./repositoryToolTypes').BranchStacks>('main.RepositoryService.BranchStacks',root),
+    stackForkPoint:(root:string,parent:string)=>invoke<string>('main.RepositoryService.StackForkPoint',root,parent),
+    mutateStackBranch:(root:string,request:import('./repositoryToolTypes').StackBranchRequest)=>invoke<void>('main.RepositoryService.MutateStackBranch',root,request),
+    previewStackPush:(root:string,request:import('./repositoryToolTypes').StackPushRequest)=>invoke<import('./repositoryToolTypes').StackPushPreview>('main.RepositoryService.PreviewStackPush',root,request),
+    pushStackBranch:(root:string,request:import('./repositoryToolTypes').StackPushRequest)=>invoke<void>('main.RepositoryService.PushStackBranch',root,request),
     flow:(root:string)=>invoke<import('./repositoryToolTypes').FlowState>('main.RepositoryService.Flow',root),
     mutateFlow:(root:string,request:import('./repositoryToolTypes').FlowRequest)=>invoke<import('./gitOperations').GitOperationResult>('main.RepositoryService.MutateFlow',root,request),
     bisect:(root:string,request:import('./repositoryToolTypes').BisectRequest)=>invoke<import('./gitOperations').GitOperationResult>('main.RepositoryService.Bisect',root,request),

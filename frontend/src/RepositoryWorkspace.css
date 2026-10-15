@@ -58,3 +58,5 @@
   .repository-tracking { display: none; }
   .repository-toolbar-row .btn { font-size: 11px; padding-inline: 7px; }
 }
+
+.history-workspace .section-intro { flex-wrap: wrap; }.history-workspace .workspace-toolbar { flex-wrap: wrap; }.repository-toolbar-row { flex-wrap: wrap; }

@@ -5,6 +5,7 @@ import type { ApplyPatchRequest, ExportPatchRequest, LFSLock, LFSRequest, LFSSta
 import GitflowPanel from './GitflowPanel'
 import BisectPanel from './BisectPanel'
 import CommandPanel from './CommandPanel'
+import BranchStackPanel from './BranchStackPanel'
 
 export interface AdvancedPanelProps { repository:RepositorySnapshot;busy:boolean;reload:number;run:(mutation:GitMutation)=>Promise<boolean>;task:<T>(work:()=>Promise<T>)=>Promise<T|undefined>;onOpen?:(path:string)=>void }
 export default function AdvancedGitPanel({repository,locked,onOperate,onPaused,onOpen}:{repository:RepositorySnapshot;locked:boolean;onOperate:(mutation:GitMutation)=>Promise<unknown>;onPaused:()=>void;onOpen?:(path:string)=>void}){
@@ -13,7 +14,7 @@ export default function AdvancedGitPanel({repository,locked,onOperate,onPaused,o
  const task=async<T,>(work:()=>Promise<T>):Promise<T|undefined>=>{if(busy||guard.current)return;guard.current=true;setPending(true);setError('');try{return await work()}catch(issue){setError(issue instanceof Error?issue.message:String(issue));return undefined}finally{guard.current=false;setPending(false)}}
  const run=async(mutation:GitMutation)=>{const result=await task(async()=>{const result=await onOperate(mutation);setReload(n=>n+1);if((result as GitOperationResult|undefined)?.operation)onPaused();return true});return result===true}
  const props:AdvancedPanelProps={repository,busy,reload,run,task,onOpen}
- return <><div className="repository-tool-form"><label>Git tool<select value={tool} disabled={busy} onChange={e=>{setTool(e.target.value);setError('')}}><option value="patches">Patch import & export</option><option value="submodules">Submodules</option><option value="lfs">Git LFS</option><option value="gitflow">Gitflow</option><option value="bisect">Bisect</option><option value="commands">Terminal & custom commands</option></select></label></div>{tool==='patches'?<PatchPanel {...props}/>:tool==='submodules'?<SubmodulePanel {...props}/>:tool==='gitflow'?<GitflowPanel {...props}/>:tool==='bisect'?<BisectPanel {...props}/>:tool==='commands'?<CommandPanel {...props}/>:<LFSPanel {...props}/ >}{error&&<p role="alert" className="git-operation-error">{error}</p>}</>
+ return <><div className="repository-tool-form"><label>Git tool<select value={tool} disabled={busy} onChange={e=>{setTool(e.target.value);setError('')}}><option value="patches">Patch import & export</option><option value="submodules">Submodules</option><option value="lfs">Git LFS</option><option value="gitflow">Gitflow</option><option value="bisect">Bisect</option><option value="commands">Terminal & custom commands</option><option value="stacks">Branch stacks</option></select></label></div>{tool==='patches'?<PatchPanel {...props}/>:tool==='submodules'?<SubmodulePanel {...props}/>:tool==='gitflow'?<GitflowPanel {...props}/>:tool==='bisect'?<BisectPanel {...props}/>:tool==='commands'?<CommandPanel {...props}/>:tool==='stacks'?<BranchStackPanel {...props}/>:<LFSPanel {...props}/ >}{error&&<p role="alert" className="git-operation-error">{error}</p>}</>
 }
 
 function PatchPanel({repository,busy,run,task}:AdvancedPanelProps){

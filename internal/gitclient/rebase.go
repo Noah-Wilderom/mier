@@ -32,15 +32,20 @@ type RebaseStep struct {
 	Message string `json:"message"`
 }
 type RebaseRequest struct {
-	Preview RebasePreviewRequest `json:"preview"`
-	Token   string               `json:"token"`
-	Steps   []RebaseStep         `json:"steps"`
+	Preview    RebasePreviewRequest `json:"preview"`
+	Token      string               `json:"token"`
+	Steps      []RebaseStep         `json:"steps"`
+	StackToken string               `json:"stackToken,omitempty"`
 }
 type rebaseEditorPlan struct {
-	GitDir   string
-	Todo     string
-	Messages map[string]string
-	Actions  map[string]string
+	GitDir       string
+	Todo         string
+	Messages     map[string]string
+	Actions      map[string]string
+	StackBranch  string
+	StackParent  string
+	StackOldBase string
+	StackNewBase string
 }
 
 func (c *Client) rebasePreview(ctx context.Context, root string, request RebasePreviewRequest) (RebasePreview, error) {
@@ -190,7 +195,14 @@ func (c *Client) Rebase(ctx context.Context, path string, request RebaseRequest)
 			return errors.New("The rebase preview changed. Preview again")
 		}
 		plan, err := buildRebasePlan(preview, request.Steps)
+		if len(preview.Commits) == 0 && len(request.Steps) == 0 && request.StackToken != "" {
+			plan = rebaseEditorPlan{Todo: "noop\n", Messages: map[string]string{}, Actions: map[string]string{}}
+			err = nil
+		}
 		if err != nil {
+			return err
+		}
+		if err = c.validateStackRebase(ctx, root, request, &plan); err != nil {
 			return err
 		}
 		if err = c.protectResetPaths(ctx, root, preview.Head, preview.Onto); err != nil {
@@ -244,6 +256,8 @@ func (c *Client) Rebase(ctx context.Context, path string, request RebaseRequest)
 			keepPlan = true
 		} else if commandErr != nil {
 			return commandErr
+		} else if err = c.finishStackRebase(ctx, root, plan); err != nil {
+			return err
 		}
 		return nil
 	})

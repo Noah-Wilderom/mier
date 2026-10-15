@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -15,6 +16,16 @@ type BisectRequest struct {
 	ExpectedHead   string `json:"expectedHead"`
 	ExpectedBranch string `json:"expectedBranch"`
 	Token          string `json:"token"`
+}
+
+var bisectResultLine = regexp.MustCompile(`(?m)^# first (?:'[^'\r\n]+'|[^\s]+) commit: \[([a-f0-9]{40}|[a-f0-9]{64})\]`)
+
+func bisectResult(log string) string {
+	match := bisectResultLine.FindStringSubmatch(log)
+	if len(match) > 1 {
+		return match[1]
+	}
+	return ""
 }
 
 func (c *Client) bisect(ctx context.Context, root string, request BisectRequest) (OperationResult, error) {
@@ -56,7 +67,7 @@ func (c *Client) bisect(ctx context.Context, root string, request BisectRequest)
 			return OperationResult{}, errors.New("Choose good, bad, skip, check out, or end bisect")
 		}
 		if request.Action != "checkout" {
-			if strings.Contains(op.Message, "# first bad commit:") || strings.Contains(op.Message, "# only skipped commits left to test") {
+			if op.BisectDone {
 				return OperationResult{}, errors.New("Bisection has finished. Review its log and end the session")
 			}
 			if op.SourceSHA != state.HeadSHA {
@@ -70,6 +81,19 @@ func (c *Client) bisect(ctx context.Context, root string, request BisectRequest)
 			if err != nil && !isExitCode(err, 2) {
 				return OperationResult{}, err
 			}
+		}
+	}
+	state, err = c.status(ctx, root)
+	if err != nil {
+		return OperationResult{}, err
+	}
+	next, err := c.operation(ctx, root, state)
+	if err != nil {
+		return OperationResult{}, err
+	}
+	if next != nil && next.BisectResult != "" {
+		if _, err = c.run(ctx, root, c.options.LocalTimeout, "update-ref", "BISECT_HEAD", next.BisectResult); err != nil {
+			return OperationResult{}, err
 		}
 	}
 	candidate, err := c.run(ctx, root, c.options.LocalTimeout, "rev-parse", "--verify", "BISECT_HEAD^{commit}")

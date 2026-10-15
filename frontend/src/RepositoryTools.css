@@ -5,7 +5,6 @@
 .repository-tool-dialog > nav > button.selected { border-bottom-color: var(--accent); color: var(--text); }
 .repository-tool-panel { padding: 20px; overflow: auto; flex: 1; min-height: 0; }
 .repository-tool-panel > h3 { margin: 0 0 14px; }.repository-tool-panel p { font-size: 12px; line-height: 1.6; }
-.git-output { max-height: 260px; overflow: auto; padding: 12px; border: 1px solid var(--border); background: var(--surface); font-size: 12px; line-height: 1.6; white-space: pre; tab-size: 4; }
 .repository-tool-form, .repository-tool-confirm { display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding-bottom: 18px; }
 .repository-tool-confirm { padding: 14px; border: 1px solid var(--border); margin: 12px 0; background: var(--panel); }
 .repository-tool-form label,.repository-tool-confirm label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; }
@@ -17,6 +16,4 @@
 .repository-tool-row > div:first-child { flex: 1; min-width: 120px; display: flex; flex-direction: column; gap: 5px; overflow-wrap: anywhere; }
 .repository-tool-row > div > span { color: var(--muted); }
 .repository-tool-dialog > .git-operation-error { margin: 0; padding: 12px 20px; border-top: 1px solid var(--border); font-size: 12px; }
-.signature-result { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
-.history-workspace .section-intro { flex-wrap: wrap; }.history-workspace .workspace-toolbar { flex-wrap: wrap; }.repository-toolbar-row { flex-wrap: wrap; }
 .rebase-plan { padding-left: 0; list-style-position: inside; }.rebase-plan li { border: 1px solid var(--border); padding: 12px; margin: 8px 0; }.rebase-step-heading { display: flex; align-items: center; gap: 10px; }.rebase-step-heading > div { display: flex; flex: 1; flex-direction: column; gap: 5px; min-width: 0; }.rebase-step-heading code { color: var(--muted); font-size: 11px; }.rebase-plan label { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; font-size: 12px; }.rebase-dropped .rebase-step-heading strong { text-decoration: line-through; color: var(--muted); }

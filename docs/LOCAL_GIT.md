@@ -90,6 +90,14 @@ Finishing first saves a reviewable plan. Features merge into development. Releas
 
 Custom commands are stored privately on this device, outside the repository. Save an executable, a JSON array of arguments, and a timeout (1–900 seconds); saving never runs it. **Run** executes the selected definition against the displayed checkout, with live stdout/stderr and **Cancel command**. App Git mutations are serialized while it runs, and repository status refreshes when it finishes or fails. Each output stream displays up to 512 KiB without stopping the process when the display limit is reached. Commands inherit the user's environment and permissions; shell syntax requires explicitly choosing a shell executable. They are never loaded or run automatically from repository configuration.
 
+## Stacked branches and pull requests
+
+**Repository tools → Advanced → Branch stacks** creates a child at the current branch's exact tip and records its parent/fork point in local Git configuration. Existing branches can be linked with a reviewed fork point; cycles are rejected. Each branch is restacked separately, parent first. Preview lists only commits after the saved fork point. Restack uses the real rebase sequencer, checkpoints, conflict editor, and abort/continue. Successful completion records the new fork point, including after a conflict pause; abort keeps the original one. An empty child can move to its updated parent. Merge-topology ranges use an external client, as in the normal rebase tool.
+
+Publishing is separate. **Preview publishing** reads the configured push destination's current branch. A rewrite requires explicit acknowledgement. **Publish with lease** pins both the local commit and remote commit (or absence of a remote branch); changed previews are rejected and Git's exact lease protects the final push. This never performs an unconditional force push. Original remote commits already present locally are checkpointed before replacement.
+
+In a GitHub PR, expand **PR stack** to navigate related PRs as separate closable tabs. Relationships match base/head branches and repository identities, including recently closed/merged parents; matching branch names in unrelated forks are excluded. Ambiguous parents/cycles are shown as warnings. Discovery loads up to the 1,000 most recently updated PRs and reports truncation. To create a stacked PR, select its parent's published head as the base in the normal creation form. Changing a PR's base requires a preview and checks the reviewed head/base before the request; draft review comments must first be submitted or removed.
+
 ## Resolve conflicts
 
 An operation bar appears for merges, cherry-picks, rebases, reverts and patch application, including operations started in another client. Choose **Resolve conflicts** to open Changes.

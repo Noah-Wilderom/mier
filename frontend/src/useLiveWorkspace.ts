@@ -246,6 +246,7 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
     },epoch)
   },[perform,saveDraft,setItems])
   const acceptNewCommits=useCallback(async()=>{const epoch=activeEpoch.current,number=selectedRef.current;return perform(async()=>{await loadDetail(number,true);if(epoch===activeEpoch.current)notify('Review updated to the latest commits. Draft comments from earlier commits are retained for you to reposition.')},epoch)},[loadDetail,notify,perform])
+  const retarget=useCallback(async(pr:PullRequest,base:string)=>{const epoch=activeEpoch.current;return perform(async()=>{const current=prsRef.current.find(item=>item.number===pr.number),provider=current?.provider;if(!current||!provider||provider.host!==pr.provider?.host||provider.owner!==pr.provider?.owner||provider.repo!==pr.provider?.repo)throw new Error('Reopen this PR before changing its base.');if(current.pendingComments.length)throw new Error('Submit or remove your draft review comments before changing this PR’s base.');await services.github.retarget(provider.host,provider.owner,provider.repo,current.number,{base,expectedBase:current.base,expectedHead:current.headSha});await loadDetail(current.number,true);if(epoch===activeEpoch.current)notify(`Pull request #${current.number} now targets ${base}.`)},epoch)},[loadDetail,notify,perform])
   const merge=useCallback(async(pr:PullRequest,method:MergeMethod)=>{const epoch=activeEpoch.current;return perform(async()=>{
     const p=pr.provider;if(!p)throw new Error('This pull request is not connected to GitHub.')
     await services.github.mergePullRequest(p.host,p.owner,p.repo,p.number,method,pr.headSha)
@@ -333,6 +334,8 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
           case 'gitflow':result=await services.repository.mutateFlow(repo.root,mutation.request);break
           case 'bisect':result=await services.repository.bisect(repo.root,mutation.request);break
           case 'custom-command':await services.commands.execute(repo.root,mutation.id,repo.headSha??'',repo.currentBranch);break
+          case 'stack-branch':await services.repository.mutateStackBranch(repo.root,mutation.request);break
+          case 'stack-push':await services.repository.pushStackBranch(repo.root,mutation.request);break
           default:result=await services.repository.controlOperation(repo.root,mutation.token,mutation.kind)
         }
       } catch(issue){failure=issue}
@@ -377,5 +380,5 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
   const inboxPullRequests=useMemo(()=>{const byNumber=new Map(prs.map(pr=>[pr.number,pr]));return pullRequestNumbers.flatMap(number=>{const pr=byNumber.get(number);return pr?[pr]:[]})},[prs,pullRequestNumbers])
   const loadMorePullRequests=useCallback(()=>loadPullRequestPage(true),[loadPullRequestPage])
   const retryPullRequests=useCallback(()=>loadPullRequestPage(pageNumbersRef.current.length>0),[loadPullRequestPage])
-  return {available,enabled,repository,identity:repository?identityFor(repository):undefined,prs,inboxPullRequests,account,recent,repositoryCards,busy,openingRepository,loadingPullRequests,loadingMorePullRequests,hasMorePullRequests,pullRequestTotal,openPullRequestCount,pullRequestResultLimit,pullRequestPageError,setPullRequestQuery,loadMorePullRequests,retryPullRequests,retainPullRequests,error,updatedAt,selected,history:mapped?.history??emptyHistory,changes:mapped?.changes??emptyChanges,branch:mapped?.branch??'',openRepository,connect,selectPullRequest,updatePullRequest,appendAISuggestions,acceptNewCommits,merge,create,git,operate,diff,commitDiff,refresh,useDemo}
+  return {available,enabled,repository,identity:repository?identityFor(repository):undefined,prs,inboxPullRequests,account,recent,repositoryCards,busy,openingRepository,loadingPullRequests,loadingMorePullRequests,hasMorePullRequests,pullRequestTotal,openPullRequestCount,pullRequestResultLimit,pullRequestPageError,setPullRequestQuery,loadMorePullRequests,retryPullRequests,retainPullRequests,error,updatedAt,selected,history:mapped?.history??emptyHistory,changes:mapped?.changes??emptyChanges,branch:mapped?.branch??'',openRepository,connect,selectPullRequest,updatePullRequest,appendAISuggestions,acceptNewCommits,retarget,merge,create,git,operate,diff,commitDiff,refresh,useDemo}
 }
