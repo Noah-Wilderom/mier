@@ -22,15 +22,16 @@ const providers = {
     return { ...value, scopeKeys: value.preferences.teams }
   } },
 }
-type ReviewProps = { pr: PullRequest; onOpenSettings: () => void; children: ReactNode }
+type ReviewProps = { pr: PullRequest; children: ReactNode }
 export function ReviewTickets({ enabled, ...props }: ReviewProps & { enabled: boolean }) {
   return enabled && props.pr.provider ? <TicketReview {...props}/> : <>{props.children}</>
 }
-function TicketReview({ pr, onOpenSettings, children }: ReviewProps) {
+function TicketReview({ pr, children }: ReviewProps) {
   const readerId = useId()
   const jira = useJiraConnection(), linear = useLinearConnection()
   const [providerChoice, setProviderChoice] = useState<TicketProvider>()
-  const provider = providerChoice ?? (linear.status?.connected && !jira.status?.connected ? 'linear' : 'jira')
+  const connectedProviders = (['jira', 'linear'] as const).filter(value => (value === 'jira' ? jira : linear).status?.connected)
+  const provider = providerChoice && connectedProviders.includes(providerChoice) ? providerChoice : connectedProviders[0] ?? 'jira'
   const api = providers[provider]
   const { status, native, error: statusError, revision, refresh: refreshConnection } = provider === 'jira' ? jira : linear
   const workspaceId = provider === 'jira' ? jira.status?.defaultSiteId : linear.status?.workspace?.id
@@ -40,7 +41,7 @@ function TicketReview({ pr, onOpenSettings, children }: ReviewProps) {
   const result = resultState?.context === context ? resultState.value : undefined
   const setResult = (value: TicketResult | undefined) => setResultState(value ? { context, value } : undefined)
   const [selection, setSelection] = useState<{ context: string; key: string }>(), [issue, setIssue] = useState<TicketIssue>(), [issueError, setIssueError] = useState(''), [issueLoading, setIssueLoading] = useState(false), [issueAttempt, setIssueAttempt] = useState(0)
-  const selected = selection?.context === context ? selection.key : undefined
+  const selected = status?.connected && selection?.context === context ? selection.key : undefined
   const setSelected = (key: string | undefined) => setSelection(key ? { context, key } : undefined)
   const [searchOpen, setSearchOpen] = useState(false), [query, setQuery] = useState(''), [matches, setMatches] = useState<TicketIssue[]>([]), [searchError, setSearchError] = useState(''), [searching, setSearching] = useState(false)
   const [mappingOpen, setMappingOpen] = useState(false), [site, setSite] = useState(''), [projects, setProjects] = useState(''), [field, setField] = useState(''), [saving, setSaving] = useState(false)
@@ -73,12 +74,12 @@ function TicketReview({ pr, onOpenSettings, children }: ReviewProps) {
     return () => { stale = true; abort.abort() }
   }, [selected, request?.repository, status?.connected, api, revision, issueAttempt])
   useEffect(() => {
-    if (!searchOpen || !request || query.trim().length < 2) { setMatches([]); setSearchError(''); setSearching(false); return }
+    if (!status?.connected || !searchOpen || !request || query.trim().length < 2) { setMatches([]); setSearchError(''); setSearching(false); return }
     const abort = new AbortController(); let stale = false
     setSearching(true); setSearchError(''); setMatches([])
     const timer = setTimeout(() => { void api.search({ repository: request.repository, query: query.trim() }, abort.signal).then(value => { if (!stale) setMatches(value) }).catch(failure => { if (!stale) setSearchError(failure instanceof Error ? failure.message : `${api.name} search failed.`) }).finally(() => { if (!stale) setSearching(false) }) }, 300)
     return () => { stale = true; clearTimeout(timer); abort.abort() }
-  }, [searchOpen, query, context, revision])
+  }, [status?.connected, searchOpen, query, context, revision])
   const close = () => { setSelected(undefined); setIssue(undefined); restoreFocus.current?.focus({ preventScroll: true }) }
   useEffect(() => {
     if (!selected || !panel.current) return
@@ -103,9 +104,9 @@ function TicketReview({ pr, onOpenSettings, children }: ReviewProps) {
   if (!native || !request) return <>{children}</>
   return <div ref={layout} className={`jira-review-layout${selected ? ' has-ticket' : ''}${compact ? ' is-compact' : ''}${resizing ? ' is-resizing-ticket' : ''}`} style={{ '--jira-ticket-width': `${visiblePaneWidth}px` } as CSSProperties}>
     <div className="jira-review-main">
-    <section className="jira-pr-tickets" aria-label={`${api.name} tickets`}>
-    <div className="jira-ticket-toolbar"><div className="ticket-provider-options" role="group" aria-label="Ticket provider">{(['jira', 'linear'] as const).map(value => <button className="btn-ghost" key={value} aria-pressed={provider === value} disabled={saving} onClick={() => setProviderChoice(value)}><img src={`/integrations/${value}.svg`} width={14} height={14} alt=""/>{providers[value].name}</button>)}<strong>Tickets {result && <span className="badge">{result.tickets.length}</span>}</strong></div><div>
-      {!status?.connected ? <button className="btn-ghost" onClick={onOpenSettings}>Connect {api.name}</button> : <><span className="jira-ticket-site muted">{result?.workspace.name}</span><button className="btn-ghost" disabled={saving} onClick={() => setSearchOpen(value => !value)}>Add ticket</button><button className="icon-button" aria-label={`Refresh ${api.name} tickets`} disabled={loading} onClick={() => setAttempt(value => value + 1)}><Icon name="refresh" size={13}/></button><button className="icon-button" aria-label={`${api.name} repository settings`} onClick={() => setMappingOpen(value => !value)}><Icon name="settings" size={13}/></button></>}
+    {status?.connected && <section className="jira-pr-tickets" aria-label={`${api.name} tickets`}>
+    <div className="jira-ticket-toolbar"><div className="ticket-provider-options" role="group" aria-label="Ticket provider">{connectedProviders.map(value => <button className="btn-ghost" key={value} aria-pressed={provider === value} disabled={saving} onClick={() => setProviderChoice(value)}><img src={`/integrations/${value}.svg`} width={14} height={14} alt=""/>{providers[value].name}</button>)}<strong>Tickets {result && <span className="badge">{result.tickets.length}</span>}</strong></div><div>
+      <span className="jira-ticket-site muted">{result?.workspace.name}</span><button className="btn-ghost" disabled={saving} onClick={() => setSearchOpen(value => !value)}>Add ticket</button><button className="icon-button" aria-label={`Refresh ${api.name} tickets`} disabled={loading} onClick={() => setAttempt(value => value + 1)}><Icon name="refresh" size={13}/></button><button className="icon-button" aria-label={`${api.name} repository settings`} onClick={() => setMappingOpen(value => !value)}><Icon name="settings" size={13}/></button>
     </div></div>
     {statusError && <p className="jira-ticket-error" role="alert">{statusError}<button className="btn-ghost" onClick={refreshConnection}>Retry</button></p>}
     {error && <p className="jira-ticket-error" role="alert">{error}<button className="btn-ghost" disabled={loading} onClick={() => setAttempt(value => value + 1)}>Retry</button></p>}
@@ -121,7 +122,7 @@ function TicketReview({ pr, onOpenSettings, children }: ReviewProps) {
     {status?.connected && !loading && result && !result.tickets.length && <p className="jira-no-tickets">No related tickets found. Add a ticket or include its key in the branch, title, or description.</p>}
     {result?.truncated && <p className="muted jira-no-tickets">Showing the first 25 matching tickets. Narrow the repository’s {provider === 'jira' ? 'Jira projects' : 'Linear teams'} to refine the list.</p>}
     {!!result?.hidden.length && <details className="jira-hidden-tickets"><summary>Hidden tickets ({result.hidden.length})</summary>{result.hidden.map(key => <button className="btn-ghost" key={key} disabled={saving} onClick={() => void select(key, 'restore')}>Restore {key}</button>)}</details>}
-    </section>
+    </section>}
     {children}
     </div>
     {selected && !compact && <div className="jira-ticket-resizer" role="separator" aria-label={`Resize ${api.name} ticket pane`} aria-orientation="vertical" aria-valuemin={280} aria-valuemax={maxPaneWidth} aria-valuenow={visiblePaneWidth} aria-valuetext={`${visiblePaneWidth} pixels`} tabIndex={0} title={`Drag to resize ${api.name} ticket pane`} onPointerDown={event => {

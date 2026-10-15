@@ -972,7 +972,7 @@ export default function App() {
                 busy={live.busy}
               />
               <ReviewAssistant expanded={focusMode} onExpand={()=>setFocusMode(true)} key={`ai:${pr.provider?.host}/${pr.provider?.owner}/${pr.provider?.repo}#${pr.number}`} enabled={live.enabled} pr={pr} onImport={(run,findings)=>pr.provider?live.appendAISuggestions({host:pr.provider.host,owner:pr.provider.owner,repo:pr.provider.repo,number:pr.number},run,findings):Promise.resolve()} onOpenSettings={()=>navigate('settings')} onOpenComment={(threadId,path)=>{setReviewLocation({path,threadId});setTab('changes')}}>
-              <ReviewTickets key={`${pr.provider?.host}/${pr.provider?.owner}/${pr.provider?.repo}#${pr.number}`} enabled={live.enabled} pr={pr} onOpenSettings={() => navigate('settings')}>
+              <ReviewTickets key={`${pr.provider?.host}/${pr.provider?.owner}/${pr.provider?.repo}#${pr.number}`} enabled={live.enabled} pr={pr}>
               {live.enabled && pr.provider?.hasNewCommits && <div className="new-commits-banner" role="status"><Icon name="git-commit"/><div><strong>New commits are available</strong><span>Your current diff and draft comments are preserved.</span></div><button className="btn" disabled={live.busy} onClick={()=>void live.acceptNewCommits().catch(()=>{})}>Refresh changes</button></div>}
               {live.enabled && live.error && <div className="live-error" role="status"><Icon name="alert-circle"/><span>{live.error}</span><button className="btn btn-ghost" onClick={()=>void live.refresh()}>Retry</button></div>}
               <div
