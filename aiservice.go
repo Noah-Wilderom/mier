@@ -20,6 +20,7 @@ type AIPreferences struct {
 	CopilotPath string `json:"copilotPath"`
 	Provider    string `json:"provider"`
 	Model       string `json:"model"`
+	Intensity   string `json:"intensity"`
 }
 type AIReviewRequest struct {
 	Host         string `json:"host"`
@@ -31,6 +32,7 @@ type AIReviewRequest struct {
 	Provider     string `json:"provider"`
 	Model        string `json:"model"`
 	Instructions string `json:"instructions"`
+	Intensity    string `json:"intensity"`
 }
 type AIConnection struct {
 	Run   reviewagent.RunSnapshot `json:"run"`
@@ -79,11 +81,11 @@ func NewAIService(github *GitHubService, credentials *CredentialService) *AIServ
 	if err == nil {
 		err = cacheErr
 	}
-	s := &AIService{github: github, credentials: credentials, tasks: map[string]*aiTask{}, active: map[string]string{}, loginStates: map[string]AILoginStatus{}, preferences: AIPreferences{Provider: "codex"}, directory: filepath.Join(cache, "mag-ik-een-review", "ai"), configPath: filepath.Join(config, "mag-ik-een-review", "ai.json"), initErr: err}
+	s := &AIService{github: github, credentials: credentials, tasks: map[string]*aiTask{}, active: map[string]string{}, loginStates: map[string]AILoginStatus{}, preferences: AIPreferences{Provider: "codex", Intensity: "medium"}, directory: filepath.Join(cache, "mag-ik-een-review", "ai"), configPath: filepath.Join(config, "mag-ik-een-review", "ai.json"), initErr: err}
 	if data, readErr := os.ReadFile(s.configPath); readErr == nil {
 		if json.Unmarshal(data, &s.preferences) != nil {
 			s.preferencesErr = errors.New("AI preferences could not be read. Save provider settings to reset them")
-			s.preferences = AIPreferences{Provider: "codex"}
+			s.preferences = AIPreferences{Provider: "codex", Intensity: "medium"}
 		}
 	}
 	return s
@@ -97,6 +99,11 @@ func (s *AIService) GetPreferences() (AIPreferences, error) {
 	return s.preferences, s.preferencesErr
 }
 func (s *AIService) SavePreferences(input AIPreferences) error {
+	intensity, err := reviewagent.NormalizeIntensity(input.Intensity)
+	if err != nil {
+		return err
+	}
+	input.Intensity = intensity
 	if input.Provider != "codex" && input.Provider != "copilot" {
 		return errors.New("Choose Codex or GitHub Copilot")
 	}
@@ -354,6 +361,11 @@ func (s *AIService) StartMCPReview(ctx context.Context, request AIReviewRequest)
 	return s.start(ctx, request, true)
 }
 func (s *AIService) start(ctx context.Context, request AIReviewRequest, external bool) (AIConnection, error) {
+	intensity, err := reviewagent.NormalizeIntensity(request.Intensity)
+	if err != nil {
+		return AIConnection{}, err
+	}
+	request.Intensity = intensity
 	if len(request.Instructions) > 4000 || len(request.Model) > 200 {
 		return AIConnection{}, errors.New("Review instructions or model name exceed the supported length")
 	}
@@ -392,7 +404,7 @@ func (s *AIService) start(ctx context.Context, request AIReviewRequest, external
 	if err != nil {
 		return AIConnection{}, err
 	}
-	scope := reviewagent.Context{Key: key, Host: request.Host, Owner: request.Owner, Repository: request.Repository, PullRequest: request.PullRequest, HeadSHA: request.HeadSHA, BaseSHA: request.BaseSHA, MergeBaseSHA: changes.MergeBaseSHA, Title: changes.PullRequest.Title, Description: changes.PullRequest.Body, Files: []reviewagent.File{}, Warnings: []string{}}
+	scope := reviewagent.Context{Key: key, Host: request.Host, Owner: request.Owner, Repository: request.Repository, PullRequest: request.PullRequest, HeadSHA: request.HeadSHA, BaseSHA: request.BaseSHA, MergeBaseSHA: changes.MergeBaseSHA, Title: changes.PullRequest.Title, Description: changes.PullRequest.Body, Files: []reviewagent.File{}, Warnings: []string{}, Intensity: intensity, Focus: request.Instructions}
 	bytes := 0
 	for _, file := range changes.Files {
 		if len(scope.Files) >= 64 || bytes+len(file.Patch) > 384*1024 {
@@ -515,6 +527,7 @@ func (s *AIService) execute(ctx context.Context, request AIReviewRequest, task *
 		defer os.RemoveAll(directory)
 	}
 	prompt := "Review the captured pull request using the mier MCP tools. Start with get_review_context. Add actionable comments with add_review_comment and record a summary with finish_review."
+	prompt += "\n" + reviewagent.IntensityInstructions(request.Intensity)
 	if request.Instructions != "" {
 		prompt += "\nAdditional reviewer focus: " + request.Instructions
 	}

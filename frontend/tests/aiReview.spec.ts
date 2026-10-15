@@ -59,6 +59,88 @@ async function openReview(desktop: Awaited<ReturnType<typeof desktopFixture>>) {
   ).toBeEnabled();
 }
 
+test("model logos and all three intensities reach native reviews through the chat composer", async ({
+  desktop,
+  page,
+}) => {
+  let current: AIReview;
+  const requests: { intensity: string; instructions: string }[] = [];
+  desktop.handlers.set("main.AIService.GetProviderStatus", (args) => ({
+    provider: args[0],
+    installed: true,
+    authenticated: true,
+    account: "reviewer",
+    plan: "",
+    error: "",
+    models: [
+      { id: "gpt-review", name: "GPT review model", default: true },
+      { id: "claude-review", name: "Claude review model", default: false },
+      { id: "gemini-review", name: "Gemini review model", default: false },
+    ],
+  }));
+  desktop.handlers.set("main.AIService.StartReview", (args) => {
+    requests.push(args[0]);
+    current = review({
+      id: `review-${requests.length}`,
+      provider: "copilot",
+      model: args[0].model,
+      intensity: args[0].intensity,
+      instructions: args[0].instructions,
+      state: "completed",
+      summary: `Review ${requests.length} completed.`,
+    });
+    return current;
+  });
+  desktop.handlers.set("main.AIService.GetReview", () => current);
+  desktop.handlers.set("main.AIService.SavePreferences", () => null);
+  await openReview(desktop);
+  await page.getByLabel("AI review provider").selectOption("copilot");
+  await page.getByRole("combobox", { name: "AI review model" }).click();
+  for (const [label, brand] of [
+    ["GPT review model", "openai"],
+    ["Claude review model", "claude"],
+    ["Gemini review model", "gemini"],
+  ]) {
+    await expect(
+      page.getByRole("option", { name: new RegExp(label) }).locator("img"),
+    ).toHaveAttribute("src", `/ai/${brand}.svg`);
+  }
+  await page
+    .getByRole("option", { name: "Claude review model", exact: true })
+    .click();
+  const draft = page.getByLabel("Review focus (optional)");
+  await draft.fill("Keep this focus while the pane is hidden");
+  await page
+    .getByRole("button", { name: "Hide AI review", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Review with AI", exact: true })
+    .click();
+  await expect(draft).toHaveValue("Keep this focus while the pane is hidden");
+  for (const [index, [label, intensity]] of [
+    ["Quick", "low"],
+    ["Balanced", "medium"],
+    ["Thorough", "high"],
+  ].entries()) {
+    if (index) await page.locator(".ai-chat-settings > summary").click();
+    await page.getByRole("radio", { name: label, exact: true }).check();
+    await draft.fill(`Focus ${index}`);
+    await draft.press("Shift+Enter");
+    await draft.pressSequentially("Check failure handling");
+    await draft.press("Enter");
+    await expect.poll(() => requests.length).toBe(index + 1);
+    expect(requests[index]).toMatchObject({
+      intensity,
+      instructions: `Focus ${index}\nCheck failure handling`,
+    });
+    await expect(page.locator(".ai-chat-user")).toContainText(`Focus ${index}`);
+    await expect(page.locator(".ai-chat-assistant")).toContainText(
+      `Review ${index + 1} completed.`,
+    );
+    await expect(draft).toHaveValue("");
+  }
+});
+
 test("reviews use the captured revision and add native private drafts without duplicates or GitHub writes", async ({
   desktop,
   page,
@@ -78,6 +160,7 @@ test("reviews use the captured revision and add native private drafts without du
       provider: "codex",
       model: "fixture-model",
       instructions: "Check retry handling",
+      intensity: "high",
     });
     await new Promise<void>((resolve) => {
       release = resolve;
@@ -85,7 +168,9 @@ test("reviews use the captured revision and add native private drafts without du
     return current;
   });
   await openReview(desktop);
-  await page.getByLabel("AI review model").selectOption("fixture-model");
+  await page.getByRole("combobox", { name: "AI review model" }).click();
+  await page.getByRole("option", { name: /Fixture model/ }).click();
+  await page.getByRole("radio", { name: "Thorough", exact: true }).check();
   await page.getByLabel("Review focus (optional)").fill("Check retry handling");
   await page
     .getByRole("button", { name: "Start AI review", exact: true })
@@ -160,6 +245,15 @@ test("the AI pane sits beside the editor and stacks at narrow sizes while preser
   page,
 }) => {
   await openReview(desktop);
+  const initialPane = (await page
+    .getByRole("complementary", { name: "AI reviewer" })
+    .boundingBox())!;
+  const initialComposer = (await page
+    .locator(".ai-chat-composer")
+    .boundingBox())!;
+  expect(initialComposer.y + initialComposer.height).toBeLessThanOrEqual(
+    initialPane.y + initialPane.height + 1,
+  );
   await page
     .getByRole("button", { name: "Expand code area", exact: true })
     .click();
@@ -226,6 +320,9 @@ test("stopping preserves partial suggestions and provider failures remain retrya
     throw new Error("Provider subscription limit reached. Retry later.");
   });
   await page
+    .getByLabel("Review focus (optional)")
+    .fill("Keep my focus for the retry");
+  await page
     .getByRole("button", { name: "Run a new review", exact: true })
     .click();
   await expect(
@@ -234,6 +331,9 @@ test("stopping preserves partial suggestions and provider failures remain retrya
       .getByRole("alert")
       .first(),
   ).toContainText("subscription limit");
+  await expect(page.getByLabel("Review focus (optional)")).toHaveValue(
+    "Keep my focus for the retry",
+  );
   await expect(
     page.getByRole("button", { name: "Run a new review", exact: true }),
   ).toBeEnabled();

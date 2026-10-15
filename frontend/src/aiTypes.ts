@@ -1,9 +1,20 @@
 import type { PendingComment, PullRequest } from "./data";
 export type AIProvider = "codex" | "copilot";
+export type AIIntensity = "low" | "medium" | "high";
+export const aiIntensities = [
+  { id: "low", name: "Quick", detail: "Focus on high-impact bugs" },
+  { id: "medium", name: "Balanced", detail: "Check behavior and error paths" },
+  {
+    id: "high",
+    name: "Thorough",
+    detail: "Trace callers, edge cases, and tests",
+  },
+] as const;
 export interface AIModel {
   id: string;
   name: string;
   default: boolean;
+  reasoningEfforts?: string[];
 }
 export interface AIProviderStatus {
   provider: AIProvider;
@@ -20,6 +31,7 @@ export interface AIPreferences {
   copilotPath: string;
   provider: AIProvider;
   model: string;
+  intensity?: AIIntensity;
 }
 export interface AIFinding {
   id: string;
@@ -34,6 +46,8 @@ export interface AIReview {
   key: string;
   provider: AIProvider | "external";
   model: string;
+  intensity?: AIIntensity;
+  instructions?: string;
   headSha: string;
   state: "preparing" | "running" | "completed" | "failed" | "cancelled";
   progress: string;
@@ -55,6 +69,7 @@ export interface AIReviewRequest {
   provider: AIProvider;
   model: string;
   instructions: string;
+  intensity: AIIntensity;
 }
 export interface AIConnection {
   run: AIReview;

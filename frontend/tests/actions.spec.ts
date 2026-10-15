@@ -97,10 +97,12 @@ async function openActions(
   desktop: Awaited<ReturnType<typeof desktopFixture>>,
 ) {
   await openFixture(desktop);
-  await desktop.page
-    .locator(".sidebar")
-    .getByRole("button", { name: "Actions", exact: true })
-    .click();
+  await expect(
+    desktop.page
+      .locator(".sidebar")
+      .getByRole("button", { name: "Actions", exact: true }),
+  ).toHaveCount(0);
+  await desktop.page.keyboard.press("Control+4");
   await expect(
     desktop.page.getByRole("heading", { name: "Actions", exact: true }),
   ).toBeVisible();

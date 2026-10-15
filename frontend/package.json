@@ -13,9 +13,11 @@
     "test:ui": "tsc -p tsconfig.ui.json && playwright test"
   },
   "dependencies": {
+    "@assistant-ui/react": "0.15.28",
     "@shikijs/langs": "^4.5.0",
     "@shikijs/themes": "^4.5.0",
     "@wailsio/runtime": "3.0.0-beta.29",
+    "radix-ui": "1.7.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-markdown": "^10.1.0",

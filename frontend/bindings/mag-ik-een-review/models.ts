@@ -37,6 +37,7 @@ export interface AIPreferences {
     "copilotPath": string;
     "provider": string;
     "model": string;
+    "intensity": string;
 }
 
 export interface AIReviewRequest {
@@ -49,6 +50,7 @@ export interface AIReviewRequest {
     "provider": string;
     "model": string;
     "instructions": string;
+    "intensity": string;
 }
 
 export interface Account {

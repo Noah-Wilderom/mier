@@ -16,9 +16,10 @@ import (
 )
 
 type Model struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Default bool   `json:"default"`
+	ID               string   `json:"id"`
+	Name             string   `json:"name"`
+	Default          bool     `json:"default"`
+	ReasoningEfforts []string `json:"reasoningEfforts,omitempty"`
 }
 type ProviderStatus struct {
 	Provider      string  `json:"provider"`
@@ -58,8 +59,11 @@ func CodexStatus(ctx context.Context, client *Codex) (ProviderStatus, error) {
 	for page := 0; page < 5; page++ {
 		var models struct {
 			Data []struct {
-				ID, Model, DisplayName string
-				IsDefault              bool
+				ID, Model, DisplayName    string
+				IsDefault                 bool
+				SupportedReasoningEfforts []struct {
+					ReasoningEffort string `json:"reasoningEffort"`
+				} `json:"supportedReasoningEfforts"`
 			} `json:"data"`
 			NextCursor *string `json:"nextCursor"`
 		}
@@ -76,7 +80,11 @@ func CodexStatus(ctx context.Context, client *Codex) (ProviderStatus, error) {
 				id = model.ID
 			}
 			if id != "" {
-				result.Models = append(result.Models, Model{ID: id, Name: model.DisplayName, Default: model.IsDefault})
+				efforts := []string{}
+				for _, effort := range model.SupportedReasoningEfforts {
+					efforts = append(efforts, effort.ReasoningEffort)
+				}
+				result.Models = append(result.Models, Model{ID: id, Name: model.DisplayName, Default: model.IsDefault, ReasoningEfforts: efforts})
 			}
 		}
 		if models.NextCursor == nil || *models.NextCursor == "" {
@@ -163,13 +171,11 @@ func RunCodex(ctx context.Context, binary, directory, version, model, prompt str
 		return err
 	}
 	defer client.Close()
-	var account struct {
-		Account *struct{ Type string } `json:"account"`
-	}
-	if err := client.Call(ctx, "account/read", map[string]bool{"refreshToken": false}, &account); err != nil {
+	status, err := CodexStatus(ctx, client)
+	if err != nil {
 		return err
 	}
-	if account.Account == nil || account.Account.Type != "chatgpt" {
+	if !status.Authenticated {
 		return errors.New("Sign in with ChatGPT in AI settings before starting a Codex review")
 	}
 	params := map[string]any{"cwd": directory, "approvalPolicy": "never", "sandbox": "read-only", "ephemeral": true, "developerInstructions": Instructions, "config": map[string]any{"mcp_servers": servers, "mcp_optional_startup_grace_ms": 15000}}
@@ -185,7 +191,11 @@ func RunCodex(ctx context.Context, binary, directory, version, model, prompt str
 	}
 	run.Progress("Reviewing captured pull request changes")
 	var turn struct{ Turn struct{ ID string } }
-	if err := client.Call(ctx, "turn/start", map[string]any{"threadId": thread.Thread.ID, "input": []map[string]string{{"type": "text", "text": prompt}}}, &turn); err != nil {
+	turnParams := map[string]any{"threadId": thread.Thread.ID, "input": []map[string]string{{"type": "text", "text": prompt}}}
+	if effort := ModelEffort(status.Models, model, run.Snapshot().Intensity); effort != "" {
+		turnParams["effort"] = effort
+	}
+	if err := client.Call(ctx, "turn/start", turnParams, &turn); err != nil {
 		return err
 	}
 	select {
@@ -236,7 +246,7 @@ func CopilotStatus(ctx context.Context, client *copilot.Client) (ProviderStatus,
 		return result, err
 	}
 	for _, model := range models {
-		result.Models = append(result.Models, Model{ID: model.ID, Name: model.Name})
+		result.Models = append(result.Models, Model{ID: model.ID, Name: model.Name, ReasoningEfforts: model.SupportedReasoningEfforts})
 	}
 	return result, nil
 }
@@ -257,9 +267,18 @@ func RunCopilot(ctx context.Context, binary, directory, token, model, prompt str
 	for _, tool := range tools {
 		allowed.AddCustom(tool.Name)
 	}
+	models, err := client.ListModels(ctx)
+	if err != nil {
+		return err
+	}
+	catalog := []Model{}
+	for _, value := range models {
+		catalog = append(catalog, Model{ID: value.ID, ReasoningEfforts: value.SupportedReasoningEfforts})
+	}
 	session, err := client.CreateSession(ctx, &copilot.SessionConfig{
 		ClientName: "mier", Model: model, WorkingDirectory: directory,
-		AvailableTools: allowed.ToSlice(), Tools: tools,
+		ReasoningEffort: ModelEffort(catalog, model, run.Snapshot().Intensity),
+		AvailableTools:  allowed.ToSlice(), Tools: tools,
 		SystemMessage:          &copilot.SystemMessageConfig{Mode: "replace", Content: Instructions},
 		SkipCustomInstructions: copilot.Bool(true), CoauthorEnabled: copilot.Bool(false), ManageScheduleEnabled: copilot.Bool(false),
 		LargeOutput:         &copilot.LargeToolOutputConfig{Enabled: copilot.Bool(false)},

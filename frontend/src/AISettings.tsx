@@ -3,10 +3,12 @@ import { hasNativeBackend, services } from "./services";
 import { openWebURL } from "./native";
 import type { AILogin, AIPreferences, AIProviderStatus } from "./aiTypes";
 import "./AIReview.css";
+import { AIModelLogo } from "./AIModelPicker";
 
 const defaults: AIPreferences = {
   provider: "codex",
   model: "",
+  intensity: "medium",
   codexPath: "",
   copilotPath: "",
 };
@@ -123,7 +125,10 @@ export default function AISettings() {
         ).map((provider) => (
           <article key={provider.id}>
             <header>
-              <strong>{provider.name}</strong>
+              <strong className="ai-provider-brand">
+                <AIModelLogo provider={provider.id} />
+                {provider.name}
+              </strong>
               <span
                 className={
                   provider.status?.authenticated ? "text-green" : "muted"

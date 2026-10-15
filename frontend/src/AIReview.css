@@ -55,12 +55,263 @@
   font-size: 12px;
 }
 .ai-review-pane-scroll {
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   min-height: 0;
   flex: 1;
-  padding: 14px;
+  padding: 0;
   font-size: 12px;
+}
+.ai-review-pane-scroll > .ai-review-error {
+  flex-shrink: 0;
+  margin: 8px 12px;
+}
+.ai-chat-thread {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.ai-chat-viewport {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
   scrollbar-gutter: stable;
+}
+.ai-chat-welcome {
+  padding: 8px 0;
+  line-height: 1.6;
+}
+.ai-chat-welcome p {
+  color: var(--muted);
+  margin: 6px 0;
+}
+.ai-chat-settings {
+  padding: 0 0 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.ai-chat-settings > summary {
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--muted);
+}
+.ai-chat-settings[open] > summary {
+  margin-bottom: 12px;
+}
+.ai-chat-message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ai-chat-user {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 9px 11px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+.ai-chat-user > strong {
+  font-size: 11px;
+  color: var(--muted);
+}
+.ai-chat-user .markdown {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.ai-chat-user .markdown > :last-child {
+  margin-bottom: 0;
+}
+.ai-chat-assistant .ai-run-result {
+  padding-top: 0;
+  margin-top: 0;
+  border-top: 0;
+}
+.ai-chat-composer {
+  flex-shrink: 0;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+}
+.ai-chat-composer > label {
+  font-size: 11px;
+  margin-bottom: 6px;
+  color: var(--muted);
+}
+.ai-chat-composer textarea {
+  width: 100%;
+  min-height: 48px;
+  max-height: 140px;
+  resize: none;
+}
+.ai-chat-composer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+.ai-chat-composer-actions > span {
+  font-size: 10px;
+  margin-right: auto;
+  line-height: 1.5;
+}
+.ai-review-selectors {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+.ai-review-selectors > label,
+.ai-model-picker {
+  min-width: 0;
+}
+.ai-review-selectors > label,
+.ai-model-picker > label {
+  font-size: 11px;
+  color: var(--muted);
+}
+.ai-model-picker > label {
+  display: block;
+  margin-bottom: 6px;
+}
+.ai-provider-select {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.ai-provider-select select {
+  min-width: 0;
+  padding: 6px 4px;
+}
+.ai-model-logo {
+  flex-shrink: 0;
+  object-fit: contain;
+}
+:root[data-theme="dark"] .ai-logo-openai,
+:root[data-theme="dark"] .ai-logo-githubcopilot,
+:root[data-theme="dark"] .ai-logo-grok {
+  filter: invert(1);
+}
+.ai-provider-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.ai-model-trigger {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-width: 0;
+  min-height: 31px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 5px 7px;
+  font: inherit;
+  color: var(--text);
+  cursor: pointer;
+}
+.ai-model-trigger > span:first-of-type {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+.ai-model-trigger:focus-visible,
+.ai-model-option:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+.ai-model-trigger:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.ai-model-options {
+  z-index: 1000;
+  max-height: min(340px, var(--radix-select-content-available-height));
+  width: max(var(--radix-select-trigger-width), 230px);
+  max-width: calc(100vw - 16px);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 4px;
+  color: var(--text);
+}
+.ai-model-option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px;
+  min-height: 33px;
+  border-radius: 3px;
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+}
+.ai-model-indicator {
+  margin-left: auto;
+}
+.ai-model-option[data-highlighted] {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+.ai-intensity {
+  padding: 0;
+  margin: 0;
+  border: 0;
+  min-width: 0;
+}
+.ai-intensity legend {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.ai-intensity > div {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+.ai-intensity label {
+  position: relative;
+  margin: 0;
+  cursor: pointer;
+}
+.ai-intensity input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.ai-intensity span {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 3px;
+  text-align: center;
+  font-size: 11px;
+}
+.ai-intensity input:checked + span {
+  color: var(--blue);
+  background: var(--blue-soft);
+  border-color: var(--blue);
+}
+.ai-intensity input:focus-visible + span {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+.ai-intensity:disabled label {
+  opacity: 0.6;
+  cursor: default;
+}
+.ai-intensity-detail {
+  font-size: 10px;
+  margin: 6px 0 0;
 }
 .ai-review-pane label,
 .ai-settings details label {
@@ -76,8 +327,7 @@
   font: inherit;
 }
 .ai-review-pane textarea {
-  resize: vertical;
-  min-height: 65px;
+  resize: none;
 }
 .ai-provider-status {
   line-height: 1.6;
@@ -300,14 +550,11 @@
   }
   .ai-review-pane {
     width: 100%;
-    height: 40%;
-    min-height: 190px;
+    height: 45%;
+    min-height: 260px;
     max-height: 420px;
     border-left: 0;
     border-top: 1px solid var(--border);
-  }
-  .ai-review-pane-scroll {
-    display: block;
   }
   .ai-provider-cards {
     grid-template-columns: 1fr;
@@ -338,8 +585,8 @@
   }
   .ai-review-pane {
     width: 100%;
-    height: 40%;
-    min-height: 190px;
+    height: 45%;
+    min-height: 260px;
     max-height: 420px;
     border-left: 0;
     border-top: 1px solid var(--border);

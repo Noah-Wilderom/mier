@@ -661,7 +661,6 @@ export default function App() {
             }}><Icon name={live.enabled&&live.repositoryCards[path]?.host?'github':'folder'}/><span className="sidebar-repository-name">{name}</span>{active&&<Icon name="check" size={14}/>}</button>
           })}
         </div>
-        <button className={`nav-item ${destination === "actions" ? "selected" : ""}`} onClick={() => navigate("actions")}><Icon name="play"/><span>Actions</span></button>
         <div className="nav-section-heading workspace-heading">
           <span>Local workspace</span>
         </div>

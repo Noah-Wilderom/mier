@@ -1,6 +1,6 @@
 # GitHub Actions
 
-Open a GitHub repository, then select **Actions** in the sidebar or use **Cmd/Ctrl+4**. The view uses the same GitHub account and remote as the pull request inbox, including Enterprise hosts.
+Open a GitHub repository, then use **Cmd/Ctrl+4** or choose **GitHub Actions** in the command palette (**Cmd/Ctrl+K**). The view uses the same GitHub account and remote as the pull request inbox, including Enterprise hosts.
 
 Filter runs by workflow, status or branch, and page through older runs. Select a run to inspect its commit, event, actor, jobs and steps. **Run attempt** lets you inspect earlier reruns without replacing their logs with a newer attempt's output.
 

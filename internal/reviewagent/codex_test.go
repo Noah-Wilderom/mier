@@ -53,7 +53,7 @@ func fakeCodex() {
 		case "account/read":
 			response = map[string]any{"account": map[string]string{"type": "chatgpt", "email": "test@example.invalid", "planType": "test"}}
 		case "model/list":
-			response = map[string]any{"data": []map[string]any{{"model": "model-from-provider", "displayName": "Provider model", "isDefault": true}}}
+			response = map[string]any{"data": []map[string]any{{"model": "model-from-provider", "displayName": "Provider model", "isDefault": true, "supportedReasoningEfforts": []map[string]string{{"reasoningEffort": "low"}, {"reasoningEffort": "medium"}, {"reasoningEffort": "high"}}}}}
 		case "thread/start":
 			var value struct {
 				Sandbox string
@@ -72,6 +72,14 @@ func fakeCodex() {
 			token = strings.TrimPrefix(value.Config.Servers["mier"].Headers["Authorization"], "Bearer ")
 			response = map[string]any{"thread": map[string]string{"id": "thread-1"}}
 		case "turn/start":
+			if expected := os.Getenv("MIER_FAKE_CODEX_EFFORT"); expected != "" {
+				var params struct {
+					Effort string `json:"effort"`
+				}
+				if json.Unmarshal(message.Params, &params) != nil || params.Effort != expected {
+					os.Exit(18)
+				}
+			}
 			write(map[string]any{"id": message.ID, "result": map[string]any{"turn": map[string]string{"id": "turn-1"}}})
 			if os.Getenv("MIER_FAKE_CODEX_HANG") == "1" {
 				continue
@@ -107,8 +115,11 @@ func fakeCodex() {
 }
 func TestCodexHarnessUsesMCPAndRejectsWriteApproval(t *testing.T) {
 	t.Setenv("MIER_FAKE_CODEX", "1")
+	t.Setenv("MIER_FAKE_CODEX_EFFORT", "high")
 	binary, _ := os.Executable()
-	run := NewRun("codex", "model-from-provider", reviewFixture(), nil)
+	scope := reviewFixture()
+	scope.Intensity = "high"
+	run := NewRun("codex", "model-from-provider", scope, nil)
 	bridge, err := StartBridge(run)
 	if err != nil {
 		t.Fatal(err)

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"mag-ik-een-review/internal/reviewagent"
@@ -9,6 +10,16 @@ import (
 	"strings"
 	"testing"
 )
+
+func TestAIIntensityValidationPrecedesProviderAccess(t *testing.T) {
+	s := &AIService{}
+	if _, err := s.StartReview(context.Background(), AIReviewRequest{Provider: "codex", Intensity: "extreme"}); err == nil || !strings.Contains(err.Error(), "intensity") {
+		t.Fatal("invalid intensity reached provider setup", err)
+	}
+	if err := s.SavePreferences(AIPreferences{Provider: "codex", Intensity: "extreme"}); err == nil {
+		t.Fatal("unsupported preference saved")
+	}
+}
 
 func TestAIConnectionCanBeRestoredAndRevokedWithoutExposingProviderSessions(t *testing.T) {
 	s := &AIService{tasks: map[string]*aiTask{}}

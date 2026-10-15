@@ -14,6 +14,7 @@ export interface Model {
     "id": string;
     "name": string;
     "default": boolean;
+    "reasoningEfforts"?: string[] | null;
 }
 
 export interface ProviderStatus {
@@ -32,6 +33,8 @@ export interface RunSnapshot {
     "key": string;
     "provider": string;
     "model": string;
+    "intensity": string;
+    "instructions": string;
     "headSha": string;
     "state": string;
     "progress": string;

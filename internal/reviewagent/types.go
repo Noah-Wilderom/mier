@@ -36,6 +36,8 @@ type Context struct {
 	Description  string   `json:"description"`
 	Files        []File   `json:"files"`
 	Warnings     []string `json:"warnings"`
+	Intensity    string   `json:"intensity"`
+	Focus        string   `json:"focus"`
 }
 type Finding struct {
 	ID       string `json:"id,omitempty"`
@@ -55,20 +57,22 @@ type Source struct {
 }
 type ReadSource func(context.Context, string, string, int, int) (Source, error)
 type RunSnapshot struct {
-	ID         string    `json:"id"`
-	Key        string    `json:"key"`
-	Provider   string    `json:"provider"`
-	Model      string    `json:"model"`
-	HeadSHA    string    `json:"headSha"`
-	State      string    `json:"state"`
-	Progress   string    `json:"progress"`
-	Summary    string    `json:"summary"`
-	Error      string    `json:"error"`
-	Findings   []Finding `json:"findings"`
-	Version    uint64    `json:"version"`
-	CreatedAt  string    `json:"createdAt"`
-	FinishedAt string    `json:"finishedAt"`
-	Warnings   []string  `json:"warnings"`
+	ID           string    `json:"id"`
+	Key          string    `json:"key"`
+	Provider     string    `json:"provider"`
+	Model        string    `json:"model"`
+	Intensity    string    `json:"intensity"`
+	Instructions string    `json:"instructions"`
+	HeadSHA      string    `json:"headSha"`
+	State        string    `json:"state"`
+	Progress     string    `json:"progress"`
+	Summary      string    `json:"summary"`
+	Error        string    `json:"error"`
+	Findings     []Finding `json:"findings"`
+	Version      uint64    `json:"version"`
+	CreatedAt    string    `json:"createdAt"`
+	FinishedAt   string    `json:"finishedAt"`
+	Warnings     []string  `json:"warnings"`
 }
 
 type Run struct {
@@ -90,7 +94,8 @@ func ID() string {
 	return hex.EncodeToString(value[:])
 }
 func NewRun(provider, model string, scope Context, reader ReadSource) *Run {
-	return &Run{snapshot: RunSnapshot{ID: ID(), Key: scope.Key, Provider: provider, Model: model, HeadSHA: scope.HeadSHA, State: "preparing", Progress: "Preparing review context…", Findings: []Finding{}, Warnings: append([]string{}, scope.Warnings...), Version: 1, CreatedAt: time.Now().UTC().Format(time.RFC3339)}, context: scope, reader: reader, anchors: diffAnchors(scope.Files)}
+	intensity, _ := NormalizeIntensity(scope.Intensity)
+	return &Run{snapshot: RunSnapshot{ID: ID(), Key: scope.Key, Provider: provider, Model: model, Intensity: intensity, Instructions: scope.Focus, HeadSHA: scope.HeadSHA, State: "preparing", Progress: "Preparing review context…", Findings: []Finding{}, Warnings: append([]string{}, scope.Warnings...), Version: 1, CreatedAt: time.Now().UTC().Format(time.RFC3339)}, context: scope, reader: reader, anchors: diffAnchors(scope.Files)}
 }
 func (r *Run) Snapshot() RunSnapshot {
 	r.mu.Lock()
