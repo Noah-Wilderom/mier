@@ -327,6 +327,9 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
           case 'revert':result=await services.repository.revert(repo.root,mutation.request);break
           case 'rebase':result=await services.repository.rebase(repo.root,mutation.request);break
           case 'worktree':await services.repository.mutateWorktree(repo.root,mutation.request);break
+          case 'apply-patch':result=await services.repository.applyPatch(repo.root,mutation.request);break
+          case 'submodule':await services.repository.mutateSubmodule(repo.root,mutation.request);break
+          case 'lfs':await services.repository.mutateLFS(repo.root,mutation.request);break
           default:result=await services.repository.controlOperation(repo.root,mutation.token,mutation.kind)
         }
       } catch(issue){failure=issue}

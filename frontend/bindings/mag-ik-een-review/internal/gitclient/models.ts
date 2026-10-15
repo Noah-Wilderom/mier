@@ -7,6 +7,15 @@ export interface AmendRequest {
     "operationToken"?: string;
 }
 
+export interface ApplyPatchRequest {
+    "patch": string;
+    "mode": string;
+    "reverse": boolean;
+    "expectedHead": string;
+    "expectedBranch": string;
+    "token": string;
+}
+
 export interface BlameLine {
     "sha": string;
     "originalLine": number;
@@ -128,6 +137,11 @@ export interface DiscardRequest {
     "lines"?: number[] | null;
 }
 
+export interface ExportPatchRequest {
+    "mode": string;
+    "sha": string;
+}
+
 export interface FileStatus {
     "path": string;
     "originalPath"?: string;
@@ -153,6 +167,47 @@ export interface HistoryQuery {
     "path": string;
     "cursor": string;
     "limit": number;
+}
+
+export interface LFSFile {
+    "name": string;
+    "oid": string;
+    "size": number;
+    "downloaded": boolean;
+}
+
+export interface LFSLock {
+    "id": string;
+    "path": string;
+    "owner": {"name": string};
+    "locked_at": string;
+}
+
+export interface LFSPattern {
+    "pattern": string;
+    "source": string;
+    "lockable": boolean;
+}
+
+export interface LFSRequest {
+    "action": string;
+    "pattern": string;
+    "filename": boolean;
+    "lockable": boolean;
+    "remote": string;
+    "expectedHead": string;
+    "expectedBranch": string;
+    "token": string;
+}
+
+export interface LFSState {
+    "installed": boolean;
+    "version": string;
+    "initialized": boolean;
+    "patterns": LFSPattern[] | null;
+    "files": LFSFile[] | null;
+    "summary": string;
+    "token": string;
 }
 
 export interface MergeBranchRequest {
@@ -190,6 +245,12 @@ export interface Operation {
 export interface OperationResult {
     "headSha": string;
     "operation"?: Operation | null;
+}
+
+export interface PatchPreview {
+    "token": string;
+    "stat": string;
+    "paths": string[] | null;
 }
 
 export interface RebasePreview {
@@ -331,6 +392,28 @@ export interface StashRequest {
     "action": string;
     "restoreIndex": boolean;
     "expectedHead": string;
+}
+
+export interface Submodule {
+    "name": string;
+    "path": string;
+    "url": string;
+    "recordedSha": string;
+    "currentSha": string;
+    "branch": string;
+    "initialized": boolean;
+    "changes": number;
+    "token": string;
+    "error": string;
+}
+
+export interface SubmoduleRequest {
+    "action": string;
+    "path": string;
+    "url": string;
+    "token": string;
+    "expectedHead": string;
+    "expectedBranch": string;
 }
 
 export interface Tag {

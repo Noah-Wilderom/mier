@@ -193,8 +193,22 @@ func (c *Client) MutateWorktree(ctx context.Context, path string, request Worktr
 			return err
 		}
 		var selected *Worktree
+		requestedPath := filepath.Clean(request.Path)
+		if resolved, resolveErr := filepath.EvalSymlinks(requestedPath); resolveErr == nil {
+			requestedPath = resolved
+		}
 		for _, item := range items {
-			if filepath.Clean(item.Path) == filepath.Clean(request.Path) {
+			itemPath := filepath.Clean(item.Path)
+			if resolved, resolveErr := filepath.EvalSymlinks(itemPath); resolveErr == nil {
+				itemPath = resolved
+			}
+			samePath := itemPath == requestedPath
+			if !samePath {
+				a, aErr := os.Stat(itemPath)
+				b, bErr := os.Stat(requestedPath)
+				samePath = aErr == nil && bErr == nil && os.SameFile(a, b)
+			}
+			if samePath {
 				selected = &item
 				break
 			}

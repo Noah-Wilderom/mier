@@ -100,3 +100,24 @@ func TestWorktreeCreationPreservesExistingPathsAndRejectsNestedDirectories(t *te
 		}
 	}
 }
+func TestWorktreeAcceptsCanonicalDirectoryAliases(t *testing.T) {
+	c, root := testRepository(t, Options{})
+	head := initialCommit(t, c, root)
+	ctx := context.Background()
+	parent := t.TempDir()
+	alias := filepath.Join(t.TempDir(), "alias")
+	if err := os.Symlink(parent, alias); err != nil {
+		t.Skipf("Directory symlinks unavailable: %v", err)
+	}
+	target := filepath.Join(alias, "linked")
+	if err := c.MutateWorktree(ctx, root, WorktreeRequest{Action: "add", Path: target, Mode: "detached", StartSHA: head, ExpectedHead: head, ExpectedBranch: "main"}); err != nil {
+		t.Fatal(err)
+	}
+	items, err := c.Worktrees(ctx, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = c.MutateWorktree(ctx, root, WorktreeRequest{Action: "lock", Path: target, Token: items[1].Token, Reason: "Alias path"}); err != nil {
+		t.Fatal(err)
+	}
+}

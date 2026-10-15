@@ -68,6 +68,14 @@ An **edit** step pauses after its commit. In Changes, use **Amend last commit**,
 
 Worktrees can be locked and unlocked. Removal previews its directory and keeps the branch and commits. It refuses the current/primary worktree, stale entries, locked or dirty worktrees, and unregistered directories. Git may also refuse submodule-containing worktrees. Removal deletes ignored build files with the directory. Worktree creation preserves existing directories and refuses nested/overlapping worktrees, including paths reached through directory symlinks.
 
+## Patches, submodules, and Git LFS
+
+**Repository tools → Advanced** exports unstaged/staged binary-capable patches or a non-merge commit as an author-preserving mailbox. Save through the native file dialog. Import a file or paste its contents, choose working files, files plus index, or mailbox commits, and preview before applying. Changes to the patch, index, branch, or affected files invalidate approval. Mailbox conflicts use Git's actual apply-mailbox sequencer with continue, skip, and abort. Imports are limited to 8 MiB, 2,000 paths, and bounded binary expansion.
+
+**Submodules** lists recorded and checked-out commits. Add a submodule in a new directory, initialize it, update to its recorded commit, edit/sync its URL, or open its repository. Updates preserve dirty work, protect ignored-file collisions, and force ordinary checkout rather than repository-configured update commands. Deinitialization requires confirmation and clean files. It removes the checkout, including ignored files, but retains Git's stored repository. Nested submodules are managed by opening their parent module.
+
+**Git LFS** uses the installed Git LFS CLI. Enable repository filters, track patterns or exact filenames, mark patterns lockable, and stop tracking with confirmation. Stage .gitattributes with the affected files. Existing history is kept. Fetch/download objects, check out cached objects, and explicitly load remote locks. File unlocks verify ownership and never force another person's lock. Older CLI versions fall back to textual listings when JSON catalogs are unavailable.
+
 ## Resolve conflicts
 
 An operation bar appears for merges, cherry-picks, rebases, reverts and patch application, including operations started in another client. Choose **Resolve conflicts** to open Changes.

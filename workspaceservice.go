@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -32,6 +33,44 @@ func (s *WorkspaceService) ChooseRepository() (string, error) {
 		return "", errors.New("Native repository picker is unavailable")
 	}
 	return s.app.Dialog.OpenFile().SetTitle("Open a Git repository").CanChooseDirectories(true).CanChooseFiles(false).PromptForSingleSelection()
+}
+func (s *WorkspaceService) ChoosePatch() (string, error) {
+	if s.app == nil {
+		return "", errors.New("The native file picker is unavailable")
+	}
+	path, err := s.app.Dialog.OpenFile().SetTitle("Import a Git patch").CanChooseFiles(true).CanChooseDirectories(false).AddFilter("Git patches", "*.patch;*.diff;*.mbox").PromptForSingleSelection()
+	if err != nil || path == "" {
+		return "", err
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	data, err := io.ReadAll(io.LimitReader(f, 8*1024*1024+1))
+	if err != nil {
+		return "", err
+	}
+	if len(data) > 8*1024*1024 {
+		return "", errors.New("Choose a patch of at most 8 MiB")
+	}
+	return string(data), nil
+}
+func (s *WorkspaceService) SavePatch(content, name string) (string, error) {
+	if s.app == nil {
+		return "", errors.New("The native file picker is unavailable")
+	}
+	if len(content) > 8*1024*1024 {
+		return "", errors.New("The patch exceeds 8 MiB")
+	}
+	path, err := s.app.Dialog.SaveFile().SetMessage("Export Git patch").SetFilename(filepath.Base(name)).AddFilter("Git patches", "*.patch;*.diff;*.mbox").PromptForSingleSelection()
+	if err != nil || path == "" {
+		return "", err
+	}
+	if err = os.WriteFile(path, []byte(content), 0600); err != nil {
+		return "", err
+	}
+	return path, nil
 }
 func (s *WorkspaceService) RecentRepositories() ([]string, error) {
 	s.mu.Lock()

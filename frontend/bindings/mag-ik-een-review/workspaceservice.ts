@@ -10,6 +10,10 @@
 // @ts-ignore: Unused imports
 import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wailsio/runtime";
 
+export function ChoosePatch(): $CancellablePromise<string> {
+    return $Call.ByID(1197830037);
+}
+
 export function ChooseRepository(): $CancellablePromise<string> {
     return $Call.ByID(1018947409);
 }
@@ -20,4 +24,8 @@ export function RecentRepositories(): $CancellablePromise<string[] | null> {
 
 export function RememberRepository(path: string): $CancellablePromise<void> {
     return $Call.ByID(2908451379, path);
+}
+
+export function SavePatch(content: string, name: string): $CancellablePromise<string> {
+    return $Call.ByID(66694665, content, name);
 }

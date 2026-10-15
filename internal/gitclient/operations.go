@@ -77,6 +77,9 @@ func (c *Client) operation(ctx context.Context, root string, status RepositorySn
 	case exists("rebase-merge") || exists("rebase-apply"):
 		if exists("rebase-apply/applying") {
 			op.Kind = "am"
+			op.CanSkip = true
+			op.SourceLabel = "Mailbox patch " + read("rebase-apply/next")
+			op.Message = read("rebase-apply/final-commit")
 		} else {
 			op.Kind = "rebase"
 			op.CanSkip = true
@@ -89,6 +92,10 @@ func (c *Client) operation(ctx context.Context, root string, status RepositorySn
 		op.SourceLabel = "Replayed commit " + shortSHA(op.SourceSHA)
 		op.CurrentLabel = "Rebased result (onto " + shortSHA(read(dir+"onto")) + ")"
 		identity = read(dir+"orig-head") + "\x00" + read(dir+"onto") + "\x00" + read(dir+"head-name")
+		if op.Kind == "am" {
+			op.CurrentLabel = status.CurrentBranch
+			identity += "\x00" + read(dir+"next") + "\x00" + read(dir+"patch") + "\x00" + read("ORIG_HEAD")
+		}
 		if op.Kind == "rebase" {
 			done := strings.Fields(read(dir + "done"))
 			for i := len(done) - 1; i >= 0; i-- {
@@ -125,7 +132,9 @@ func (c *Client) operation(ctx context.Context, root string, status RepositorySn
 	if op.Kind == "revert" {
 		op.SourceLabel = "Reverted commit " + op.SourceLabel
 	}
-	op.Message = read("MERGE_MSG")
+	if op.Message == "" {
+		op.Message = read("MERGE_MSG")
+	}
 	for _, file := range status.Changes {
 		if file.Conflict {
 			op.Conflicts++
@@ -134,7 +143,7 @@ func (c *Client) operation(ctx context.Context, root string, status RepositorySn
 	if op.Conflicts > 0 {
 		op.PausedForEdit = false
 	}
-	op.Empty = op.Kind == "cherry-pick" && len(status.Changes) == 0
+	op.Empty = (op.Kind == "cherry-pick" || op.Kind == "am") && len(status.Changes) == 0
 	op.Token = digest(root, op.Kind, status.HeadSHA, op.SourceSHA, identity)
 	return op, nil
 }

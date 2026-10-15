@@ -17,8 +17,8 @@ An unchecked item is planned, not a supported capability. AI additions come last
 - [x] Conflict editor alignment, result highlighting, both orderings, and shortcuts
 - [x] Merge conflict preflight
 - [x] Worktree management
-- [ ] Submodules and Git LFS
-- [ ] Patch import and export
+- [x] Submodules and Git LFS
+- [x] Patch import and export
 - [ ] Gitflow and bisect
 - [ ] Terminal and custom commands
 - [ ] Stacked pull requests

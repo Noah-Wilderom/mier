@@ -14,3 +14,13 @@ export interface RebaseStep { sha:string; action:'pick'|'reword'|'edit'|'squash'
 export interface RebaseRequest { preview:RebasePreviewRequest; token:string; steps:RebaseStep[] }
 export interface Worktree { path:string;sha:string;branch:string;token:string;primary:boolean;current:boolean;locked:boolean;lockReason:string;prunable:boolean;changes:number;error:string }
 export interface WorktreeRequest { action:'add'|'lock'|'unlock'|'remove';path:string;mode:'new'|'existing'|'detached';branch:string;startSha:string;expectedHead:string;expectedBranch:string;token:string;reason:string }
+export interface ExportPatchRequest { mode:'working'|'staged'|'commit';sha:string }
+export interface ApplyPatchRequest { patch:string;mode:'working'|'index'|'commits';reverse:boolean;expectedHead:string;expectedBranch:string;token:string }
+export interface PatchPreview { token:string;stat:string;paths:string[] }
+export interface Submodule { name:string;path:string;url:string;recordedSha:string;currentSha:string;branch:string;initialized:boolean;changes:number;token:string;error:string }
+export interface SubmoduleRequest { action:'add'|'update'|'sync'|'set-url'|'deinit';path:string;url:string;token:string;expectedHead:string;expectedBranch:string }
+export interface LFSPattern { pattern:string;source:string;lockable:boolean }
+export interface LFSFile { name:string;oid:string;size:number;downloaded:boolean }
+export interface LFSState { installed:boolean;version:string;initialized:boolean;patterns:LFSPattern[];files:LFSFile[];summary:string;token:string }
+export interface LFSRequest { action:'install'|'track'|'untrack'|'pull'|'fetch'|'checkout'|'lock'|'unlock';pattern:string;filename:boolean;lockable:boolean;remote:string;expectedHead:string;expectedBranch:string;token:string }
+export interface LFSLock { id:string;path:string;owner:{name:string};locked_at:string }

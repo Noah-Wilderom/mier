@@ -577,6 +577,8 @@ export const services = {
     installJira: () => invoke<void>("main.IntegrationService.InstallJira"),
   },
   workspace: {
+    choosePatch:()=>invoke<string>('main.WorkspaceService.ChoosePatch'),
+    savePatch:(content:string,name:string)=>invoke<string>('main.WorkspaceService.SavePatch',content,name),
     chooseRepository: () => invoke<string>("main.WorkspaceService.ChooseRepository"),
     recentRepositories: async () => (await invoke<string[] | null>("main.WorkspaceService.RecentRepositories")) ?? [],
     rememberRepository: (path: string) => invoke<void>("main.WorkspaceService.RememberRepository", path),
@@ -613,6 +615,14 @@ export const services = {
     setLabels: async (host: string, owner: string, repo: string, number: number, labels: string[]) => (await invoke<string[] | null>("main.GitHubService.SetLabels", host, owner, repo, number, labels)) ?? [],
   },
   repository: {
+    exportPatch:(root:string,request:import('./repositoryToolTypes').ExportPatchRequest)=>invoke<string>('main.RepositoryService.ExportPatch',root,request),
+    previewPatch:(root:string,request:import('./repositoryToolTypes').ApplyPatchRequest)=>invoke<import('./repositoryToolTypes').PatchPreview>('main.RepositoryService.PreviewPatch',root,request),
+    applyPatch:(root:string,request:import('./repositoryToolTypes').ApplyPatchRequest)=>invoke<import('./gitOperations').GitOperationResult>('main.RepositoryService.ApplyPatch',root,request),
+    submodules:(root:string)=>invoke<import('./repositoryToolTypes').Submodule[]>('main.RepositoryService.Submodules',root),
+    mutateSubmodule:(root:string,request:import('./repositoryToolTypes').SubmoduleRequest)=>invoke<void>('main.RepositoryService.MutateSubmodule',root,request),
+    lfs:(root:string)=>invoke<import('./repositoryToolTypes').LFSState>('main.RepositoryService.LFS',root),
+    mutateLFS:(root:string,request:import('./repositoryToolTypes').LFSRequest)=>invoke<string>('main.RepositoryService.MutateLFS',root,request),
+    lfsLocks:(root:string,remote:string)=>invoke<import('./repositoryToolTypes').LFSLock[]>('main.RepositoryService.LFSLocks',root,remote),
     worktrees:(root:string)=>invoke<import('./repositoryToolTypes').Worktree[]>('main.RepositoryService.Worktrees',root),
     mutateWorktree:(root:string,request:import('./repositoryToolTypes').WorktreeRequest)=>invoke<void>('main.RepositoryService.MutateWorktree',root,request),
     previewMerge:(root:string,request:import('./gitOperations').MergeBranchRequest)=>invoke<import('./gitOperations').MergePreflight>('main.RepositoryService.PreviewMerge',root,request),

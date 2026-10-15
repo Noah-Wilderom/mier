@@ -38,6 +38,9 @@ export type GitMutation =
   | { kind: 'revert'; request:CherryPickRequest }
   | { kind: 'rebase'; request:import('./repositoryToolTypes').RebaseRequest }
   | { kind: 'worktree'; request:import('./repositoryToolTypes').WorktreeRequest }
+  | { kind:'apply-patch';request:import('./repositoryToolTypes').ApplyPatchRequest }
+  | { kind:'submodule';request:import('./repositoryToolTypes').SubmoduleRequest }
+  | { kind:'lfs';request:import('./repositoryToolTypes').LFSRequest }
   | { kind: 'continue' | 'abort' | 'skip'; token: string }
 export const operationLabel = (kind: GitOperation['kind']) => ({ merge: 'Merge', 'cherry-pick': 'Cherry-pick', rebase: 'Rebase', revert: 'Revert', am: 'Apply patches' })[kind]
 
