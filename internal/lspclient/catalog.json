@@ -1,0 +1,1735 @@
+[
+  {
+    "id": "php",
+    "name": "Phpactor",
+    "label": "PHP",
+    "category": "Languages",
+    "description": "PHP symbols, class members, and project navigation.",
+    "files": [
+      {
+        "pattern": "*.php",
+        "languageId": "php"
+      },
+      {
+        "pattern": "*.phtml",
+        "languageId": "php"
+      },
+      {
+        "pattern": "*.inc",
+        "languageId": "php"
+      },
+      {
+        "pattern": "*.stub",
+        "languageId": "php"
+      }
+    ],
+    "program": "phpactor",
+    "args": [
+      "language-server"
+    ],
+    "homepage": "https://phpactor.readthedocs.io/en/master/usage/language-server.html",
+    "install": {
+      "method": "php",
+      "requires": "PHP 8.2+ with mbstring, tokenizer, and posix"
+    }
+  },
+  {
+    "id": "typescript",
+    "name": "TypeScript / JavaScript",
+    "label": "TS",
+    "category": "Web",
+    "description": "Type-aware navigation for JavaScript, TypeScript, JSX, and TSX.",
+    "files": [
+      {
+        "pattern": "*.ts",
+        "languageId": "typescript"
+      },
+      {
+        "pattern": "*.mts",
+        "languageId": "typescript"
+      },
+      {
+        "pattern": "*.cts",
+        "languageId": "typescript"
+      },
+      {
+        "pattern": "*.tsx",
+        "languageId": "typescriptreact"
+      },
+      {
+        "pattern": "*.js",
+        "languageId": "javascript"
+      },
+      {
+        "pattern": "*.mjs",
+        "languageId": "javascript"
+      },
+      {
+        "pattern": "*.cjs",
+        "languageId": "javascript"
+      },
+      {
+        "pattern": "*.jsx",
+        "languageId": "javascriptreact"
+      }
+    ],
+    "program": "typescript-language-server",
+    "args": [
+      "--stdio"
+    ],
+    "homepage": "https://github.com/typescript-language-server/typescript-language-server",
+    "install": {
+      "method": "npm",
+      "package": "typescript-language-server",
+      "binary": "typescript-language-server",
+      "requires": "Node.js 22.22.2+"
+    }
+  },
+  {
+    "id": "vue",
+    "name": "Vue",
+    "label": "VUE",
+    "category": "Web",
+    "description": "Vue single-file components with the TypeScript language tools.",
+    "files": [
+      {
+        "pattern": "*.vue",
+        "languageId": "vue"
+      }
+    ],
+    "program": "vue-language-server",
+    "args": [
+      "--stdio"
+    ],
+    "homepage": "https://github.com/vuejs/language-tools",
+    "install": {
+      "method": "npm",
+      "package": "@vue/language-server",
+      "binary": "vue-language-server",
+      "requires": "Node.js 22.22.2+"
+    }
+  },
+  {
+    "id": "html",
+    "name": "HTML",
+    "label": "HTML",
+    "category": "Web",
+    "description": "HTML elements, attributes, and linked documents.",
+    "files": [
+      {
+        "pattern": "*.html",
+        "languageId": "html"
+      },
+      {
+        "pattern": "*.htm",
+        "languageId": "html"
+      },
+      {
+        "pattern": "*.xhtml",
+        "languageId": "html"
+      }
+    ],
+    "program": "vscode-html-language-server",
+    "args": [
+      "--stdio"
+    ],
+    "homepage": "https://github.com/microsoft/vscode-html-languageservice",
+    "install": {
+      "method": "npm",
+      "package": "vscode-langservers-extracted",
+      "binary": "vscode-html-language-server",
+      "requires": "Node.js 22.22.2+"
+    }
+  },
+  {
+    "id": "css",
+    "name": "CSS / SCSS / Less",
+    "label": "CSS",
+    "category": "Web",
+    "description": "Stylesheet symbols, selectors, variables, and properties.",
+    "files": [
+      {
+        "pattern": "*.css",
+        "languageId": "css"
+      },
+      {
+        "pattern": "*.scss",
+        "languageId": "scss"
+      },
+      {
+        "pattern": "*.sass",
+        "languageId": "sass"
+      },
+      {
+        "pattern": "*.less",
+        "languageId": "less"
+      }
+    ],
+    "program": "vscode-css-language-server",
+    "args": [
+      "--stdio"
+    ],
+    "homepage": "https://github.com/microsoft/vscode-css-languageservice",
+    "install": {
+      "method": "npm",
+      "package": "vscode-langservers-extracted",
+      "binary": "vscode-css-language-server",
+      "requires": "Node.js 22.22.2+"
+    }
+  },
+  {
+    "id": "json",
+    "name": "JSON / JSONC",
+    "label": "{}",
+    "category": "Data",
+    "description": "Schema-aware keys, values, and configuration documentation.",
+    "files": [
+      {
+        "pattern": "*.json",
+        "languageId": "json"
+      },
+      {
+        "pattern": "*.jsonc",
+        "languageId": "jsonc"
+      },
+      {
+        "pattern": "*.code-workspace",
+        "languageId": "jsonc"
+      }
+    ],
+    "program": "vscode-json-language-server",
+    "args": [
+      "--stdio"
+    ],
+    "homepage": "https://github.com/microsoft/vscode-json-languageservice",
+    "install": {
+      "method": "npm",
+      "package": "vscode-langservers-extracted",
+      "binary": "vscode-json-language-server",
+      "requires": "Node.js 22.22.2+"
+    }
+  },
+  {
+    "id": "yaml",
+    "name": "YAML",
+    "label": "YML",
+    "category": "Configuration",
+    "description": "YAML configuration and JSON Schema documentation.",
+    "files": [
+      {
+        "pattern": "*.yaml",
+        "languageId": "yaml"
+      },
+      {
+        "pattern": "*.yml",
+        "languageId": "yaml"
+      }
+    ],
+    "program": "yaml-language-server",
+    "args": [
+      "--stdio"
+    ],
+    "homepage": "https://github.com/redhat-developer/yaml-language-server",
+    "install": {
+      "method": "npm",
+      "package": "yaml-language-server",
+      "binary": "yaml-language-server",
+      "requires": "Node.js 22.22.2+"
+    },
+    "settings": {
+      "yaml": {
+        "hover": true,
+        "validate": true,
+        "schemaStore": {
+          "enable": true,
+          "url": "https://www.schemastore.org/api/json/catalog.json"
+        }
+      }
+    }
+  },
+  {
+    "id": "dockerfile",
+    "name": "Dockerfile",
+    "label": "DKR",
+    "category": "Configuration",
+    "description": "Container build instructions, arguments, and stage navigation.",
+    "files": [
+      {
+        "pattern": "Dockerfile",
+        "languageId": "dockerfile"
+      },
+      {
+        "pattern": "Dockerfile.*",
+        "languageId": "dockerfile"
+      },
+      {
+        "pattern": "*.dockerfile",
+        "languageId": "dockerfile"
+      },
+      {
+        "pattern": "Containerfile",
+        "languageId": "dockerfile"
+      },
+      {
+        "pattern": "Containerfile.*",
+        "languageId": "dockerfile"
+      }
+    ],
+    "program": "docker-langserver",
+    "args": [
+      "--stdio"
+    ],
+    "homepage": "https://github.com/rcjsuen/dockerfile-language-server-nodejs",
+    "install": {
+      "method": "npm",
+      "package": "dockerfile-language-server-nodejs",
+      "binary": "docker-langserver",
+      "requires": "Node.js 22.22.2+"
+    }
+  },
+  {
+    "id": "docker-compose",
+    "name": "Docker Compose",
+    "label": "DC",
+    "category": "Configuration",
+    "description": "Compose services, volumes, networks, and configuration.",
+    "files": [
+      {
+        "pattern": "compose.yaml",
+        "languageId": "dockercompose"
+      },
+      {
+        "pattern": "compose.yml",
+        "languageId": "dockercompose"
+      },
+      {
+        "pattern": "compose.*.yaml",
+        "languageId": "dockercompose"
+      },
+      {
+        "pattern": "compose.*.yml",
+        "languageId": "dockercompose"
+      },
+      {
+        "pattern": "docker-compose.yaml",
+        "languageId": "dockercompose"
+      },
+      {
+        "pattern": "docker-compose.yml",
+        "languageId": "dockercompose"
+      },
+      {
+        "pattern": "docker-compose.*.yaml",
+        "languageId": "dockercompose"
+      },
+      {
+        "pattern": "docker-compose.*.yml",
+        "languageId": "dockercompose"
+      }
+    ],
+    "program": "docker-compose-langserver",
+    "args": [
+      "--stdio"
+    ],
+    "homepage": "https://github.com/microsoft/compose-language-service",
+    "install": {
+      "method": "npm",
+      "package": "@microsoft/compose-language-service",
+      "binary": "docker-compose-langserver",
+      "requires": "Node.js 22.22.2+"
+    }
+  },
+  {
+    "id": "github-actions",
+    "name": "GitHub Actions",
+    "label": "GH",
+    "category": "Configuration",
+    "description": "Workflow jobs, steps, contexts, and Actions expressions.",
+    "files": [
+      {
+        "pattern": ".github/workflows/*.yml",
+        "languageId": "yaml"
+      },
+      {
+        "pattern": ".github/workflows/*.yaml",
+        "languageId": "yaml"
+      },
+      {
+        "pattern": "action.yml",
+        "languageId": "yaml"
+      },
+      {
+        "pattern": "action.yaml",
+        "languageId": "yaml"
+      }
+    ],
+    "program": "actions-languageserver",
+    "args": [
+      "--stdio"
+    ],
+    "homepage": "https://github.com/actions/languageservices",
+    "install": {
+      "method": "npm",
+      "package": "@actions/languageserver",
+      "binary": "actions-languageserver",
+      "requires": "Node.js 22.22.2+"
+    }
+  },
+  {
+    "id": "bash",
+    "name": "Bash / Shell",
+    "label": "SH",
+    "category": "Languages",
+    "description": "Shell functions, variables, and script navigation.",
+    "files": [
+      {
+        "pattern": "*.sh",
+        "languageId": "shellscript"
+      },
+      {
+        "pattern": "*.bash",
+        "languageId": "shellscript"
+      },
+      {
+        "pattern": "*.zsh",
+        "languageId": "shellscript"
+      },
+      {
+        "pattern": ".bashrc",
+        "languageId": "shellscript"
+      },
+      {
+        "pattern": ".bash_profile",
+        "languageId": "shellscript"
+      },
+      {
+        "pattern": ".zshrc",
+        "languageId": "shellscript"
+      }
+    ],
+    "program": "bash-language-server",
+    "args": [
+      "start"
+    ],
+    "homepage": "https://github.com/bash-lsp/bash-language-server",
+    "install": {
+      "method": "npm",
+      "package": "bash-language-server",
+      "binary": "bash-language-server",
+      "requires": "Node.js 22.22.2+; Bash for shell analysis"
+    }
+  },
+  {
+    "id": "python",
+    "name": "Python · Pyright",
+    "label": "PY",
+    "category": "Languages",
+    "description": "Python types, imports, and symbol navigation.",
+    "files": [
+      {
+        "pattern": "*.py",
+        "languageId": "python"
+      },
+      {
+        "pattern": "*.pyi",
+        "languageId": "python"
+      }
+    ],
+    "program": "pyright-langserver",
+    "args": [
+      "--stdio"
+    ],
+    "homepage": "https://github.com/microsoft/pyright",
+    "install": {
+      "method": "npm",
+      "package": "pyright",
+      "binary": "pyright-langserver",
+      "requires": "Node.js 22.22.2+; Python for project environments"
+    }
+  },
+  {
+    "id": "astro",
+    "name": "Astro",
+    "label": "AS",
+    "category": "Web",
+    "description": "Astro components and embedded template symbols.",
+    "files": [
+      {
+        "pattern": "*.astro",
+        "languageId": "astro"
+      }
+    ],
+    "program": "astro-ls",
+    "args": [
+      "--stdio"
+    ],
+    "homepage": "https://github.com/withastro/language-tools",
+    "install": {
+      "method": "npm",
+      "package": "@astrojs/language-server",
+      "binary": "astro-ls",
+      "requires": "Node.js 22.22.2+"
+    }
+  },
+  {
+    "id": "svelte",
+    "name": "Svelte",
+    "label": "SV",
+    "category": "Web",
+    "description": "Svelte components, scripts, and template navigation.",
+    "files": [
+      {
+        "pattern": "*.svelte",
+        "languageId": "svelte"
+      }
+    ],
+    "program": "svelteserver",
+    "args": [
+      "--stdio"
+    ],
+    "homepage": "https://github.com/sveltejs/language-tools",
+    "install": {
+      "method": "npm",
+      "package": "svelte-language-server",
+      "binary": "svelteserver",
+      "requires": "Node.js 22.22.2+"
+    }
+  },
+  {
+    "id": "graphql",
+    "name": "GraphQL",
+    "label": "GQL",
+    "category": "Data",
+    "description": "GraphQL schemas, fields, operations, and fragments.",
+    "files": [
+      {
+        "pattern": "*.graphql",
+        "languageId": "graphql"
+      },
+      {
+        "pattern": "*.gql",
+        "languageId": "graphql"
+      }
+    ],
+    "program": "graphql-lsp",
+    "args": [
+      "server",
+      "-m",
+      "stream"
+    ],
+    "homepage": "https://www.npmjs.com/package/graphql-language-service-cli",
+    "install": {
+      "method": "npm",
+      "package": "graphql-language-service-cli",
+      "binary": "graphql-lsp",
+      "requires": "Node.js 22.22.2+"
+    }
+  },
+  {
+    "id": "prisma",
+    "name": "Prisma",
+    "label": "PR",
+    "category": "Data",
+    "description": "Prisma schema models, fields, and relationships.",
+    "files": [
+      {
+        "pattern": "*.prisma",
+        "languageId": "prisma"
+      }
+    ],
+    "program": "prisma-language-server",
+    "args": [
+      "--stdio"
+    ],
+    "homepage": "https://github.com/prisma/language-tools",
+    "install": {
+      "method": "npm",
+      "package": "@prisma/language-server",
+      "binary": "prisma-language-server",
+      "requires": "Node.js 22.22.2+"
+    }
+  },
+  {
+    "id": "sql",
+    "name": "SQL · sqls",
+    "label": "SQL",
+    "category": "Data",
+    "description": "SQL hover and database schema information through your existing sqls setup.",
+    "files": [
+      {
+        "pattern": "*.sql",
+        "languageId": "sql"
+      }
+    ],
+    "program": "sqls",
+    "args": [],
+    "homepage": "https://github.com/sqls-server/sqls",
+    "install": {
+      "method": "external",
+      "requires": "sqls with your database schema / connection configuration"
+    }
+  },
+  {
+    "id": "cucumber",
+    "name": "Cucumber / Gherkin",
+    "label": "GHK",
+    "category": "Languages",
+    "description": "Feature files, step definitions, and Gherkin documentation.",
+    "files": [
+      {
+        "pattern": "*.feature",
+        "languageId": "gherkin"
+      }
+    ],
+    "program": "cucumber-language-server",
+    "args": [
+      "--stdio"
+    ],
+    "homepage": "https://github.com/cucumber/language-server",
+    "install": {
+      "method": "npm",
+      "package": "@cucumber/language-server",
+      "binary": "cucumber-language-server",
+      "requires": "Node.js 22.22.2+"
+    }
+  },
+  {
+    "id": "mdx",
+    "name": "MDX",
+    "label": "MDX",
+    "category": "Markup",
+    "description": "Markdown documents with JSX components and imports.",
+    "files": [
+      {
+        "pattern": "*.mdx",
+        "languageId": "mdx"
+      }
+    ],
+    "program": "mdx-language-server",
+    "args": [
+      "--stdio"
+    ],
+    "homepage": "https://github.com/mdx-js/mdx-analyzer/tree/main/packages/language-server",
+    "install": {
+      "method": "npm",
+      "package": "@mdx-js/language-server",
+      "binary": "mdx-language-server",
+      "requires": "Node.js 22.22.2+"
+    }
+  },
+  {
+    "id": "solidity",
+    "name": "Solidity",
+    "label": "SOL",
+    "category": "Languages",
+    "description": "Solidity contracts, types, and symbol definitions.",
+    "files": [
+      {
+        "pattern": "*.sol",
+        "languageId": "solidity"
+      }
+    ],
+    "program": "nomicfoundation-solidity-language-server",
+    "args": [
+      "--stdio"
+    ],
+    "homepage": "https://github.com/NomicFoundation/hardhat-vscode",
+    "install": {
+      "method": "npm",
+      "package": "@nomicfoundation/solidity-language-server",
+      "binary": "nomicfoundation-solidity-language-server",
+      "requires": "Node.js 22.22.2+"
+    }
+  },
+  {
+    "id": "vim",
+    "name": "Vim script",
+    "label": "VIM",
+    "category": "Languages",
+    "description": "Vim functions, commands, variables, and help.",
+    "files": [
+      {
+        "pattern": "*.vim",
+        "languageId": "vim"
+      },
+      {
+        "pattern": ".vimrc",
+        "languageId": "vim"
+      }
+    ],
+    "program": "vim-language-server",
+    "args": [
+      "--stdio"
+    ],
+    "homepage": "https://github.com/iamcco/vim-language-server",
+    "install": {
+      "method": "npm",
+      "package": "vim-language-server",
+      "binary": "vim-language-server",
+      "requires": "Node.js 22.22.2+"
+    }
+  },
+  {
+    "id": "awk",
+    "name": "AWK",
+    "label": "AWK",
+    "category": "Languages",
+    "description": "AWK functions, patterns, and program navigation.",
+    "files": [
+      {
+        "pattern": "*.awk",
+        "languageId": "awk"
+      }
+    ],
+    "program": "awk-language-server",
+    "args": [],
+    "homepage": "https://github.com/Beaglefoot/awk-language-server",
+    "install": {
+      "method": "npm",
+      "package": "awk-language-server",
+      "binary": "awk-language-server",
+      "requires": "Node.js 22.22.2+"
+    }
+  },
+  {
+    "id": "perl",
+    "name": "Perl · PerlNavigator",
+    "label": "PL",
+    "category": "Languages",
+    "description": "Perl packages, subroutines, types, and imports.",
+    "files": [
+      {
+        "pattern": "*.pl",
+        "languageId": "perl"
+      },
+      {
+        "pattern": "*.pm",
+        "languageId": "perl"
+      },
+      {
+        "pattern": "*.t",
+        "languageId": "perl"
+      }
+    ],
+    "program": "perlnavigator",
+    "args": [
+      "--stdio"
+    ],
+    "homepage": "https://github.com/bscan/PerlNavigator",
+    "install": {
+      "method": "npm",
+      "package": "perlnavigator-server",
+      "binary": "perlnavigator",
+      "requires": "Node.js 22.22.2+ and Perl 5"
+    }
+  },
+  {
+    "id": "twig",
+    "name": "Twig",
+    "label": "TW",
+    "category": "Web",
+    "description": "Twig templates, includes, blocks, and variables.",
+    "files": [
+      {
+        "pattern": "*.twig",
+        "languageId": "twig"
+      }
+    ],
+    "program": "twiggy-language-server",
+    "args": [
+      "--stdio"
+    ],
+    "homepage": "https://github.com/moetelo/twiggy",
+    "install": {
+      "method": "npm",
+      "package": "twiggy-language-server",
+      "binary": "twiggy-language-server",
+      "requires": "Node.js 22.22.2+"
+    }
+  },
+  {
+    "id": "marko",
+    "name": "Marko",
+    "label": "MK",
+    "category": "Web",
+    "description": "Marko tags, templates, and component symbols.",
+    "files": [
+      {
+        "pattern": "*.marko",
+        "languageId": "marko"
+      }
+    ],
+    "program": "marko-language-server",
+    "args": [
+      "--stdio"
+    ],
+    "homepage": "https://github.com/marko-js/language-server",
+    "install": {
+      "method": "npm",
+      "package": "@marko/language-server",
+      "binary": "marko-language-server",
+      "requires": "Node.js 22.22.2+"
+    }
+  },
+  {
+    "id": "coffeescript",
+    "name": "CoffeeScript",
+    "label": "CS",
+    "category": "Web",
+    "description": "CoffeeScript symbols, types, and project navigation.",
+    "files": [
+      {
+        "pattern": "*.coffee",
+        "languageId": "coffeescript"
+      },
+      {
+        "pattern": "*.litcoffee",
+        "languageId": "coffeescript"
+      }
+    ],
+    "program": "coffeesense-language-server",
+    "args": [
+      "--stdio"
+    ],
+    "homepage": "https://github.com/phil294/coffeesense",
+    "install": {
+      "method": "npm",
+      "package": "coffeesense-language-server",
+      "binary": "coffeesense-language-server",
+      "requires": "Node.js 22.22.2+"
+    }
+  },
+  {
+    "id": "ansible",
+    "name": "Ansible",
+    "label": "ANS",
+    "category": "Configuration",
+    "description": "Ansible playbooks, tasks, modules, and role references.",
+    "files": [
+      {
+        "pattern": "*.ansible.yml",
+        "languageId": "yaml.ansible"
+      },
+      {
+        "pattern": "*.ansible.yaml",
+        "languageId": "yaml.ansible"
+      },
+      {
+        "pattern": "ansible.yml",
+        "languageId": "yaml.ansible"
+      },
+      {
+        "pattern": "ansible.yaml",
+        "languageId": "yaml.ansible"
+      },
+      {
+        "pattern": "**/playbooks/**/*.yml",
+        "languageId": "yaml.ansible"
+      },
+      {
+        "pattern": "**/playbooks/**/*.yaml",
+        "languageId": "yaml.ansible"
+      },
+      {
+        "pattern": "**/roles/*/tasks/**/*.yml",
+        "languageId": "yaml.ansible"
+      },
+      {
+        "pattern": "**/roles/*/tasks/**/*.yaml",
+        "languageId": "yaml.ansible"
+      },
+      {
+        "pattern": "**/roles/*/handlers/**/*.yml",
+        "languageId": "yaml.ansible"
+      },
+      {
+        "pattern": "**/roles/*/handlers/**/*.yaml",
+        "languageId": "yaml.ansible"
+      }
+    ],
+    "program": "ansible-language-server",
+    "args": [
+      "--stdio"
+    ],
+    "homepage": "https://github.com/ansible/vscode-ansible",
+    "install": {
+      "method": "npm",
+      "package": "@ansible/ansible-language-server",
+      "binary": "ansible-language-server",
+      "requires": "Node.js 22.22.2+; Ansible for module documentation"
+    }
+  },
+  {
+    "id": "azure-pipelines",
+    "name": "Azure Pipelines",
+    "label": "AZ",
+    "category": "Configuration",
+    "description": "Azure pipeline stages, jobs, steps, and parameters.",
+    "files": [
+      {
+        "pattern": "azure-pipelines.yml",
+        "languageId": "yaml"
+      },
+      {
+        "pattern": "azure-pipelines.yaml",
+        "languageId": "yaml"
+      },
+      {
+        "pattern": "azure-pipelines.*.yml",
+        "languageId": "yaml"
+      },
+      {
+        "pattern": "azure-pipelines.*.yaml",
+        "languageId": "yaml"
+      }
+    ],
+    "program": "azure-pipelines-language-server",
+    "args": [
+      "--stdio"
+    ],
+    "homepage": "https://github.com/microsoft/azure-pipelines-language-server",
+    "install": {
+      "method": "npm",
+      "package": "azure-pipelines-language-server",
+      "binary": "azure-pipelines-language-server",
+      "requires": "Node.js 22.22.2+"
+    }
+  },
+  {
+    "id": "turtle",
+    "name": "Turtle / RDF",
+    "label": "RDF",
+    "category": "Data",
+    "description": "RDF prefixes, resources, and semantic graph documents.",
+    "files": [
+      {
+        "pattern": "*.ttl",
+        "languageId": "turtle"
+      },
+      {
+        "pattern": "*.n3",
+        "languageId": "turtle"
+      },
+      {
+        "pattern": "*.trig",
+        "languageId": "trig"
+      }
+    ],
+    "program": "turtle-language-server",
+    "args": [
+      "--stdio"
+    ],
+    "homepage": "https://github.com/stardog-union/stardog-language-servers",
+    "install": {
+      "method": "npm",
+      "package": "turtle-language-server",
+      "binary": "turtle-language-server",
+      "requires": "Node.js 22.22.2+"
+    }
+  },
+  {
+    "id": "systemverilog",
+    "name": "SystemVerilog / Verilog",
+    "label": "SV",
+    "category": "Languages",
+    "description": "Hardware modules, signals, ports, symbol hover, and definition navigation.",
+    "files": [
+      {
+        "pattern": "*.sv",
+        "languageId": "systemverilog"
+      },
+      {
+        "pattern": "*.svh",
+        "languageId": "systemverilog"
+      },
+      {
+        "pattern": "*.v",
+        "languageId": "verilog"
+      },
+      {
+        "pattern": "*.vh",
+        "languageId": "verilog"
+      }
+    ],
+    "program": "svlangserver",
+    "args": [
+      "--stdio"
+    ],
+    "homepage": "https://github.com/imc-trading/svlangserver",
+    "install": {
+      "method": "npm",
+      "package": "@imc-trading/svlangserver",
+      "binary": "svlangserver",
+      "requires": "Node.js 22.22.2+"
+    },
+    "settings": {
+      "systemverilog": {
+        "disableLinting": true,
+        "includeIndexing": [
+          "**/*.sv",
+          "**/*.svh",
+          "**/*.v",
+          "**/*.vh"
+        ]
+      }
+    }
+  },
+  {
+    "id": "go",
+    "name": "Go · gopls",
+    "label": "GO",
+    "category": "Languages",
+    "description": "Go packages, types, imports, and definitions.",
+    "files": [
+      {
+        "pattern": "*.go",
+        "languageId": "go"
+      }
+    ],
+    "program": "gopls",
+    "args": [],
+    "homepage": "https://go.dev/gopls/",
+    "install": {
+      "method": "go",
+      "package": "golang.org/x/tools/gopls",
+      "module": "golang.org/x/tools/gopls",
+      "binary": "gopls",
+      "requires": "Go 1.24+; upstream may require a newer toolchain"
+    }
+  },
+  {
+    "id": "jsonnet",
+    "name": "Jsonnet",
+    "label": "JN",
+    "category": "Configuration",
+    "description": "Jsonnet configuration, imports, and object members.",
+    "files": [
+      {
+        "pattern": "*.jsonnet",
+        "languageId": "jsonnet"
+      },
+      {
+        "pattern": "*.libsonnet",
+        "languageId": "jsonnet"
+      }
+    ],
+    "program": "jsonnet-language-server",
+    "args": [],
+    "homepage": "https://github.com/grafana/jsonnet-language-server",
+    "install": {
+      "method": "go",
+      "package": "github.com/grafana/jsonnet-language-server",
+      "module": "github.com/grafana/jsonnet-language-server",
+      "binary": "jsonnet-language-server",
+      "requires": "Go 1.24+; upstream may require a newer toolchain"
+    }
+  },
+  {
+    "id": "jq",
+    "name": "jq",
+    "label": "JQ",
+    "category": "Data",
+    "description": "jq filters, functions, and JSON query definitions.",
+    "files": [
+      {
+        "pattern": "*.jq",
+        "languageId": "jq"
+      }
+    ],
+    "program": "jq-lsp",
+    "args": [],
+    "homepage": "https://github.com/wader/jq-lsp",
+    "install": {
+      "method": "go",
+      "package": "github.com/wader/jq-lsp",
+      "module": "github.com/wader/jq-lsp",
+      "binary": "jq-lsp",
+      "requires": "Go 1.24+; upstream may require a newer toolchain"
+    }
+  },
+  {
+    "id": "cue",
+    "name": "CUE",
+    "label": "CUE",
+    "category": "Configuration",
+    "description": "CUE schemas, constraints, and data configuration.",
+    "files": [
+      {
+        "pattern": "*.cue",
+        "languageId": "cue"
+      }
+    ],
+    "program": "cue",
+    "args": [
+      "lsp"
+    ],
+    "homepage": "https://cuelang.org/docs/concept/using-the-cue-language-server/",
+    "install": {
+      "method": "go",
+      "package": "cuelang.org/go/cmd/cue",
+      "module": "cuelang.org/go",
+      "binary": "cue",
+      "requires": "Go 1.24+; upstream may require a newer toolchain"
+    }
+  },
+  {
+    "id": "rego",
+    "name": "Rego",
+    "label": "OPA",
+    "category": "Configuration",
+    "description": "Open Policy Agent rules, packages, and references.",
+    "files": [
+      {
+        "pattern": "*.rego",
+        "languageId": "rego"
+      }
+    ],
+    "program": "regols",
+    "args": [],
+    "homepage": "https://github.com/kitagry/regols",
+    "install": {
+      "method": "go",
+      "package": "github.com/kitagry/regols",
+      "module": "github.com/kitagry/regols",
+      "binary": "regols",
+      "requires": "Go 1.24+; upstream may require a newer toolchain"
+    }
+  },
+  {
+    "id": "helm",
+    "name": "Helm",
+    "label": "HELM",
+    "category": "Configuration",
+    "description": "Helm chart templates, values, and Go-template references.",
+    "files": [
+      {
+        "pattern": "**/templates/**/*.yaml",
+        "languageId": "helm"
+      },
+      {
+        "pattern": "**/templates/**/*.yml",
+        "languageId": "helm"
+      },
+      {
+        "pattern": "**/templates/**/*.tpl",
+        "languageId": "helm"
+      }
+    ],
+    "program": "helm_ls",
+    "args": [
+      "serve"
+    ],
+    "homepage": "https://github.com/mrjosh/helm-ls",
+    "install": {
+      "method": "go",
+      "package": "github.com/mrjosh/helm-ls",
+      "module": "github.com/mrjosh/helm-ls",
+      "binary": "helm_ls",
+      "requires": "Go 1.24+ and GCC or Clang; upstream may require newer Go",
+      "cgo": true
+    },
+    "settings": {
+      "helm-ls": {
+        "helmLint": {
+          "enabled": false
+        },
+        "yamlls": {
+          "enabled": false
+        }
+      }
+    }
+  },
+  {
+    "id": "terraform",
+    "name": "Terraform / HCL",
+    "label": "TF",
+    "category": "Configuration",
+    "description": "Terraform resources, modules, providers, and variables.",
+    "files": [
+      {
+        "pattern": "*.tf",
+        "languageId": "terraform"
+      },
+      {
+        "pattern": "*.tfvars",
+        "languageId": "terraform-vars"
+      },
+      {
+        "pattern": "*.hcl",
+        "languageId": "hcl"
+      }
+    ],
+    "program": "terraform-ls",
+    "args": [
+      "serve"
+    ],
+    "homepage": "https://github.com/hashicorp/terraform-ls",
+    "install": {
+      "method": "go",
+      "package": "github.com/hashicorp/terraform-ls",
+      "module": "github.com/hashicorp/terraform-ls",
+      "binary": "terraform-ls",
+      "requires": "Go 1.24+; upstream may require a newer toolchain"
+    }
+  },
+  {
+    "id": "cmake",
+    "name": "CMake",
+    "label": "CMAKE",
+    "category": "Configuration",
+    "description": "CMake functions, targets, variables, and project files.",
+    "files": [
+      {
+        "pattern": "CMakeLists.txt",
+        "languageId": "cmake"
+      },
+      {
+        "pattern": "*.cmake",
+        "languageId": "cmake"
+      }
+    ],
+    "program": "cmake-language-server",
+    "args": [],
+    "homepage": "https://github.com/regen100/cmake-language-server",
+    "install": {
+      "method": "python",
+      "package": "cmake-language-server",
+      "binary": "cmake-language-server",
+      "requires": "Python 3.10–3.13 with venv; CMake for project analysis",
+      "dependencies": {
+        "pygls": "1.3.1"
+      }
+    }
+  },
+  {
+    "id": "fortran",
+    "name": "Fortran · fortls",
+    "label": "F",
+    "category": "Languages",
+    "description": "Fortran modules, procedures, types, and references.",
+    "files": [
+      {
+        "pattern": "*.f",
+        "languageId": "fortran"
+      },
+      {
+        "pattern": "*.f90",
+        "languageId": "fortran"
+      },
+      {
+        "pattern": "*.f95",
+        "languageId": "fortran"
+      },
+      {
+        "pattern": "*.f03",
+        "languageId": "fortran"
+      },
+      {
+        "pattern": "*.f08",
+        "languageId": "fortran"
+      },
+      {
+        "pattern": "*.for",
+        "languageId": "fortran"
+      }
+    ],
+    "program": "fortls",
+    "args": [],
+    "homepage": "https://fortls.fortran-lang.org/",
+    "install": {
+      "method": "python",
+      "package": "fortls",
+      "binary": "fortls",
+      "requires": "Python 3.10+ with venv"
+    }
+  },
+  {
+    "id": "nginx",
+    "name": "Nginx",
+    "label": "NG",
+    "category": "Configuration",
+    "description": "Nginx directives, includes, and server configuration.",
+    "files": [
+      {
+        "pattern": "nginx.conf",
+        "languageId": "nginx"
+      },
+      {
+        "pattern": "*.nginx",
+        "languageId": "nginx"
+      },
+      {
+        "pattern": "*.nginx.conf",
+        "languageId": "nginx"
+      }
+    ],
+    "program": "nginx-language-server",
+    "args": [],
+    "homepage": "https://github.com/pappasam/nginx-language-server",
+    "install": {
+      "method": "python",
+      "package": "nginx-language-server",
+      "binary": "nginx-language-server",
+      "requires": "Python 3.10–3.13 with venv"
+    }
+  },
+  {
+    "id": "robot",
+    "name": "Robot Framework",
+    "label": "RF",
+    "category": "Languages",
+    "description": "Robot test cases, keywords, resources, and libraries.",
+    "files": [
+      {
+        "pattern": "*.robot",
+        "languageId": "robot"
+      },
+      {
+        "pattern": "*.resource",
+        "languageId": "robot"
+      }
+    ],
+    "program": "robotframework_ls",
+    "args": [],
+    "homepage": "https://github.com/robocorp/robotframework-lsp",
+    "install": {
+      "method": "python",
+      "package": "robotframework-lsp",
+      "binary": "robotframework_ls",
+      "requires": "Python 3.10+ with venv; Robot Framework is included"
+    }
+  },
+  {
+    "id": "rust",
+    "name": "Rust · rust-analyzer",
+    "label": "RS",
+    "category": "Languages",
+    "description": "Rust types, traits, macros, and crate navigation.",
+    "files": [
+      {
+        "pattern": "*.rs",
+        "languageId": "rust"
+      }
+    ],
+    "program": "rust-analyzer",
+    "args": [],
+    "homepage": "https://rust-analyzer.github.io/book/installation.html",
+    "install": {
+      "method": "external",
+      "requires": "rust-analyzer and the Rust toolchain"
+    },
+    "initializationOptions": {
+      "cargo": {
+        "buildScripts": {
+          "enable": false
+        }
+      },
+      "procMacro": {
+        "enable": false
+      },
+      "checkOnSave": false
+    }
+  },
+  {
+    "id": "cpp",
+    "name": "C / C++ · clangd",
+    "label": "C++",
+    "category": "Languages",
+    "description": "C, C++, Objective-C, and header-file navigation.",
+    "files": [
+      {
+        "pattern": "*.c",
+        "languageId": "c"
+      },
+      {
+        "pattern": "*.h",
+        "languageId": "c"
+      },
+      {
+        "pattern": "*.cc",
+        "languageId": "cpp"
+      },
+      {
+        "pattern": "*.cpp",
+        "languageId": "cpp"
+      },
+      {
+        "pattern": "*.cxx",
+        "languageId": "cpp"
+      },
+      {
+        "pattern": "*.hpp",
+        "languageId": "cpp"
+      },
+      {
+        "pattern": "*.hh",
+        "languageId": "cpp"
+      },
+      {
+        "pattern": "*.hxx",
+        "languageId": "cpp"
+      },
+      {
+        "pattern": "*.m",
+        "languageId": "objective-c"
+      },
+      {
+        "pattern": "*.mm",
+        "languageId": "objective-cpp"
+      }
+    ],
+    "program": "clangd",
+    "args": [
+      "--background-index=false",
+      "--clang-tidy=false",
+      "--enable-config=false"
+    ],
+    "homepage": "https://clangd.llvm.org/installation",
+    "install": {
+      "method": "external",
+      "requires": "LLVM clangd; compile_commands.json improves results"
+    }
+  },
+  {
+    "id": "java",
+    "name": "Java · Eclipse JDT LS",
+    "label": "JAVA",
+    "category": "Languages",
+    "description": "Java classes, methods, imports, and project symbols.",
+    "files": [
+      {
+        "pattern": "*.java",
+        "languageId": "java"
+      }
+    ],
+    "program": "jdtls",
+    "args": [],
+    "homepage": "https://github.com/eclipse-jdtls/eclipse.jdt.ls",
+    "install": {
+      "method": "external",
+      "requires": "Eclipse JDT LS and a supported JDK"
+    }
+  },
+  {
+    "id": "csharp",
+    "name": "C# · csharp-ls",
+    "label": "C#",
+    "category": "Languages",
+    "description": "C# types, namespaces, and solution navigation.",
+    "files": [
+      {
+        "pattern": "*.cs",
+        "languageId": "csharp"
+      }
+    ],
+    "program": "csharp-ls",
+    "args": [],
+    "homepage": "https://github.com/razzmatazz/csharp-language-server",
+    "install": {
+      "method": "external",
+      "requires": "csharp-ls and the .NET SDK"
+    }
+  },
+  {
+    "id": "kotlin",
+    "name": "Kotlin",
+    "label": "KT",
+    "category": "Languages",
+    "description": "Kotlin declarations, types, and project references.",
+    "files": [
+      {
+        "pattern": "*.kt",
+        "languageId": "kotlin"
+      },
+      {
+        "pattern": "*.kts",
+        "languageId": "kotlin"
+      }
+    ],
+    "program": "kotlin-lsp",
+    "args": [
+      "--stdio"
+    ],
+    "homepage": "https://github.com/Kotlin/kotlin-lsp",
+    "install": {
+      "method": "external",
+      "requires": "Kotlin Language Server and a supported JDK"
+    }
+  },
+  {
+    "id": "swift",
+    "name": "Swift · SourceKit-LSP",
+    "label": "SW",
+    "category": "Languages",
+    "description": "Swift types, symbols, and package navigation.",
+    "files": [
+      {
+        "pattern": "*.swift",
+        "languageId": "swift"
+      }
+    ],
+    "program": "sourcekit-lsp",
+    "args": [],
+    "homepage": "https://github.com/swiftlang/sourcekit-lsp",
+    "install": {
+      "method": "external",
+      "requires": "Swift toolchain with SourceKit-LSP"
+    }
+  },
+  {
+    "id": "lua",
+    "name": "Lua · LuaLS",
+    "label": "LUA",
+    "category": "Languages",
+    "description": "Lua globals, modules, types, and documentation.",
+    "files": [
+      {
+        "pattern": "*.lua",
+        "languageId": "lua"
+      }
+    ],
+    "program": "lua-language-server",
+    "args": [],
+    "homepage": "https://luals.github.io/wiki/getting-started/",
+    "install": {
+      "method": "external",
+      "requires": "Lua Language Server"
+    }
+  },
+  {
+    "id": "markdown",
+    "name": "Markdown · Marksman",
+    "label": "MD",
+    "category": "Markup",
+    "description": "Markdown headings, wiki links, and document references.",
+    "files": [
+      {
+        "pattern": "*.md",
+        "languageId": "markdown"
+      },
+      {
+        "pattern": "*.markdown",
+        "languageId": "markdown"
+      }
+    ],
+    "program": "marksman",
+    "args": [
+      "server"
+    ],
+    "homepage": "https://github.com/artempyanykh/marksman",
+    "install": {
+      "method": "external",
+      "requires": "Marksman"
+    }
+  },
+  {
+    "id": "toml",
+    "name": "TOML · Taplo",
+    "label": "TOML",
+    "category": "Configuration",
+    "description": "TOML tables, keys, values, and schema documentation.",
+    "files": [
+      {
+        "pattern": "*.toml",
+        "languageId": "toml"
+      }
+    ],
+    "program": "taplo",
+    "args": [
+      "lsp",
+      "stdio"
+    ],
+    "homepage": "https://taplo.tamasfe.dev/cli/installation.html",
+    "install": {
+      "method": "external",
+      "requires": "Taplo CLI with language-server support"
+    }
+  },
+  {
+    "id": "zig",
+    "name": "Zig · ZLS",
+    "label": "ZIG",
+    "category": "Languages",
+    "description": "Zig types, declarations, imports, and definitions.",
+    "files": [
+      {
+        "pattern": "*.zig",
+        "languageId": "zig"
+      },
+      {
+        "pattern": "*.zon",
+        "languageId": "zig"
+      }
+    ],
+    "program": "zls",
+    "args": [],
+    "homepage": "https://zigtools.org/zls/install/",
+    "install": {
+      "method": "external",
+      "requires": "ZLS and a matching Zig toolchain"
+    }
+  },
+  {
+    "id": "latex",
+    "name": "LaTeX · TexLab",
+    "label": "TEX",
+    "category": "Markup",
+    "description": "LaTeX commands, labels, citations, and documents.",
+    "files": [
+      {
+        "pattern": "*.tex",
+        "languageId": "latex"
+      },
+      {
+        "pattern": "*.bib",
+        "languageId": "bibtex"
+      }
+    ],
+    "program": "texlab",
+    "args": [],
+    "homepage": "https://github.com/latex-lsp/texlab",
+    "install": {
+      "method": "external",
+      "requires": "TexLab; TeX distribution for bibliography tools"
+    }
+  },
+  {
+    "id": "xml",
+    "name": "XML · LemMinX",
+    "label": "XML",
+    "category": "Markup",
+    "description": "XML elements, schemas, namespaces, and references.",
+    "files": [
+      {
+        "pattern": "*.xml",
+        "languageId": "xml"
+      },
+      {
+        "pattern": "*.xsd",
+        "languageId": "xml"
+      },
+      {
+        "pattern": "*.xsl",
+        "languageId": "xml"
+      },
+      {
+        "pattern": "*.xslt",
+        "languageId": "xml"
+      },
+      {
+        "pattern": "*.dtd",
+        "languageId": "xml"
+      }
+    ],
+    "program": "lemminx",
+    "args": [],
+    "homepage": "https://github.com/eclipse-lemminx/lemminx",
+    "install": {
+      "method": "external",
+      "requires": "LemMinX launcher and Java; configure java -jar if needed"
+    }
+  },
+  {
+    "id": "ruby",
+    "name": "Ruby · Ruby LSP",
+    "label": "RB",
+    "category": "Languages",
+    "description": "Ruby classes, methods, constants, and references.",
+    "files": [
+      {
+        "pattern": "*.rb",
+        "languageId": "ruby"
+      },
+      {
+        "pattern": "*.rake",
+        "languageId": "ruby"
+      },
+      {
+        "pattern": "Gemfile",
+        "languageId": "ruby"
+      },
+      {
+        "pattern": "Rakefile",
+        "languageId": "ruby"
+      }
+    ],
+    "program": "ruby-lsp",
+    "args": [],
+    "homepage": "https://shopify.github.io/ruby-lsp/",
+    "install": {
+      "method": "external",
+      "requires": "Ruby with the ruby-lsp gem"
+    }
+  },
+  {
+    "id": "elixir",
+    "name": "Elixir · ElixirLS",
+    "label": "EX",
+    "category": "Languages",
+    "description": "Elixir modules, functions, types, and references.",
+    "files": [
+      {
+        "pattern": "*.ex",
+        "languageId": "elixir"
+      },
+      {
+        "pattern": "*.exs",
+        "languageId": "elixir"
+      }
+    ],
+    "program": "elixir-ls",
+    "args": [],
+    "homepage": "https://elixir-lsp.github.io/elixir-ls/",
+    "install": {
+      "method": "external",
+      "requires": "ElixirLS and compatible Elixir / Erlang runtimes"
+    }
+  },
+  {
+    "id": "ocaml",
+    "name": "OCaml · OCaml-LSP",
+    "label": "ML",
+    "category": "Languages",
+    "description": "OCaml modules, types, and interface navigation.",
+    "files": [
+      {
+        "pattern": "*.ml",
+        "languageId": "ocaml"
+      },
+      {
+        "pattern": "*.mli",
+        "languageId": "ocaml.interface"
+      }
+    ],
+    "program": "ocamllsp",
+    "args": [],
+    "homepage": "https://github.com/ocaml/ocaml-lsp",
+    "install": {
+      "method": "external",
+      "requires": "OCaml-LSP in your project or opam environment"
+    }
+  },
+  {
+    "id": "dart",
+    "name": "Dart / Flutter",
+    "label": "DART",
+    "category": "Languages",
+    "description": "Dart types, widgets, packages, and definitions.",
+    "files": [
+      {
+        "pattern": "*.dart",
+        "languageId": "dart"
+      }
+    ],
+    "program": "dart",
+    "args": [
+      "language-server",
+      "--protocol=lsp"
+    ],
+    "homepage": "https://dart.dev/tools/dart-language-server",
+    "install": {
+      "method": "external",
+      "requires": "Dart SDK or Flutter with Dart on PATH"
+    }
+  }
+]

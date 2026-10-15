@@ -13,40 +13,35 @@ import (
 	"strings"
 )
 
-var languageNames = map[string]string{"php": "Phpactor", "typescript": "TypeScript / JavaScript", "vue": "Vue"}
-var setupURLs = map[string]string{"php": "https://phpactor.readthedocs.io/en/master/usage/language-server.html", "typescript": "https://github.com/typescript-language-server/typescript-language-server#installing", "vue": "https://github.com/vuejs/language-tools/tree/master/packages/language-server"}
-
 func canonicalLanguage(value string) (string, error) {
-	switch value {
-	case "php", "typescript", "vue":
-		return value, nil
-	case "javascript":
-		return "typescript", nil
-	default:
-		return "", errors.New("Supported language servers are PHP, TypeScript / JavaScript, and Vue")
+	if value == "javascript" {
+		value = "typescript"
 	}
+	if catalogByID[value] != nil {
+		return value, nil
+	}
+	return "", errors.New("Choose a supported language server from the Settings catalog")
+}
+
+func usesTypeScriptSDK(language string) bool {
+	return language == "typescript" || language == "vue" || language == "astro" || language == "mdx"
 }
 func languageForPath(path string) string {
-	switch strings.ToLower(filepath.Ext(path)) {
-	case ".php", ".phtml":
-		return "php"
-	case ".ts", ".mts", ".cts":
-		return "typescript"
-	case ".tsx":
-		return "typescriptreact"
-	case ".js", ".mjs", ".cjs":
-		return "javascript"
-	case ".jsx":
-		return "javascriptreact"
-	case ".vue":
-		return "vue"
+	if matches := serversForPath(path); len(matches) > 0 {
+		return matches[0].LanguageID
 	}
 	return ""
 }
 func serverLanguage(language string) string {
-	switch language {
-	case "javascript", "typescriptreact", "javascriptreact":
-		return "typescript"
+	if catalogByID[language] != nil {
+		return language
+	}
+	for _, server := range serverCatalog {
+		for _, file := range server.Files {
+			if file.LanguageID == language {
+				return server.ID
+			}
+		}
 	}
 	return language
 }
@@ -238,14 +233,21 @@ func findDependency(paths []string, filename string) string {
 	return ""
 }
 func detectServer(root, language string, configuration ServerConfiguration, managed ...ServerConfiguration) ServerStatus {
-	status := ServerStatus{Language: language, Name: languageNames[language], SetupURL: setupURLs[language], Configuration: configuration, Args: []string{}}
-	status.Configuration.Args = append([]string{}, configuration.Args...)
-	directories := []string{}
+	var directories []string
 	if root != "" {
 		directories = projectDirectories(root)
 	}
-	defaults := map[string][]string{"php": {"language-server"}, "typescript": {"--stdio"}, "vue": {"--stdio"}}
-	programs := map[string]string{"php": "phpactor", "typescript": "typescript-language-server", "vue": "vue-language-server"}
+	return detectServerInDirectories(directories, language, configuration, managed...)
+}
+func detectServerInDirectories(directories []string, language string, configuration ServerConfiguration, managed ...ServerConfiguration) ServerStatus {
+	status := catalogStatus(language)
+	status.Configuration = configuration
+	status.Configuration.Args = append([]string{}, configuration.Args...)
+	definition := catalogByID[language]
+	if definition == nil {
+		status.Error = "Choose a supported language server from the catalog"
+		return status
+	}
 	if configuration.Command != "" {
 		status.Command = configuration.Command
 		status.Args = append([]string{}, configuration.Args...)
@@ -261,7 +263,7 @@ func detectServer(root, language string, configuration ServerConfiguration, mana
 			configuration.VuePluginPath = managed[0].VuePluginPath
 		}
 	} else {
-		status.Args = append([]string{}, defaults[language]...)
+		status.Args = append([]string{}, definition.Args...)
 		for _, directory := range directories {
 			var script, interpreter string
 			switch language {
@@ -274,6 +276,11 @@ func detectServer(root, language string, configuration ServerConfiguration, mana
 			case "vue":
 				script = filepath.Join(directory, "node_modules", "@vue", "language-server", "bin", "vue-language-server.js")
 				interpreter = "node"
+			default:
+				if definition.Install.Method == "npm" {
+					script, _ = npmServerEntry(directory, definition)
+					interpreter = "node"
+				}
 			}
 			if existingFile(script) {
 				if executable, err := resolveProgram(interpreter); err == nil {
@@ -285,7 +292,7 @@ func detectServer(root, language string, configuration ServerConfiguration, mana
 			}
 		}
 		if status.Command == "" {
-			if executable, err := resolveProgram(programs[language]); err == nil {
+			if executable, err := resolveProgram(definition.Program); err == nil {
 				status.Command = executable
 				status.Source = "PATH"
 			}
@@ -293,6 +300,9 @@ func detectServer(root, language string, configuration ServerConfiguration, mana
 	}
 	if status.Command == "" {
 		status.Error = fmt.Sprintf("%s is not installed. Install it in Settings or configure an existing executable", status.Name)
+		if definition.Install.Method == "external" {
+			status.Error = fmt.Sprintf("Install %s with its SDK or upstream setup instructions, then configure its executable", status.Name)
+		}
 		return status
 	}
 	executable, err := resolveProgram(status.Command)
@@ -301,7 +311,7 @@ func detectServer(root, language string, configuration ServerConfiguration, mana
 		return status
 	}
 	status.Command = executable
-	if language != "php" {
+	if usesTypeScriptSDK(language) {
 		sdk := configuration.TypeScriptSDKPath
 		if sdk == "" {
 			sdk = findDependency(dependencyCandidates(directories, status.Command, status.Args, filepath.Join("typescript", "lib")), "tsserver.js")

@@ -234,8 +234,8 @@ func TestServerConfigurationPersistsReadbackAndMissingToolsAreActionable(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(statuses) != 3 || !statuses[0].Available || statuses[0].Source != "configured" || statuses[0].Configuration.Command == "" {
-		t.Fatalf("Configured server status incomplete: %#v", statuses)
+	if len(statuses) != len(serverCatalog) || !statuses[0].Available || statuses[0].Source != "configured" || statuses[0].Configuration.Command == "" {
+		t.Fatalf("Configured server status incomplete: %d entries", len(statuses))
 	}
 	for _, status := range statuses[1:] {
 		if status.Available || status.Error == "" || !strings.HasPrefix(status.SetupURL, "https://") {
@@ -248,7 +248,7 @@ func TestServerConfigurationPersistsReadbackAndMissingToolsAreActionable(t *test
 	if err != nil || readback[0].Configuration.Command != statuses[0].Configuration.Command {
 		t.Fatal("Language server configuration did not persist")
 	}
-	if err = m.Configure(context.Background(), "ruby", ServerConfiguration{}); err == nil {
+	if err = m.Configure(context.Background(), "not-a-catalog-server", ServerConfiguration{}); err == nil {
 		t.Fatal("Unsupported language accepted")
 	}
 	if err = m.Configure(context.Background(), "php", ServerConfiguration{Command: "php", Args: []string{"\x00"}}); err == nil {

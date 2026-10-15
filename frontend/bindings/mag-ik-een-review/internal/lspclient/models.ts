@@ -35,6 +35,11 @@ export interface DefinitionTarget {
     "external": boolean;
 }
 
+export interface FileAssociation {
+    "pattern": string;
+    "languageId": string;
+}
+
 export interface Hover {
     "contents": string;
     "kind": string;
@@ -69,6 +74,14 @@ export interface ServerConfiguration {
 export interface ServerStatus {
     "language": string;
     "name": string;
+    "label": string;
+    "category": string;
+    "description": string;
+    "fileTypes": FileAssociation[] | null;
+    "installMethod": string;
+    "requirements": string;
+    "defaultCommand": string;
+    "defaultArgs": string[] | null;
     "available": boolean;
     "command": string;
     "args": string[] | null;

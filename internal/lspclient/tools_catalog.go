@@ -26,10 +26,10 @@ import (
 const managedTypeScriptSDK = "5.9.3"
 const npmRegistry = "https://registry.npmjs.org"
 
-var toolLanguages = []string{"php", "typescript", "vue"}
+var toolLanguages = managedLanguages()
 var npmVersion = regexp.MustCompile(`^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$`)
 var phpactorVersion = regexp.MustCompile(`^\d{4}\.\d{2}\.\d{2}\.\d{1,4}$`)
-var toolDirectoryName = regexp.MustCompile(`^(php|typescript|vue)-[0-9]+$`)
+var toolDirectoryName = regexp.MustCompile(`^[a-z][a-z0-9-]*-[0-9]+$`)
 
 type toolRelease struct {
 	Version   string            `json:"version"`
@@ -47,8 +47,9 @@ type toolRecord struct {
 	Runtime   string            `json:"runtime"`
 }
 type toolRuntime struct {
-	command string
-	npmCLI  string
+	command  string
+	npmCLI   string
+	compiler string
 }
 type runtimeResult struct {
 	runtime toolRuntime
@@ -82,7 +83,7 @@ func newToolInstaller(ctx context.Context, directory string, client *http.Client
 	copyClient := *client
 	copyClient.CheckRedirect = func(request *http.Request, via []*http.Request) error {
 		host := strings.ToLower(request.URL.Hostname())
-		allowed := host == "api.github.com" || host == "github.com" || host == "registry.npmjs.org" || host == "release-assets.githubusercontent.com" || host == "objects.githubusercontent.com" || host == "github-releases.githubusercontent.com"
+		allowed := host == "api.github.com" || host == "github.com" || host == "registry.npmjs.org" || host == "pypi.org" || host == "proxy.golang.org" || host == "release-assets.githubusercontent.com" || host == "objects.githubusercontent.com" || host == "github-releases.githubusercontent.com"
 		if len(via) >= 5 || request.URL.Scheme != "https" || request.URL.User != nil || !allowed {
 			return errors.New("Language tool downloads must stay on their official HTTPS providers")
 		}
@@ -174,6 +175,10 @@ func writeToolJSON(path string, value any) error {
 }
 
 func validRecord(language string, record toolRecord) bool {
+	definition := catalogByID[language]
+	if definition == nil || definition.Install.Method == "external" {
+		return false
+	}
 	if !filepath.IsAbs(record.Runtime) || len(record.Runtime) > 8192 || strings.ContainsRune(record.Runtime, 0) {
 		return false
 	}
@@ -186,6 +191,12 @@ func validRecord(language string, record toolRecord) bool {
 	if language == "php" {
 		return phpactorVersion.MatchString(record.Version)
 	}
+	if definition.Install.Method == "go" {
+		return goToolVersion.MatchString(record.Version) && len(record.Packages) == 0
+	}
+	if definition.Install.Method == "python" {
+		return validPythonPackages(definition, record.Version, record.Packages)
+	}
 	return validPackages(language, record.Version, record.Packages)
 }
 func validPackages(language, version string, packages map[string]string) bool {
@@ -193,7 +204,20 @@ func validPackages(language, version string, packages map[string]string) bool {
 	if language == "vue" {
 		main = "@vue/language-server"
 	} else if language != "typescript" {
-		return false
+		definition := catalogByID[language]
+		if definition == nil || definition.Install.Method != "npm" {
+			return false
+		}
+		expected := 1 + len(definition.Install.Dependencies)
+		if usesTypeScriptSDK(language) {
+			expected++
+		}
+		for dependency := range definition.Install.Dependencies {
+			if !npmVersion.MatchString(packages[dependency]) {
+				return false
+			}
+		}
+		return len(packages) == expected && npmVersion.MatchString(version) && packages[definition.Install.Package] == version && (!usesTypeScriptSDK(language) || npmVersion.MatchString(packages["typescript"]))
 	}
 	expected := 2
 	if language == "vue" {
@@ -209,16 +233,50 @@ func validRelease(language string, release toolRelease) bool {
 		expected := "https://github.com/phpactor/phpactor/releases/download/" + release.Version + "/phpactor.phar"
 		return phpactorVersion.MatchString(release.Version) && release.URL == expected && regexp.MustCompile(`^sha256:[0-9a-f]{64}$`).MatchString(release.Digest) && release.Size > 0 && release.Size <= 64*1024*1024
 	}
-	return validPackages(language, release.Version, release.Packages) && release.Packages["typescript"] == managedTypeScriptSDK
+	definition := catalogByID[language]
+	if definition == nil || definition.Install.Method == "external" {
+		return false
+	}
+	if definition.Install.Method == "go" {
+		return goToolVersion.MatchString(release.Version) && len(release.Packages) == 0
+	}
+	if definition.Install.Method == "python" {
+		return validPythonPackages(definition, release.Version, release.Packages) && validPinnedDependencies(definition, release.Packages)
+	}
+	return validPackages(language, release.Version, release.Packages) && validPinnedDependencies(definition, release.Packages) && (!usesTypeScriptSDK(language) || release.Packages["typescript"] == managedTypeScriptSDK)
+}
+
+func validPinnedDependencies(definition *serverDefinition, packages map[string]string) bool {
+	for name, version := range definition.Install.Dependencies {
+		if packages[name] != version {
+			return false
+		}
+	}
+	return true
+}
+
+func validPythonPackages(definition *serverDefinition, version string, packages map[string]string) bool {
+	if !pythonToolVersion.MatchString(version) || packages[definition.Install.Package] != version || len(packages) != 1+len(definition.Install.Dependencies) {
+		return false
+	}
+	for name := range definition.Install.Dependencies {
+		if !pythonToolVersion.MatchString(packages[name]) {
+			return false
+		}
+	}
+	return true
 }
 
 func newerVersion(candidate, installed string) bool {
 	if installed == "" {
 		return false
 	}
-	a, b := strings.Split(candidate, "."), strings.Split(installed, ".")
-	if len(a) != len(b) {
-		return false
+	a, b := strings.Split(strings.TrimPrefix(candidate, "v"), "."), strings.Split(strings.TrimPrefix(installed, "v"), ".")
+	for len(a) < len(b) {
+		a = append(a, "0")
+	}
+	for len(b) < len(a) {
+		b = append(b, "0")
 	}
 	for index := range a {
 		left, leftErr := strconv.ParseUint(a[index], 10, 32)
@@ -253,11 +311,11 @@ func (t *toolInstaller) getJSON(ctx context.Context, endpoint string, value any)
 	if response.StatusCode != http.StatusOK {
 		return fmt.Errorf("The language tool provider returned HTTP %d; try again later", response.StatusCode)
 	}
-	body, err := io.ReadAll(io.LimitReader(response.Body, 1024*1024+1))
+	body, err := io.ReadAll(io.LimitReader(response.Body, 4*1024*1024+1))
 	if err != nil {
 		return err
 	}
-	if len(body) > 1024*1024 {
+	if len(body) > 4*1024*1024 {
 		return errors.New("Language tool provider metadata exceeds the size limit")
 	}
 	if err = json.Unmarshal(body, value); err != nil {
@@ -277,6 +335,13 @@ func (t *toolInstaller) npmPackage(ctx context.Context, name, version string) (s
 }
 func (t *toolInstaller) fetchRelease(ctx context.Context, language string) (toolRelease, error) {
 	release := toolRelease{CheckedAt: time.Now().UTC()}
+	definition := catalogByID[language]
+	if definition == nil || definition.Install.Method == "external" {
+		return release, errors.New("This server is installed with its SDK or upstream setup instructions")
+	}
+	if definition.Install.Method == "go" || definition.Install.Method == "python" {
+		return t.fetchEcosystemRelease(ctx, definition)
+	}
 	if language == "php" {
 		var upstream struct {
 			Tag               string `json:"tag_name"`
@@ -298,6 +363,18 @@ func (t *toolInstaller) fetchRelease(ctx context.Context, language string) (tool
 				release.Version, release.URL, release.Digest, release.Size = upstream.Tag, asset.URL, asset.Digest, asset.Size
 				break
 			}
+		}
+	} else if language != "typescript" && language != "vue" {
+		version, err := t.npmPackage(ctx, definition.Install.Package, "latest")
+		if err != nil {
+			return release, err
+		}
+		release.Version, release.Packages = version, map[string]string{definition.Install.Package: version}
+		for name, version := range definition.Install.Dependencies {
+			release.Packages[name] = version
+		}
+		if usesTypeScriptSDK(language) {
+			release.Packages["typescript"] = managedTypeScriptSDK
 		}
 	} else {
 		server, err := t.npmPackage(ctx, "typescript-language-server", "latest")
@@ -339,16 +416,27 @@ func (t *toolInstaller) checkUpdates(ctx context.Context, force bool) error {
 	}
 	defer func() { t.checkGate <- struct{}{} }()
 	var workers sync.WaitGroup
+	parallel := make(chan struct{}, 6)
 	for _, language := range toolLanguages {
 		t.mu.Lock()
 		last := t.releases[language]
+		installed := t.records[language].Version != ""
 		t.mu.Unlock()
+		if !installed {
+			continue
+		}
 		if !force && !last.CheckedAt.IsZero() && time.Since(last.CheckedAt) < 6*time.Hour {
 			continue
 		}
 		workers.Add(1)
 		go func(language string) {
 			defer workers.Done()
+			select {
+			case parallel <- struct{}{}:
+				defer func() { <-parallel }()
+			case <-ctx.Done():
+				return
+			}
 			release, err := t.fetchRelease(ctx, language)
 			t.mu.Lock()
 			defer t.mu.Unlock()
@@ -381,8 +469,11 @@ func (t *toolInstaller) checkUpdates(ctx context.Context, force bool) error {
 
 func (t *toolInstaller) runtimeFor(ctx context.Context, language string) (toolRuntime, error) {
 	key := "node"
-	if language == "php" {
-		key = "php"
+	if definition := catalogByID[language]; definition != nil && definition.Install.Method != "npm" {
+		key = definition.Install.Method
+		if definition.Install.CGO {
+			key += "-cgo"
+		}
 	}
 	t.runtimeMu.Lock()
 	defer t.runtimeMu.Unlock()
@@ -398,6 +489,22 @@ func (t *toolInstaller) runtimeFor(ctx context.Context, language string) (toolRu
 func (t *toolInstaller) detectRuntime(ctx context.Context, language string) (toolRuntime, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
+	if definition := catalogByID[language]; definition != nil && (definition.Install.Method == "go" || definition.Install.Method == "python") {
+		var compiler string
+		if definition.Install.CGO {
+			var err error
+			compiler, err = resolveProgram("gcc")
+			if err != nil {
+				compiler, err = resolveProgram("clang")
+			}
+			if err != nil {
+				return toolRuntime{}, errors.New("This server also needs a C compiler for Go's cgo support; install GCC or Clang and check again")
+			}
+		}
+		host, err := t.detectEcosystemRuntime(ctx, definition.Install.Method)
+		host.compiler = compiler
+		return host, err
+	}
 	if language == "php" {
 		if runtime.GOOS == "windows" {
 			return toolRuntime{}, errors.New("Managed Phpactor needs PHP's POSIX extension, which is unavailable in native Windows PHP. TypeScript and Vue installation remain supported.")
@@ -532,7 +639,30 @@ func (t *toolInstaller) configurationLocked(language string) (ServerConfiguratio
 			return ServerConfiguration{}, false
 		}
 	default:
-		return ServerConfiguration{}, false
+		definition := catalogByID[language]
+		if definition == nil {
+			return ServerConfiguration{}, false
+		}
+		if !usesTypeScriptSDK(language) {
+			configuration.TypeScriptSDKPath = ""
+		}
+		configuration.Args = append([]string{}, definition.Args...)
+		switch definition.Install.Method {
+		case "npm":
+			entry, err := npmServerEntry(directory, definition)
+			if err != nil {
+				return ServerConfiguration{}, false
+			}
+			configuration.Args = append([]string{entry}, configuration.Args...)
+			return configuration, existingFile(record.Runtime) && (!usesTypeScriptSDK(language) || existingFile(filepath.Join(configuration.TypeScriptSDKPath, "tsserver.js")))
+		case "go":
+			configuration.Command = toolBinary(directory, "go", definition.Install.Binary)
+		case "python":
+			configuration.Command = toolBinary(directory, "python", definition.Install.Binary)
+		default:
+			return ServerConfiguration{}, false
+		}
+		return configuration, existingFile(configuration.Command)
 	}
 	return configuration, existingFile(record.Runtime) && existingFile(configuration.Args[0]) && (language == "php" || existingFile(filepath.Join(configuration.TypeScriptSDKPath, "tsserver.js")))
 }

@@ -174,6 +174,9 @@ func extractWorkspace(ctx context.Context, root, cache string, archive ArchiveRe
 	for _, project := range projectDirectories(directory) {
 		relative, _ := filepath.Rel(directory, project)
 		for _, kind := range dependencyKinds {
+			if kind != "vendor" && kind != "node_modules" {
+				continue
+			}
 			source := filepath.Join(root, relative, kind)
 			resolved, err := filepath.EvalSymlinks(source)
 			if err != nil || !existingDirectory(resolved) {

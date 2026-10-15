@@ -5,6 +5,7 @@ export type {
     CodePositionRequest,
     DefinitionDocument,
     DefinitionTarget,
+    FileAssociation,
     Hover,
     Position,
     Range,

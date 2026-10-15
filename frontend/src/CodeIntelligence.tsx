@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import { Icon } from './Icon'
 import { SymbolInformation } from './SymbolInformation'
+import { serverForFile } from './languageServerCatalog'
 import { hoverSymbolSpan } from './hoverSymbol'
 import { hasNativeBackend, LSP_CONFIGURATION_CHANGED_EVENT, services, type CodePositionRequest, type LSPDefinitionDocument, type LSPDefinitionTarget, type LSPHover, type LSPServerStatus } from './services'
 import { codeReviewStyleVariables, effectiveCodeTheme, getCodeAppearance, getCodeReviewPreferences, subscribeCodeAppearance, subscribeCodeReviewPreferences } from './codeReviewPreferences'
@@ -80,15 +81,6 @@ type HoverState = { location: DOMCodeLocation; x: number; y: number; loading: bo
 type ReaderEntry = { target: LSPDefinitionTarget; document: LSPDefinitionDocument }
 const completeRevision = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i
 
-function languageFor(position: DOMCodeLocation): string | undefined {
-  const supplied = position.element.dataset.codeLanguage
-  if (supplied) return ['javascript', 'typescriptreact', 'javascriptreact'].includes(supplied) ? 'typescript' : supplied
-  const extension = position.path.split('.').pop()?.toLowerCase()
-  if (extension && ['php', 'phtml'].includes(extension)) return 'php'
-  if (extension && ['js', 'jsx', 'mjs', 'cjs', 'ts', 'tsx', 'mts', 'cts'].includes(extension)) return 'typescript'
-  return extension === 'vue' ? 'vue' : undefined
-}
-
 export default function CodeIntelligence({ root, host, owner, repo, pullRequest, headSha, baseSha, headRevision, baseRevision, revisionKey, enabled, onOpenSettings, children }: CodeIntelligenceProps) {
   const [nativeAvailable, setNativeAvailable] = useState(hasNativeBackend)
   const [location, setLocation] = useState<DOMCodeLocation>()
@@ -99,6 +91,11 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [serverStatuses, setServerStatuses] = useState<LSPServerStatus[]>()
+  const languageFor = (position: DOMCodeLocation) => serverForFile(position.path, serverStatuses ?? [], position.element.dataset.codeLanguage)?.language
+  const symbolLanguageLabel = (language: string, position: DOMCodeLocation) => {
+    const conventional: Record<string, string> = { php: 'PHP', typescript: 'TypeScript', javascript: 'JavaScript', typescriptreact: 'TSX', javascriptreact: 'JSX', vue: 'Vue', 'yaml.ansible': 'Ansible', dockercompose: 'Compose', 'objective-c': 'Objective-C', 'objective-cpp': 'Objective-C++' }
+    return conventional[language] || serverForFile(position.path, serverStatuses ?? [], language)?.label || language || 'Symbol'
+  }
   const [availabilityError, setAvailabilityError] = useState('')
   const [preparing, setPreparing] = useState(false)
   const [preparationError, setPreparationError] = useState('')
@@ -346,7 +343,7 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
   const goToDefinition = async (position?: DOMCodeLocation) => {
     if (!position || busy) return
     const language = languageFor(position)
-    if (!language) {setNotice('Language intelligence supports PHP, TypeScript / JavaScript, and Vue files.');return}
+    if (!language) {setNotice(serverStatuses ? 'Choose a language server for this file in the Settings catalog.' : 'Language server availability is still loading.');return}
     const server = serverStatuses?.find(item => item.language === language)
     if (server && !server.available) {setError(server.error || `${server.name} needs to be configured before code navigation is available.`);return}
     const request = requestFor(position)
@@ -529,7 +526,7 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
     </section>}
     {!!targets.length && <div className="code-intelligence-targets" role="dialog" aria-label="Choose a definition"><div><strong>Definitions</strong><button className="icon-button" type="button" aria-label="Close definition choices" onClick={() => setTargets([])}><Icon name="close" size={14} /></button></div><ul>{targets.map(target => <li key={target.id || `${target.uri}:${target.range.start.line}:${target.range.start.character}`}><button type="button" disabled={busy} onClick={() => void openTarget(target)}><Icon name="file" size={16} /><span><strong>{target.path}:{target.range.start.line + 1}</strong><span>{target.external ? 'Dependency file' : 'Repository file'} · {target.language}</span></span><Icon name="chevron-right" size={14} /></button></li>)}</ul></div>}
     {hover && <div ref={hoverPanel} className="code-intelligence-hover" role="dialog" aria-label="Symbol information" style={{ left: hover.x, top: hover.y, ...codeReviewStyleVariables(preferences) }} onPointerEnter={() => {clearTimeout(hideTimer.current);hideTimer.current = undefined;hoverEligible.current = true}} onKeyDown={event => {if (event.key === 'Escape') {event.preventDefault();event.stopPropagation();clearHover()}}}>
-      <div className="code-hover-heading"><div><span className="code-hover-language">{({ php: 'PHP', typescript: 'TypeScript', javascript: 'JavaScript', vue: 'Vue' } as Record<string, string>)[hover.result?.language || languageFor(hover.location) || ''] || 'Symbol'}</span><span className="code-hover-location" title={reader?.document.path || hover.location.path}>{(reader?.document.path || hover.location.path).split('/').pop()}:{hover.location.line + 1}</span></div><button className="icon-button" type="button" aria-label="Close symbol information" onClick={clearHover}><Icon name="close" size={13} /></button></div>
+      <div className="code-hover-heading"><div><span className="code-hover-language">{symbolLanguageLabel(hover.result?.language || languageFor(hover.location) || '', hover.location)}</span><span className="code-hover-location" title={reader?.document.path || hover.location.path}>{(reader?.document.path || hover.location.path).split('/').pop()}:{hover.location.line + 1}</span></div><button className="icon-button" type="button" aria-label="Close symbol information" onClick={clearHover}><Icon name="close" size={13} /></button></div>
       {hover.loading ? <div className="code-hover-loading" role="status"><span>{preparing ? 'Preparing code analysis…' : 'Loading symbol information…'}</span><span className="skeleton" aria-hidden="true" /><span className="skeleton" aria-hidden="true" /></div> : hover.error ? <p className="code-hover-error" role="alert">{hover.error}{onOpenSettings && <button className="btn-ghost" type="button" onClick={onOpenSettings}>Language server settings</button>}</p> : hover.result && <SymbolInformation contents={hover.result.contents} kind={hover.result.kind} language={hover.result.language} theme={codeTheme} />}
       <button className="btn-ghost code-hover-definition" type="button" disabled={hover.loading || busy || !!hover.error} onClick={() => void goToDefinition(hover.location)}><span><Icon name="external" size={13} />Go to definition</span><kbd>F12</kbd></button>
     </div>}

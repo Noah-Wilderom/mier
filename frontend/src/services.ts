@@ -83,6 +83,14 @@ export interface LSPServerConfiguration {
 export interface LSPServerStatus {
   language: string;
   name: string;
+  label?: string;
+  category?: string;
+  description?: string;
+  fileTypes?: { pattern: string; languageId: string }[];
+  installMethod?: "npm" | "php" | "go" | "python" | "external";
+  requirements?: string;
+  defaultCommand?: string;
+  defaultArgs?: string[];
   available: boolean;
   command: string;
   args: string[];

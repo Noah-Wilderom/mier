@@ -135,8 +135,13 @@ func (m *Manager) Servers(ctx context.Context, root string) ([]ServerStatus, err
 		return nil, m.configErr
 	}
 	result := []ServerStatus{}
-	for _, language := range []string{"php", "typescript", "vue"} {
-		status := m.detectServer(root, language)
+	var directories []string
+	if root != "" {
+		directories = projectDirectories(root)
+	}
+	for _, definition := range serverCatalog {
+		language := definition.ID
+		status := m.detectServerInDirectories(language, directories)
 		status.Managed = tools[language]
 		if language == "vue" && status.Available {
 			peer := m.vuePeer(root, status)
@@ -160,8 +165,8 @@ func (m *Manager) Configure(ctx context.Context, language string, configuration 
 	if err = validateConfiguration(configuration); err != nil {
 		return err
 	}
-	if language == "php" && (configuration.TypeScriptSDKPath != "" || configuration.VuePluginPath != "") {
-		return errors.New("TypeScript SDK and Vue plugin paths apply only to TypeScript / Vue servers")
+	if (!usesTypeScriptSDK(language) && configuration.TypeScriptSDKPath != "") || (language != "typescript" && language != "vue" && configuration.VuePluginPath != "") {
+		return errors.New("SDK and plugin paths apply only to their corresponding web language servers")
 	}
 	release, err := m.lock(ctx)
 	if err != nil {
@@ -193,11 +198,34 @@ func (m *Manager) restartSessions() {
 	}
 }
 func (m *Manager) detectServer(root, language string) ServerStatus {
+	var directories []string
+	if root != "" {
+		directories = projectDirectories(root)
+	}
+	return m.detectServerInDirectories(language, directories)
+}
+func (m *Manager) detectServerInDirectories(language string, directories []string) ServerStatus {
 	managed, ready := m.tools.configuration(language)
 	if !ready {
 		managed = ServerConfiguration{}
 	}
-	return detectServer(root, language, m.configuration[language], managed)
+	status := detectServerInDirectories(directories, language, m.configuration[language], managed)
+	if status.Source == "managed" {
+		t := m.tools
+		t.mu.Lock()
+		runtime := t.records[language].Runtime
+		t.mu.Unlock()
+		if runtime != "" {
+			status.Environment = []string{"PATH=" + filepath.Dir(runtime) + string(os.PathListSeparator) + os.Getenv("PATH")}
+		}
+		if definition := catalogByID[language]; definition != nil && definition.Install.Method == "go" {
+			status.Environment = append(status.Environment, "GOTOOLCHAIN=local", "GOWORK=off", "GOFLAGS=-mod=readonly", "GOPACKAGESDRIVER=off")
+		}
+		if definition := catalogByID[language]; definition != nil && definition.Install.Method == "python" {
+			status.Environment = []string{"PATH=" + filepath.Dir(status.Command) + string(os.PathListSeparator) + filepath.Dir(runtime) + string(os.PathListSeparator) + os.Getenv("PATH"), "PYTHONPATH=", "PYTHONHOME=", "PYTHONNOUSERSITE=1"}
+		}
+	}
+	return status
 }
 func (m *Manager) vuePeer(root string, vue ServerStatus) ServerStatus {
 	if vue.Source == "managed" {
@@ -268,7 +296,7 @@ func (m *Manager) prepare(ctx context.Context, request CodePositionRequest) (*wo
 		}
 		language = languageForPath(relative)
 		if language == "" {
-			return nil, nil, "", "", "", nil, errors.New("Code intelligence currently supports PHP, TypeScript, JavaScript, and Vue files")
+			return nil, nil, "", "", "", nil, errors.New("Choose a file supported by the language server catalog in Settings")
 		}
 		// PHP and JS/Vue need different installed dependency trees. Separate
 		// captures prevent a frontend installation from blocking a PHP review,
@@ -330,7 +358,23 @@ func (m *Manager) prepare(ctx context.Context, request CodePositionRequest) (*wo
 	if err = validatePosition(text, request); err != nil {
 		return nil, nil, "", "", "", nil, err
 	}
-	s, err := m.ensureSession(ctx, w, serverLanguage(language))
+	selected := serverLanguage(language)
+	relative, _ := filepath.Rel(w.directory, path)
+	candidates := serversForPath(filepath.ToSlash(relative))
+	if len(candidates) > 0 {
+		selected, language = candidates[0].ID, candidates[0].LanguageID
+		var directories []string
+		if w.root != "" {
+			directories = projectDirectories(w.root)
+		}
+		for _, candidate := range candidates {
+			if m.detectServerInDirectories(candidate.ID, directories).Available {
+				selected, language = candidate.ID, candidate.LanguageID
+				break
+			}
+		}
+	}
+	s, err := m.ensureSession(ctx, w, selected)
 	if err != nil {
 		return nil, nil, "", "", "", nil, err
 	}

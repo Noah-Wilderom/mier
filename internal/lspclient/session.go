@@ -38,7 +38,7 @@ func startSession(ctx, requestCtx context.Context, w *workspace, status ServerSt
 	if status.Language == "vue" {
 		args = append(args, "--tsdk="+status.Configuration.TypeScriptSDKPath)
 	}
-	rpc, err := StartRPC(ctx, ServerCommand{Command: status.Command, Args: args, Directory: w.directory}, RPCHandlers{Request: func(_ context.Context, method string, params json.RawMessage) (any, *RPCError) {
+	rpc, err := StartRPC(ctx, ServerCommand{Command: status.Command, Args: args, Directory: w.directory, Env: status.Environment}, RPCHandlers{Request: func(_ context.Context, method string, params json.RawMessage) (any, *RPCError) {
 		switch method {
 		case "workspace/configuration":
 			var request struct {
@@ -50,8 +50,8 @@ func startSession(ctx, requestCtx context.Context, w *workspace, status ServerSt
 				return nil, &RPCError{Code: -32602, Message: "Invalid configuration request"}
 			}
 			result := make([]any, len(request.Items))
-			for index := range result {
-				result[index] = map[string]any{}
+			for index, item := range request.Items {
+				result[index] = configurationSection(status.Language, item.Section)
 			}
 			return result, nil
 		case "workspace/workspaceFolders":
@@ -75,6 +75,14 @@ func startSession(ctx, requestCtx context.Context, w *workspace, status ServerSt
 	}
 	s.rpc = rpc
 	initialization := map[string]any{}
+	if definition := catalogByID[status.Language]; definition != nil && definition.InitializationOptions != nil {
+		for key, value := range definition.InitializationOptions {
+			initialization[key] = value
+		}
+	}
+	if status.Language == "astro" || status.Language == "mdx" {
+		initialization["typescript"] = map[string]any{"tsdk": status.Configuration.TypeScriptSDKPath, "enabled": true}
+	}
 	if status.Language == "php" {
 		// This client exposes symbol inspection, not diagnostic squiggles or
 		// document highlights. Phpactor otherwise computes them on didOpen,
@@ -92,7 +100,7 @@ func startSession(ctx, requestCtx context.Context, w *workspace, status ServerSt
 			initialization["plugins"] = []any{map[string]any{"name": "@vue/typescript-plugin", "location": status.Configuration.VuePluginPath, "languages": []string{"vue"}}}
 		}
 	}
-	params := map[string]any{"processId": os.Getpid(), "clientInfo": map[string]any{"name": "M.I.E.R.", "version": "0.1.0"}, "rootUri": fileURI(w.directory), "workspaceFolders": []any{map[string]any{"uri": fileURI(w.directory), "name": filepath.Base(w.root)}}, "capabilities": map[string]any{"general": map[string]any{"positionEncodings": []string{"utf-16"}}, "workspace": map[string]any{"configuration": true, "workspaceFolders": true, "applyEdit": false}, "textDocument": map[string]any{"hover": map[string]any{"contentFormat": []string{"markdown", "plaintext"}}, "definition": map[string]any{"linkSupport": true}, "synchronization": map[string]any{"dynamicRegistration": true, "didSave": false, "willSave": false}}}, "initializationOptions": initialization}
+	params := map[string]any{"processId": os.Getpid(), "clientInfo": map[string]any{"name": "M.I.E.R.", "version": "0.1.0"}, "rootUri": fileURI(w.directory), "rootPath": w.directory, "workspaceFolders": []any{map[string]any{"uri": fileURI(w.directory), "name": filepath.Base(w.root)}}, "capabilities": map[string]any{"general": map[string]any{"positionEncodings": []string{"utf-16"}}, "workspace": map[string]any{"configuration": true, "workspaceFolders": true, "applyEdit": false}, "textDocument": map[string]any{"hover": map[string]any{"contentFormat": []string{"markdown", "plaintext"}}, "definition": map[string]any{"linkSupport": true}, "synchronization": map[string]any{"dynamicRegistration": true, "didSave": false, "willSave": false}}}, "initializationOptions": initialization}
 	initializeCtx, cancel := context.WithTimeout(requestCtx, 20*time.Second)
 	defer cancel()
 	var result struct {
@@ -114,7 +122,35 @@ func startSession(ctx, requestCtx context.Context, w *workspace, status ServerSt
 		rpc.Close()
 		return nil, err
 	}
+	if definition := catalogByID[status.Language]; definition != nil && len(definition.Settings) > 0 {
+		if err = rpc.Notify(initializeCtx, "workspace/didChangeConfiguration", map[string]any{"settings": definition.Settings}); err != nil {
+			rpc.Close()
+			return nil, err
+		}
+	}
 	return s, nil
+}
+
+func configurationSection(language, section string) any {
+	definition := catalogByID[language]
+	if definition == nil || definition.Settings == nil {
+		return map[string]any{}
+	}
+	if section == "" {
+		return definition.Settings
+	}
+	var value any = definition.Settings
+	for _, part := range strings.Split(section, ".") {
+		object, ok := value.(map[string]any)
+		if !ok {
+			return map[string]any{}
+		}
+		value = object[part]
+	}
+	if value == nil {
+		return map[string]any{}
+	}
+	return value
 }
 func (s *session) close() error { return s.rpc.Close() }
 func (s *session) lock(ctx context.Context) (func(), error) {

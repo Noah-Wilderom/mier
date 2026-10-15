@@ -47,6 +47,15 @@ func toolProvider(t *testing.T) *providerFixture {
 			return
 		}
 		writer.Header().Set("Content-Type", "application/json")
+		if strings.HasSuffix(request.URL.Path, "/@latest") {
+			_ = json.NewEncoder(writer).Encode(map[string]string{"Version": "v" + fixture.serverVersion.Load().(string)})
+			return
+		}
+		if strings.HasPrefix(request.URL.Path, "/pypi/") {
+			name := strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, "/pypi/"), "/json")
+			_ = json.NewEncoder(writer).Encode(map[string]any{"info": map[string]string{"name": name, "version": fixture.serverVersion.Load().(string)}, "urls": []any{map[string]string{"packagetype": "bdist_wheel"}}})
+			return
+		}
 		if strings.HasSuffix(request.URL.Path, "/phpactor.phar") {
 			if fixture.corruptPHP.Load() {
 				_, _ = writer.Write([]byte("tampered PHAR data"))
@@ -60,7 +69,7 @@ func toolProvider(t *testing.T) *providerFixture {
 			_ = json.NewEncoder(writer).Encode(map[string]any{"tag_name": version, "assets": []any{map[string]any{"name": "phpactor.phar", "size": len(body), "digest": "sha256:" + hex.EncodeToString(digest[:]), "browser_download_url": "https://github.com/phpactor/phpactor/releases/download/" + version + "/phpactor.phar"}}})
 			return
 		}
-		name, version := "typescript-language-server", fixture.serverVersion.Load().(string)
+		name, version := strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, "/"), "/latest"), fixture.serverVersion.Load().(string)
 		if strings.Contains(request.URL.Path, "@vue/language-server") {
 			name, version = "@vue/language-server", fixture.vueVersion.Load().(string)
 		} else if strings.Contains(request.URL.Path, "@vue/typescript-plugin") {
@@ -92,7 +101,7 @@ func managedHarness(t *testing.T, fixture *providerFixture) *Manager {
 		t.Fatal(err)
 	}
 	m.tools.prerequisite = func(context.Context, string) (toolRuntime, error) {
-		return toolRuntime{command: program, npmCLI: filepath.Join(directory, "npm-cli.js")}, nil
+		return toolRuntime{command: program, npmCLI: filepath.Join(directory, "npm-cli.js"), compiler: program}, nil
 	}
 	m.tools.run = func(_ context.Context, working, _ string, args ...string) ([]byte, error) {
 		if len(args) > 1 && args[1] == "install" {
@@ -115,7 +124,14 @@ func managedHarness(t *testing.T, fixture *providerFixture) *Manager {
 				return nil, errors.New("npm prefix is not the managed staging directory")
 			}
 			for name, version := range manifest.Dependencies {
-				data, _ := json.Marshal(map[string]string{"name": name, "version": version})
+				bins := map[string]string{}
+				for _, definition := range serverCatalog {
+					if definition.Install.Method == "npm" && definition.Install.Package == name {
+						bins[definition.Install.Binary] = "bin/fixture.js"
+						writeTestFile(t, filepath.Join(working, "node_modules", filepath.FromSlash(name), "bin", "fixture.js"), "fixture server")
+					}
+				}
+				data, _ := json.Marshal(map[string]any{"name": name, "version": version, "bin": bins})
 				writeTestFile(t, filepath.Join(working, "node_modules", filepath.FromSlash(name), "package.json"), string(data))
 			}
 			writeTestFile(t, filepath.Join(working, "node_modules", "typescript", "lib", "tsserver.js"), "fixture SDK")

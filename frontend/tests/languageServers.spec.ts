@@ -1,6 +1,7 @@
 import { test as base, expect, type Page } from '@playwright/test'
 import { desktopFixture, openFixture } from './desktopFixture'
 import type { LSPServerStatus, LSPToolStatus } from '../src/services'
+import { catalogServers } from './languageServerFixture'
 
 const test = base.extend<{ desktop: Awaited<ReturnType<typeof desktopFixture>> }>({
   desktop: async ({ page }, use) => {
@@ -150,4 +151,84 @@ test('a background installation refreshes code navigation without reopening sett
   finish(item)
   await page.evaluate(() => (window as any)._wails.dispatchWailsEvent({ name: 'lsp:changed', data: {} }))
   await expect(page.locator('.code-intelligence-hint')).toContainText('Hover symbols · Ctrl/Cmd click or F12 for definition')
+})
+
+test('the full catalog searches file types, categories, installed SDKs, and pending updates', async ({ desktop, page }) => {
+  const servers = catalogServers()
+  const yaml = servers.find(server => server.language === 'yaml')!
+  yaml.available = true
+  yaml.source = 'managed'
+  Object.assign(yaml.managed, { installedVersion: '1.0.0', latestVersion: '1.1.0', ready: true, updateAvailable: true })
+  servers.find(server => server.language === 'rust')!.available = true
+  withServers(desktop, servers)
+  await openFixture(desktop)
+  const section = await settings(page)
+  await expect(section.locator('article:visible')).toHaveCount(servers.length)
+  expect(servers.length).toBeGreaterThanOrEqual(40)
+  await expect(section.locator('.language-server-mark img')).toHaveCount(servers.length)
+  const search = section.getByRole('searchbox', { name: 'Search language servers' })
+  await search.fill('docker')
+  await expect(section.getByRole('heading', { name: 'Dockerfile', exact: true })).toBeVisible()
+  await expect.poll(() => section.locator('[data-language="dockerfile"] img').evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0)
+  await expect(section.getByRole('heading', { name: 'Docker Compose', exact: true })).toBeVisible()
+  await search.fill('.github/workflows')
+  await expect(section.locator('article:visible')).toHaveCount(1)
+  await expect(section.getByRole('heading', { name: 'GitHub Actions', exact: true })).toBeVisible()
+  await section.getByRole('button', { name: 'Clear language server search' }).click()
+  await section.getByRole('combobox', { name: 'Language server category' }).selectOption('Configuration')
+  await expect(section.locator('article:visible')).toHaveCount(servers.filter(server => server.category === 'Configuration').length)
+  await section.getByRole('combobox', { name: 'Language server category' }).selectOption('')
+  await section.getByRole('button', { name: /^Installed/ }).click()
+  await expect(section.locator('article:visible')).toHaveCount(2)
+  const rust = section.locator('article[data-language="rust"]')
+  await expect(rust.getByRole('button', { name: /^Install/ })).toHaveCount(0)
+  await expect(rust.getByRole('button', { name: 'Configure Rust · rust-analyzer' })).toBeVisible()
+  await section.getByRole('button', { name: /^Updates/ }).click()
+  await expect(section.locator('article:visible')).toHaveCount(1)
+  await expect(section.getByRole('button', { name: 'Update YAML', exact: true })).toBeEnabled()
+  await search.fill('not-a-language-server')
+  await expect(section.getByText('No matching language servers', { exact: true })).toBeVisible()
+  await section.getByRole('button', { name: 'Show all servers', exact: true }).click()
+  await expect(section.locator('article:visible')).toHaveCount(servers.length)
+})
+
+test('custom configuration survives filtering and does not require a TypeScript SDK for other servers', async ({ desktop, page }) => {
+  const servers = catalogServers()
+  withServers(desktop, servers)
+  desktop.handlers.set('main.LSPService.ConfigureServer', args => {
+    expect(args[0]).toBe('dockerfile')
+    expect(args[1]).toMatchObject({ command: '/custom/docker-langserver', args: ['--stdio'], typescriptSdkPath: '', vuePluginPath: '' })
+    return null
+  })
+  await openFixture(desktop)
+  const section = await settings(page)
+  await section.getByRole('searchbox').fill('dockerfile')
+  await section.getByRole('button', { name: 'Configure Dockerfile', exact: true }).click()
+  await section.getByRole('textbox', { name: 'Dockerfile executable', exact: true }).fill('/custom/docker-langserver')
+  await expect(section.getByRole('textbox', { name: 'Dockerfile arguments', exact: true })).toHaveValue('--stdio')
+  await expect(section.getByRole('textbox', { name: /TypeScript SDK/ })).toHaveCount(0)
+  await section.getByRole('searchbox').fill('go')
+  await expect(section.getByRole('textbox', { name: 'Dockerfile executable', exact: true })).not.toBeVisible()
+  await section.getByRole('searchbox').fill('dockerfile')
+  await expect(section.getByRole('textbox', { name: 'Dockerfile executable', exact: true })).toHaveValue('/custom/docker-langserver')
+  await section.getByRole('button', { name: 'Save configuration', exact: true }).click()
+  await expect(section).toContainText('Language server configuration saved.')
+})
+
+test('filtering cannot hide cancellation of a running catalog installation', async ({ desktop, page }) => {
+  const servers = catalogServers(), item = servers.find(server => server.language === 'dockerfile')!
+  withServers(desktop, servers)
+  desktop.handlers.set('main.LSPService.InstallServer', () => { item.managed.state = 'installing'; item.managed.progress = 'Installing Dockerfile…'; return null })
+  desktop.handlers.set('main.LSPService.CancelServerInstall', args => { expect(args).toEqual(['dockerfile']); item.managed.state = 'cancelled'; item.managed.progress = 'Installation cancelled.'; return null })
+  await openFixture(desktop)
+  const section = await settings(page)
+  await section.getByRole('searchbox').fill('dockerfile')
+  await section.getByRole('button', { name: 'Install Dockerfile', exact: true }).click()
+  await expect(section.getByText('Installing Dockerfile…', { exact: true })).toBeVisible()
+  await section.getByRole('searchbox').fill('nginx')
+  await expect(section.locator('.language-server-active-install')).toContainText('Installing Dockerfile…')
+  await section.getByRole('button', { name: 'Cancel Dockerfile installation', exact: true }).click()
+  await expect(section.locator('.language-server-active-install')).toHaveCount(0)
+  await section.getByRole('searchbox').fill('dockerfile')
+  await expect(section.getByText('Installation cancelled.', { exact: true })).toBeVisible()
 })

@@ -8,7 +8,7 @@ Manage branches and local changes, compare commits, and review pull requests wit
 
 [Stage individual sections, cherry-pick local commits, merge branches, and resolve conflicts](docs/LOCAL_GIT.md) with a side-by-side editor and editable result.
 
-Install and update PHP, TypeScript/JavaScript, and Vue language servers from Settings for symbol information and go to definition.
+Browse 57 language servers in Settings, with logos, search, install/update controls, and setup instructions. Includes Dockerfiles, YAML, GitHub Actions, and [many more](docs/LANGUAGE_SERVERS.md) for symbol hover and go to definition.
 
 View related [Jira Cloud](docs/JIRA.md) and [Linear](docs/LINEAR.md) tickets alongside a PR using your own OAuth app.
 

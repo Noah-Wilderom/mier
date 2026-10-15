@@ -28,6 +28,7 @@ func TestLSPRPCChild(t *testing.T) {
 		os.Stdout.Write(body)
 	}
 	documents := map[string]string{}
+	languages := map[string]string{}
 	cancelled := 0
 	var initializationID json.RawMessage
 	waiting := 0
@@ -39,6 +40,7 @@ func TestLSPRPCChild(t *testing.T) {
 	}
 	var hoverID json.RawMessage
 	var initializationOptions json.RawMessage
+	var initializationRoot string
 	for {
 		body, err := readFrame(reader)
 		if err != nil {
@@ -61,9 +63,11 @@ func TestLSPRPCChild(t *testing.T) {
 		case "initialize":
 			var params struct {
 				InitializationOptions json.RawMessage `json:"initializationOptions"`
+				RootPath              string          `json:"rootPath"`
 			}
 			_ = json.Unmarshal(message.Params, &params)
 			initializationOptions = params.InitializationOptions
+			initializationRoot = params.RootPath
 			initializationID = message.ID
 			methods := []string{"workspace/configuration", "workspace/workspaceFolders", "client/registerCapability", "window/workDoneProgress/create", "workspace/applyEdit"}
 			waiting = len(methods)
@@ -77,10 +81,15 @@ func TestLSPRPCChild(t *testing.T) {
 		case "initialized":
 		case "textDocument/didOpen":
 			var params struct {
-				TextDocument struct{ URI, Text string } `json:"textDocument"`
+				TextDocument struct{ URI, Text, LanguageID string } `json:"textDocument"`
 			}
 			json.Unmarshal(message.Params, &params)
 			documents[params.TextDocument.URI] = params.TextDocument.Text
+			languages[params.TextDocument.URI] = params.TextDocument.LanguageID
+		case "test/documentLanguage":
+			var params struct{ URI string }
+			json.Unmarshal(message.Params, &params)
+			reply(languages[params.URI])
 		case "textDocument/didChange":
 			var params struct {
 				TextDocument   struct{ URI string }    `json:"textDocument"`
@@ -132,6 +141,8 @@ func TestLSPRPCChild(t *testing.T) {
 			reply(cancelled)
 		case "test/initializationOptions":
 			reply(initializationOptions)
+		case "test/initializationRoot":
+			reply(initializationRoot)
 		case "test/echo":
 			var value struct {
 				Value int `json:"value"`

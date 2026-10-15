@@ -12,16 +12,25 @@ type ServerConfiguration struct {
 	VuePluginPath     string   `json:"vuePluginPath"`
 }
 type ServerStatus struct {
-	Language      string              `json:"language"`
-	Name          string              `json:"name"`
-	Available     bool                `json:"available"`
-	Command       string              `json:"command"`
-	Args          []string            `json:"args"`
-	Source        string              `json:"source"`
-	SetupURL      string              `json:"setupUrl"`
-	Error         string              `json:"error"`
-	Configuration ServerConfiguration `json:"configuration"`
-	Managed       ToolStatus          `json:"managed"`
+	Language       string              `json:"language"`
+	Name           string              `json:"name"`
+	Label          string              `json:"label"`
+	Category       string              `json:"category"`
+	Description    string              `json:"description"`
+	FileTypes      []FileAssociation   `json:"fileTypes"`
+	InstallMethod  string              `json:"installMethod"`
+	Requirements   string              `json:"requirements"`
+	DefaultCommand string              `json:"defaultCommand"`
+	DefaultArgs    []string            `json:"defaultArgs"`
+	Available      bool                `json:"available"`
+	Command        string              `json:"command"`
+	Args           []string            `json:"args"`
+	Source         string              `json:"source"`
+	SetupURL       string              `json:"setupUrl"`
+	Error          string              `json:"error"`
+	Configuration  ServerConfiguration `json:"configuration"`
+	Managed        ToolStatus          `json:"managed"`
+	Environment    []string            `json:"-"`
 }
 type ToolStatus struct {
 	InstalledVersion  string `json:"installedVersion"`

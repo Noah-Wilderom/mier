@@ -19,7 +19,11 @@ func dependencyKind(language string) string {
 	if language == "php" {
 		return "vendor"
 	}
-	return "node_modules"
+	switch serverLanguage(language) {
+	case "typescript", "vue", "astro", "svelte", "mdx", "html", "css", "marko", "coffeescript", "twig":
+		return "node_modules"
+	}
+	return "source-only"
 }
 
 var composerPathLiteral = regexp.MustCompile(`'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"`)
@@ -64,7 +68,7 @@ func dependencySource(path, kind string) bool {
 		return false
 	}
 	switch strings.ToLower(filepath.Ext(path)) {
-	case ".php", ".phtml", ".inc", ".stub", ".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs", ".vue", ".json", ".map", ".html", ".css", ".scss", ".sass", ".less", ".yaml", ".yml", ".neon":
+	case ".php", ".phtml", ".inc", ".stub", ".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs", ".vue", ".astro", ".svelte", ".marko", ".coffee", ".json", ".map", ".html", ".css", ".scss", ".sass", ".less", ".yaml", ".yml", ".neon":
 		return true
 	}
 	return false

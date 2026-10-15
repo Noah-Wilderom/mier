@@ -1,6 +1,6 @@
 # Language intelligence
 
-M.I.E.R. provides real language-server hover and read-only definition navigation for PHP, TypeScript, JavaScript, and Vue. It analyzes the source revision shown in the diff, rather than silently using the current checkout. This document covers setup, behavior, implementation boundaries, and validation. General application setup belongs in the [README](../README.md); the source research and experiments are recorded in [RESEARCH_LSP.md](RESEARCH_LSP.md).
+M.I.E.R. provides real language-server hover and read-only definition navigation through a 57-server catalog, including PHP, TypeScript, Dockerfiles, YAML, and GitHub Actions. It analyzes the source revision shown in the diff, rather than silently using the current checkout. This document covers setup, behavior, implementation boundaries, and validation. General application setup belongs in the [README](../README.md); the source research and experiments are recorded in [RESEARCH_LSP.md](RESEARCH_LSP.md).
 
 ## Current capabilities
 
@@ -9,6 +9,7 @@ M.I.E.R. provides real language-server hover and read-only definition navigation
 | PHP | Phpactor hover and definitions for `.php` and `.phtml` files. |
 | TypeScript / JavaScript | `typescript-language-server` with an installed TypeScript SDK; includes TSX, JSX, `.mts`, `.cts`, `.mjs`, and `.cjs`. |
 | Vue | `@vue/language-server` plus a TypeScript peer with `@vue/typescript-plugin`. Vue results are preserved; empty or unsupported semantic hover/definition requests can use the TypeScript peer. |
+| Catalog | [57 servers](LANGUAGE_SERVERS.md), with shared file associations, context-specific configuration servers, and available-server fallbacks. |
 | Pull requests | New-side source at the displayed head commit; old-side source at the comparison merge base. |
 | Local changes | Working-tree and index source layers, including an unborn repository's new files. |
 | Navigation | Ctrl/Cmd-click, F12, the `g` then `d` shortcut (case insensitive), and the visible Go to definition action. Multiple targets get a chooser. |
@@ -31,6 +32,8 @@ Installation progress survives navigation because the backend owns the operation
 | Phpactor | PHP 8.2+ with mbstring, tokenizer, and posix | Latest stable official PHAR, checked against GitHub's published SHA-256 digest and file size, then launched for a version check. |
 | TypeScript / JavaScript | Node.js 22.22.2+ and npm | Latest stable `typescript-language-server` and the tested TypeScript 5.9.3 SDK. |
 | Vue | Node.js 22.22.2+ and npm | Latest stable Vue server, exactly matching `@vue/typescript-plugin`, its own latest TypeScript language-server companion, and the tested SDK. |
+
+The [catalog guide](LANGUAGE_SERVERS.md) lists all servers, including the additional npm, Go, Python, and existing-SDK recipes. Settings provides search, category selection, Installed and Updates filters, bundled logos, and inline configuration. Update checks query installed managed servers only, with at most six concurrent requests.
 
 The app detects runtimes from PATH, common Homebrew locations, and installed mise versions, and records the actual runtime executable rather than a shell shim. Node's npm CLI is run directly, including on Windows. Missing prerequisites disable managed installation and show what to install; M.I.E.R. does not install system PHP/Node packages. Native Windows PHP does not provide the POSIX extension required by current Phpactor releases. See [PHP's POSIX documentation](https://www.php.net/manual/en/book.posix.php).
 
@@ -70,7 +73,7 @@ For tools installed under `/absolute/path/to/mier-lsp-tools`, these entries matc
 
 For manually installed tools, configure the TypeScript entry as well as Vue. The Vue session starts a peer with the plugin loaded and brokers Vue's custom TypeScript requests. Managed Vue installs already include that peer. The Vue plugin field applies to the Vue entry; the peer configuration is assembled by the backend.
 
-SDK and plugin directories must be absolute. PHP does not accept those fields. On Windows, `.cmd` and `.bat` wrappers are rejected; use `node.exe` or `php.exe` with the absolute server script/PHAR as an argument. Windows/macOS behavior has code paths, but the real-tool validation reported here ran on Linux.
+SDK and plugin directories must be absolute. Only TypeScript, Vue, Astro, and MDX accept the TypeScript SDK field; the Vue plugin applies to TypeScript/Vue. Astro and MDX installations bundle the same pinned SDK and receive `typescript.tsdk` during initialization. On Windows, `.cmd` and `.bat` wrappers are rejected; use `node.exe` or `php.exe` with the absolute server script/PHAR as an argument. Windows/macOS behavior has code paths, but the real-tool validation reported here ran on Linux.
 
 **Use automatic detection**, followed by Save, clears the explicit executable, arguments, and dependency paths. Saving closes existing server sessions and causes availability to be checked again. Failed saves retain the entered configuration in the UI.
 
@@ -166,7 +169,7 @@ MIER_LSP_INSTALL_SMOKE=1 go test -race ./internal/lspclient \
   -run '^TestRealManagedToolInstallation$' -count=1 -timeout 10m -v
 ```
 
-This opt-in test requires PHP/Node/npm and installs outside the repository. To retain its managed manifest and installations for inspection, set `MIER_LSP_INSTALL_TOOLS` to a separate absolute tools directory.
+This opt-in test requires the runtimes for the selected recipes and installs outside the repository. Set `MIER_LSP_INSTALL_LANGUAGES=dockerfile,yaml,github-actions,go,fortran` to choose catalog IDs. Run `MIER_LSP_CATALOG_SMOKE=/absolute/tools go test ./internal/lspclient -run '^TestRealCatalogServerStartup$' -v -timeout 12m` to initialize the installed catalog servers with real source fixtures. To retain its managed manifest and installations for inspection, set `MIER_LSP_INSTALL_TOOLS` to a separate absolute tools directory.
 
 ### Optional real-server smoke
 
@@ -213,7 +216,7 @@ The real-server suite includes a dirty monorepo dependency-link regression, PHP 
 
 The native `main.LSPService` exposes `Servers(root)`, `CheckServerUpdates(root, force)`, `InstallServer(language)`, `CancelServerInstall(language)`, `ConfigureServer(language, configuration)`, `Warmup(positionRequest)`, `Hover(positionRequest)`, `Definition(positionRequest)`, and `ReadDefinition({root, revision, target})`. An empty root checks global setup without scanning a repository. Positions are zero-based UTF-16. A position request has root, revision, path or granted URI, optional comparison head and PR identity, line, character, and displayed line text. Hover/definition responses identify the actual captured revision; readers must keep that revision with their opaque target. Wails omits the first Go `context.Context` parameter from frontend arguments.
 
-Future language/framework support can add detection/routing, setup fields, server-specific initialization/configuration, and tested dependency-resolution rules without changing the revision/grant boundary. Keep Vue's custom broker as a server adapter rather than a generic-LSP assumption. Currently `workspace/configuration` returns empty configuration objects; diagnostics are not normalized or sent to the UI. Add capability-specific contracts and real fixtures before advertising completion, diagnostics, framework stubs, or additional navigation features.
+Future language/framework support can add detection/routing, setup fields, server-specific initialization/configuration, and tested dependency-resolution rules without changing the revision/grant boundary. Keep Vue's custom broker as a server adapter rather than a generic-LSP assumption. The shared catalog supplies server initialization options and dotted `workspace/configuration` sections, with empty configuration for unspecified sections; diagnostics are not normalized or sent to the UI. Add capability-specific contracts and real fixtures before advertising completion, diagnostics, framework stubs, or additional navigation features.
 
 ## PHP hover presentation
 

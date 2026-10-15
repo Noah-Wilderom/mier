@@ -4,31 +4,55 @@
 .language-server-settings-heading p, .language-server-intro { margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
 .language-server-settings-heading > .btn { flex-shrink: 0; font-size: 12px; min-height: 28px; gap: 5px; }
 .language-server-intro { margin-top: 12px; }
-.language-server-list { margin-top: 18px; }
-.language-server-entry { padding: 15px 0; border-top: 1px solid var(--border); min-width: 0; }
+.language-server-catalog-toolbar { display: flex; gap: 10px; margin-top: 18px; }
+.language-server-search { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0; padding: 0 11px; border: 1px solid var(--border); border-radius: 5px; color: var(--muted); background: var(--panel); }
+.language-server-search:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.language-server-search > svg { flex-shrink: 0; }
+.language-server-search input { min-width: 0; width: 100%; height: 35px; padding: 0; border: 0; outline: 0; color: var(--text); background: transparent; font: inherit; font-size: 12px; }
+.language-server-search input::-webkit-search-cancel-button { display: none; }
+.language-server-catalog-toolbar > select { min-width: 130px; width: auto; font-size: 12px; }
+.language-server-catalog-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin: 15px 0; }
+.language-server-catalog-filters > button { display: inline-flex; align-items: center; gap: 7px; min-height: 30px; padding: 5px 9px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+.language-server-catalog-filters > button:hover, .language-server-catalog-filters > button.is-selected { color: var(--text); background: var(--panel); border-color: var(--border); }
+.language-server-catalog-filters > button > span { padding: 1px 5px; border-radius: 3px; color: var(--muted); background: var(--bg); font-size: 10px; font-variant-numeric: tabular-nums; }
+.language-server-result-count { margin-left: auto; color: var(--muted); font-size: 11px; }
+.language-server-list, .language-server-skeleton { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 12px; align-items: start; }
+.language-server-entry { padding: 15px; border: 1px solid var(--border); border-radius: 6px; min-width: 0; background: var(--panel); }
+.language-server-entry[hidden] { display: none; }
+.language-server-entry.is-editing { grid-column: 1 / -1; }
 .language-server-summary { display: flex; align-items: center; gap: 10px; }
-.language-server-summary > svg { color: var(--muted); flex-shrink: 0; }
+.language-server-mark { display: grid; place-items: center; flex: 0 0 37px; width: 37px; height: 37px; border: 1px solid var(--border); border-radius: 5px; color: #344054; background: #f8fafc; }
+.language-server-mark img { display: block; width: 27px; height: 27px; object-fit: contain; color-scheme: light; }
+.language-server-entry[data-category="Web"] .language-server-mark { color: #478aca; }
+.language-server-entry[data-category="Configuration"] .language-server-mark { color: #b78a3e; }
+.language-server-entry[data-category="Data"] .language-server-mark { color: #9b79c4; }
+.language-server-entry[data-category="Markup"] .language-server-mark { color: #639d8b; }
 .language-server-summary > div { display: flex; flex: 1; flex-direction: column; gap: 6px; min-width: 0; }
-.language-server-summary h4 { margin: 0; font-size: 13px; font-weight: 500; }
-.language-server-summary > div > span { display: flex; align-items: center; gap: 5px; font-size: 12px; }
-.language-server-summary > .btn { min-height: 28px; padding: 4px 8px; font-size: 12px; flex-shrink: 0; }
-.language-server-summary > .language-server-actions { display: flex; flex: 0 0 auto; flex-direction: row; gap: 7px; }
+.language-server-summary h4 { margin: 0; font-size: 13px; line-height: 1.4; font-weight: 600; overflow-wrap: anywhere; }
+.language-server-summary > div > span { display: flex; align-items: center; gap: 5px; font-size: 11px; line-height: 1.4; }
+.language-server-category { align-self: flex-start; padding: 2px 5px; color: var(--muted); border: 1px solid var(--border); border-radius: 3px; font-size: 10px; }
+.language-server-description { margin: 13px 0 0; color: var(--text); font-size: 12px; line-height: 1.6; }
+.language-server-files { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-top: 11px; min-height: 20px; }
+.language-server-files code, .language-server-files > span { max-width: 100%; overflow-wrap: anywhere; padding: 3px 5px; border-radius: 3px; border: 1px solid var(--border); color: var(--muted); background: var(--bg); font: 10px var(--mono); }
+.language-server-requirements { margin: 9px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.language-server-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
 .language-server-actions .btn { min-height: 28px; padding: 4px 9px; font-size: 12px; gap: 5px; }
-.language-server-installation { margin: 11px 0 0 28px; display: flex; flex-wrap: wrap; align-items: center; gap: 7px 12px; font-size: 12px; }
+.language-server-installation { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 7px 10px; font-size: 11px; }
+.language-server-installation:empty { display: none; }
 .language-server-version { color: var(--muted); }
-.language-server-update-badge { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; color: var(--amber); background: var(--panel); }
+.language-server-update-badge { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; color: var(--amber); background: var(--bg); }
 .language-server-current { color: var(--green); }
-.language-server-progress { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; color: var(--muted); }
+.language-server-progress { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; color: var(--muted); line-height: 1.5; }
 .language-server-progress .btn-ghost { flex-shrink: 0; font-size: 12px; }
 .language-server-installation > .language-server-availability-error, .language-server-installation > .language-server-error { margin: 2px 0 0; flex-basis: 100%; }
 .language-server-use-installed { font-size: 12px; min-height: 27px; padding: 4px 8px; }
 .language-server-settings .is-spinning { animation: language-server-spin 1s linear infinite; }
 @keyframes language-server-spin { to { transform: rotate(360deg); } }
-.language-server-command { display: block; margin: 10px 0 0 28px; font-family: var(--mono); font-size: 12px; color: var(--muted); overflow-wrap: anywhere; line-height: 1.6; }
-.language-server-availability-error { margin: 10px 0 0 28px; color: var(--muted); font-size: 12px; line-height: 1.5; }
-.language-server-docs { margin: 7px 0 0 28px; font-size: 12px; }
+.language-server-command { display: block; margin: 12px 0 0; font-family: var(--mono); font-size: 12px; color: var(--muted); overflow-wrap: anywhere; line-height: 1.6; }
+.language-server-availability-error { margin: 10px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.language-server-docs { margin-left: auto; font-size: 11px; }
 .language-server-docs p { margin: 0; }
-.language-server-form { margin: 15px 0 0 28px; padding: 15px; background: var(--panel); border: 1px solid var(--border); border-radius: 5px; min-width: 0; }
+.language-server-form { margin-top: 15px; padding: 15px; background: var(--bg); border: 1px solid var(--border); border-radius: 5px; min-width: 0; }
 .language-server-form > label { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; font-size: 12px; }
 .language-server-form > label:first-child { margin-top: 0; }
 .language-server-form .input { width: 100%; font-family: var(--mono); font-size: 12px; min-height: 32px; }
@@ -39,9 +63,14 @@
 .language-server-form-actions > .btn { font-size: 12px; min-height: 28px; padding: 5px 8px; }
 .language-server-error { margin: 12px 0 0; color: var(--red); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 .language-server-status { margin: 8px 0 0; min-height: 17px; color: var(--muted); font-size: 12px; }
-.language-server-skeleton { margin-top: 18px; }
-.language-server-skeleton > div { display: flex; align-items: center; justify-content: space-between; min-height: 75px; gap: 15px; border-top: 1px solid var(--border); }
-.language-server-skeleton .skeleton:first-child { display: block; height: 27px; width: 55%; }
+.language-server-skeleton > div { display: flex; flex-direction: column; justify-content: space-between; min-height: 160px; padding: 15px; gap: 15px; border: 1px solid var(--border); border-radius: 6px; }
+.language-server-skeleton .skeleton:first-child { display: block; height: 30px; width: 65%; }
 .language-server-skeleton .skeleton:last-child { display: block; height: 27px; width: 72px; }
-@media (max-width: 600px) { .language-server-form { margin-left: 0; padding: 12px; } .language-server-form-actions { flex-wrap: wrap; } .language-server-form-actions > span { flex-basis: 100%; } .language-server-settings-heading { gap: 7px; } .language-server-summary { flex-wrap: wrap; } .language-server-summary > .language-server-actions { margin-left: 28px; } }
+.language-server-empty { padding: 34px 15px; display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--muted); border: 1px solid var(--border); border-radius: 6px; text-align: center; }
+.language-server-empty strong { color: var(--text); font-size: 13px; }
+.language-server-empty p { margin: 0 0 5px; font-size: 12px; }
+.language-server-active-install { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; padding: 11px; border: 1px solid var(--border); border-radius: 5px; color: var(--muted); font-size: 12px; }
+.language-server-active-install > span { flex: 1; line-height: 1.6; }
+.language-server-active-install strong { color: var(--text); font-weight: 500; }
+@media (max-width: 600px) { .language-server-form { padding: 12px; } .language-server-form-actions { flex-wrap: wrap; } .language-server-form-actions > span { flex-basis: 100%; } .language-server-settings-heading { flex-wrap: wrap; gap: 12px; } .language-server-catalog-toolbar { flex-direction: column; } .language-server-catalog-toolbar > select { width: 100%; } }
 @media (prefers-reduced-motion: reduce) { .language-server-skeleton .skeleton, .language-server-settings .is-spinning { animation: none; } }

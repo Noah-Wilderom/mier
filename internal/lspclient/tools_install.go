@@ -41,8 +41,13 @@ func runToolCommand(ctx context.Context, directory, program string, args ...stri
 	// loaders, registry credentials, or package-install configuration.
 	for _, value := range os.Environ() {
 		key := strings.ToUpper(strings.SplitN(value, "=", 2)[0])
-		if !strings.HasPrefix(key, "NPM_CONFIG_") && key != "NODE_OPTIONS" && key != "NODE_PATH" && key != "NPM_TOKEN" && key != "NODE_AUTH_TOKEN" {
+		if !strings.HasPrefix(key, "NPM_CONFIG_") && !strings.HasPrefix(key, "PIP_") && key != "PYTHONPATH" && key != "PYTHONHOME" && key != "NODE_OPTIONS" && key != "NODE_PATH" && key != "NPM_TOKEN" && key != "NODE_AUTH_TOKEN" {
 			command.Env = append(command.Env, value)
+		}
+	}
+	if env, ok := ctx.Value(toolEnvironmentKey{}).(map[string]string); ok {
+		for key, value := range env {
+			command.Env = append(command.Env, key+"="+value)
 		}
 	}
 	output, diagnostics := &toolOutput{}, &toolOutput{}
@@ -70,6 +75,9 @@ func (t *toolInstaller) start(ctx context.Context, language string) error {
 	language, err := canonicalLanguage(language)
 	if err != nil {
 		return err
+	}
+	if catalogByID[language].Install.Method == "external" {
+		return errors.New("This server is provided by its SDK or upstream installer; configure its existing executable")
 	}
 	if err = ctx.Err(); err != nil {
 		return err
@@ -195,14 +203,19 @@ func (t *toolInstaller) install(ctx context.Context, language string) error {
 			t.phase(language, "Checking Phpactor with your PHP runtime…")
 			_, err = t.run(ctx, directory, host.command, filepath.Join(directory, "phpactor.phar"), "--version")
 		}
+	} else if definition := catalogByID[language]; definition.Install.Method == "go" || definition.Install.Method == "python" {
+		err = t.installEcosystem(ctx, language, host, directory, release)
 	} else {
 		t.phase(language, "Installing server packages and dependencies…")
 		err = t.installNPM(ctx, host, directory, release)
 		if err == nil {
-			t.phase(language, "Verifying the installed server and TypeScript SDK…")
+			t.phase(language, "Verifying the installed server packages…")
 			err = verifyToolPackages(directory, release)
 		}
-		if err == nil {
+		if err == nil && language != "typescript" && language != "vue" {
+			_, err = npmServerEntry(directory, catalogByID[language])
+		}
+		if err == nil && (language == "typescript" || language == "vue") {
 			script := filepath.Join(directory, "node_modules", "typescript-language-server", "lib", "cli.mjs")
 			_, err = t.run(ctx, directory, host.command, script, "--version")
 			if err == nil && language == "vue" {
@@ -303,9 +316,14 @@ func verifyToolPackages(directory string, release toolRelease) error {
 			return fmt.Errorf("Installed npm package %s does not match the requested version", name)
 		}
 	}
-	for _, path := range []string{filepath.Join("typescript", "lib", "tsserver.js"), filepath.Join("typescript-language-server", "lib", "cli.mjs")} {
-		if !existingFile(filepath.Join(directory, "node_modules", path)) {
-			return errors.New("Installed packages do not contain the required TypeScript server or SDK")
+	if _, sdk := release.Packages["typescript"]; sdk && !existingFile(filepath.Join(directory, "node_modules", "typescript", "lib", "tsserver.js")) {
+		return errors.New("Installed packages do not contain the required TypeScript SDK")
+	}
+	if _, typescript := release.Packages["typescript-language-server"]; typescript {
+		for _, path := range []string{filepath.Join("typescript", "lib", "tsserver.js"), filepath.Join("typescript-language-server", "lib", "cli.mjs")} {
+			if !existingFile(filepath.Join(directory, "node_modules", path)) {
+				return errors.New("Installed packages do not contain the required TypeScript server or SDK")
+			}
 		}
 	}
 	if _, vue := release.Packages["@vue/language-server"]; vue && !existingFile(filepath.Join(directory, "node_modules", "@vue", "language-server", "bin", "vue-language-server.js")) {
