@@ -136,6 +136,8 @@ The native build is written to `bin/` (`bin/mag-ik-een-review` on Linux). Run th
 
 `npm run test:ui` type-checks and runs the retained Chromium/WebKit suite in `frontend/tests/`. Playwright starts a separate Vite server on port 9255 and fixtures intercept Wails' HTTP RPC calls; no provider or user repository is modified. Tests retain traces/screenshots on failure. Linux WebKit uses Mesa software rendering and the suite runs one browser worker to remain usable on small desktop/CI hosts. [Playwright web-server configuration](https://playwright.dev/docs/test-webserver) and [API fixtures](https://playwright.dev/docs/mock) explain that harness.
 
+`npm test` also checks source and generated module names for case-insensitive import conflicts, including `.ts`/`.tsx` stems. Give components and state/helper modules distinct names: casing alone does not distinguish extensionless imports reliably on macOS and Windows. This check runs in the existing CI test matrix and catches these conflicts on Linux too.
+
 Automated provider tests use fake HTTP servers and credential stores. They cover pagination, rate limits, permissions, review threads, mutation payloads, and stale-head protection without changing a remote user repository. Sync tests cover the 15-second default, cancellation, queued refreshes, and preservation of local data after provider failures.
 
 Optional real language-server smoke tests use tooling outside the project. Set `MIER_LSP_SMOKE_TOOLS` to a directory containing `node_modules/typescript`, `typescript-language-server`, `@vue/language-server`, and `@vue/typescript-plugin`; add `phpactor.phar` there for PHP. Run `go test -run '^TestReal' -count=1 -v .`. These tests use temporary Git repositories and leave the user's checkout unchanged.

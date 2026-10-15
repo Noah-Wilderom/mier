@@ -4,7 +4,7 @@ import type { ReviewLocation } from "./ReviewWorkspace";
 import {
   emptyPullRequestTabs,
   pullRequestTabsReducer,
-} from "./pullRequestTabs";
+} from "./pullRequestTabState";
 import { createReviewSession, type ReviewSession } from "./ReviewSession";
 
 export function usePullRequestTabs(scope: string) {

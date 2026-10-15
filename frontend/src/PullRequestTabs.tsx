@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { PullRequest } from "./data";
-import type { PullRequestTab } from "./pullRequestTabs";
+import type { PullRequestTab } from "./pullRequestTabState";
 import { Icon } from "./Icon";
 import "./PullRequestTabs.css";
 

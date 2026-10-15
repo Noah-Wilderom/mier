@@ -3,7 +3,7 @@ import { test } from "node:test";
 import {
   emptyPullRequestTabs,
   pullRequestTabsReducer as reduce,
-} from "./pullRequestTabs.ts";
+} from "./pullRequestTabState.ts";
 
 const scope = "repo-a";
 test("opening an existing PR selects its one tab and keeps its own section and location", () => {
