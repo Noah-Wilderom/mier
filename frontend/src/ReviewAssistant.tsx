@@ -24,6 +24,7 @@ import {
   type AIReviewRequest,
 } from "./aiTypes";
 import "./AIReview.css";
+import { useReviewSessionState, useReviewSessionRef } from "./ReviewSession";
 import { AIModelLogo, AIModelPicker } from "./AIModelPicker";
 import { AIReviewFindings } from "./AIReviewFindings";
 import { AIReviewActivity } from "./AIReviewActivity";
@@ -88,19 +89,25 @@ function LiveAssistant({
     identity.repo,
     pr.number,
   ]);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useReviewSessionState("ai.open", false);
   const [saved, setSaved] = useState<Saved | undefined>(() => read(scope));
   const [run, setRun] = useState<AIReview>();
-  const [preferences, setPreferences] = useState<AIPreferences>({
-    provider: "codex",
-    model: "",
-    intensity: "medium",
-    codexPath: "",
-    copilotPath: "",
-  });
+  const [preferences, setPreferences] = useReviewSessionState<AIPreferences>(
+    "ai.preferences",
+    {
+      provider: "codex",
+      model: "",
+      intensity: "medium",
+      codexPath: "",
+      copilotPath: "",
+    },
+  );
   const [status, setStatus] = useState<AIProviderStatus>();
   const [connection, setConnection] = useState<AIConnection>();
-  const [instructions, setInstructions] = useState("");
+  const [instructions, setInstructions] = useReviewSessionState(
+    "ai.instructions",
+    "",
+  );
   const [error, setError] = useState(""),
     [pollError, setPollError] = useState("");
   const [busy, setBusy] = useState(false),
@@ -109,7 +116,7 @@ function LiveAssistant({
   const [confirmExternal, setConfirmExternal] = useState(false),
     [copied, setCopied] = useState(false);
   const guard = useRef(false);
-  const preferencesLoaded = useRef(false);
+  const preferencesLoaded = useReviewSessionRef("ai.preferencesLoaded", false);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;

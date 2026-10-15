@@ -339,9 +339,9 @@ test("findings support explicit batch selection, dismissal and restoration acros
     .getByRole("button", { name: "Inbox", exact: true })
     .click();
   await page.locator(".pr-list-item").first().click();
-  await page
-    .getByRole("button", { name: "Review with AI", exact: true })
-    .click();
+  await expect(
+    page.getByRole("complementary", { name: "AI reviewer", exact: true }),
+  ).toBeVisible();
   await expect(findings.locator("article")).toHaveCount(1);
   await findings.locator(".ai-dismissed-findings > summary").click();
   await findings
@@ -648,9 +648,9 @@ test("external MCP connections require an explicit start and restore without per
     .getByRole("button", { name: "Inbox", exact: true })
     .click();
   await page.locator(".pr-list-item").first().click();
-  await page
-    .getByRole("button", { name: "Review with AI", exact: true })
-    .click();
+  await expect(
+    page.getByRole("complementary", { name: "AI reviewer", exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByText("MCP connection ready", { exact: true }),
   ).toBeVisible();
@@ -701,9 +701,9 @@ test("late review starts survive navigation and older findings become outdated a
     .getByRole("button", { name: "Inbox", exact: true })
     .click();
   await page.locator(".pr-list-item").first().click();
-  await page
-    .getByRole("button", { name: "Review with AI", exact: true })
-    .click();
+  await expect(
+    page.getByRole("complementary", { name: "AI reviewer", exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Stop review", exact: true }),
   ).toBeVisible();

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Icon } from "./Icon";
 import { Markdown } from "./Markdown";
-import ReviewWorkspace, { ReviewFooter, type ReviewLocation } from "./ReviewWorkspace";
+import ReviewWorkspace, { ReviewFooter } from "./ReviewWorkspace";
 import {
   currentUser,
   latestReview,
@@ -53,6 +53,9 @@ import { mapChangedFile, mapRepositorySnapshot } from "./liveData";
 import ActionsPage from "./Actions";
 import Checks from "./Checks";
 import "./workspaceStyle.css";
+import { PullRequestTabs } from "./PullRequestTabs";
+import { usePullRequestTabs } from "./usePullRequestTabs";
+import { ReviewSessionProvider, useReviewSessionState } from "./ReviewSession";
 
 type Destination =
   | "inbox"
@@ -156,11 +159,6 @@ export default function App() {
   const [branch, setBranch] = useState(initial.branch);
   const [destination, setDestination] = useState<Destination>("inbox");
   const [repository, setRepository] = useState<Repository>("all");
-  const [selected, setSelected] = useState(142);
-  const [tab, setTab] = useState<ReviewTab>("changes");
-  const [reviewLocation, setReviewLocation] = useState<
-    ReviewLocation | undefined
-  >();
   const [filter, setFilter] = useState<"open" | "all" | "closed" | "merged">(
     "open",
   );
@@ -202,17 +200,25 @@ export default function App() {
     toastTimer.current = setTimeout(() => setToast(""), 4200);
   }, []);
   const live = useLiveWorkspace(notify);
+  const tabScope = live.enabled ? JSON.stringify(["live", live.repository?.root ?? "", live.identity?.host ?? "", live.identity?.owner ?? "", live.identity?.repo ?? ""]) : "demo";
+  const reviewTabs = usePullRequestTabs(tabScope);
+  const selected = reviewTabs.active, setSelected = reviewTabs.open;
+  const tab = reviewTabs.selected?.section ?? "changes", setTab = reviewTabs.setSection;
+  const reviewLocation = reviewTabs.selected?.location, setReviewLocation = reviewTabs.setLocation;
+  const currentReview = useRef({scope: tabScope, number: selected});
+  currentReview.current = {scope: tabScope, number: selected};
+  const [pendingReview, setPendingReview] = useState<{id: string; root: string; number: number; ready: boolean}>();
   const previousMode = useRef(live.enabled);
   useEffect(() => {
     if (live.enabled) {
       setPrs(live.prs); setHistory(live.history); setLocalChanges(live.changes); setBranch(live.branch || "No branch");
     } else if (previousMode.current) {
-      setPrs(seedPullRequests()); setHistory(seedHistory); setLocalChanges(seedLocalChanges.map(f=>({...f}))); setBranch("main"); setSelected(142);
+      setPrs(seedPullRequests()); setHistory(seedHistory); setLocalChanges(seedLocalChanges.map(f=>({...f}))); setBranch("main");
     }
     previousMode.current = live.enabled;
   }, [live.enabled, live.prs, live.repository, live.history, live.changes, live.branch]);
-  useEffect(() => {if(live.enabled){setRepository("all");setSelected(0);setCreating(false);setFocusMode(false)}}, [live.enabled,live.repository?.root]);
-  useEffect(() => { if (live.enabled && live.repository && selected > 0 && live.prs.some(pr=>pr.number===selected)) live.selectPullRequest(selected) }, [live.enabled, live.repository?.root, selected,live.prs.length]);
+  useEffect(() => {setRepository("all");setCreating(false);setFocusMode(false)}, [tabScope]);
+  useEffect(() => {live.retainPullRequests(reviewTabs.items.map(item => item.number))}, [tabScope, reviewTabs.items.map(item => item.number).join(","), live.retainPullRequests]);
   const reviewNotify = (message:string) => { if (!live.enabled || /pending|draft|copied|clipboard|unavailable/i.test(message)) notify(message) };
   const pr = prs.find((p) => p.number === selected);
   useEffect(()=>setInspectedCommit(null),[live.enabled,live.repository?.root,selected,destination]);
@@ -225,6 +231,9 @@ export default function App() {
   const isPRView = ["inbox", "mine", "requested", "assigned", "drafts"].includes(
     destination,
   );
+  useEffect(() => {
+    if (live.enabled && live.repository) live.selectPullRequest(isPRView ? selected : 0);
+  }, [live.enabled, tabScope, selected, isPRView, live.selectPullRequest]);
   useEffect(() => {
     if (!isPRView) return;
     live.setPullRequestQuery({ state: filter, view: destination === "requested" ? "review-requested" : destination as "inbox" | "mine" | "assigned" | "drafts", query });
@@ -274,7 +283,7 @@ export default function App() {
       const previous = prs.find((item) => item.number === next.number);
       if (live.enabled && previous) {
         return live.updatePullRequest(previous, next).then(() => {
-          if (previous.status !== next.status) { setFilter(next.status === "merged" ? "merged" : next.status === "closed" ? "closed" : "open"); if (destination === "drafts" && next.status !== "draft") setDestination("inbox"); }
+          if (currentReview.current.scope === tabScope && currentReview.current.number === next.number && previous.status !== next.status) { setFilter(next.status === "merged" ? "merged" : next.status === "closed" ? "closed" : "open"); if (destination === "drafts" && next.status !== "draft") setDestination("inbox"); }
         });
       }
       if (next.number === selected && previous?.status !== next.status) {
@@ -293,7 +302,7 @@ export default function App() {
         items.map((item) => (item.number === next.number ? next : item)),
       );
     },
-    [prs, selected, destination, live.enabled, live.updatePullRequest],
+    [prs, selected, destination, live.enabled, live.updatePullRequest, tabScope],
   );
   const navigate = useCallback((next: Destination) => {
     setDestination(next);
@@ -305,7 +314,7 @@ export default function App() {
   const toggleFocus = useCallback(() => {
     setTab("changes");
     setFocusMode((value) => !value);
-  }, []);
+  }, [setTab]);
 
   useEffect(() => {
     if (live.enabled) return;
@@ -340,14 +349,16 @@ export default function App() {
     return () => media.removeEventListener("change", apply);
   }, [theme]);
   useEffect(() => {
-    if (live.enabled && live.prs.some(pr => pr.number === selected && pr.provider?.detailLoaded)) return;
-    if (
-      !visiblePRs.some((p) => p.number === selected) &&
-      visiblePRs.length &&
-      !creating
-    )
-      setSelected(visiblePRs[0].number);
-  }, [visiblePRs.map((p) => p.number).join(","), selected, creating, live.enabled]);
+    if (pendingReview) {
+      if (pendingReview.ready) {
+        if (live.repository?.root === pendingReview.root) reviewTabs.open(pendingReview.number, "conversation");
+        setPendingReview(undefined);
+      }
+      return;
+    }
+    if (!reviewTabs.initialized && isPRView && visiblePRs.length && !creating)
+      reviewTabs.open((!live.enabled && visiblePRs.find(item => item.number === 142) || visiblePRs[0]).number);
+  }, [tabScope, reviewTabs.initialized, visiblePRs.map(p => p.number).join(","), isPRView, creating, live.enabled, pendingReview, reviewTabs.open]);
   useEffect(() => {
     const command = (action: string, value?: string) => {
       if (action === "navigate")
@@ -475,9 +486,8 @@ export default function App() {
     setHistory(seedHistory);
     setLocalChanges(seedLocalChanges.map((f) => ({ ...f })));
     setBranch("main");
-    setSelected(142);
+    reviewTabs.reset();
     navigate("inbox");
-    setTab("changes");
     notify("Sample workspace restored.");
   };
   const checkout = () => {
@@ -490,15 +500,25 @@ export default function App() {
     }
   };
   const selectPR = (number: number) => {
-    setReviewLocation(undefined);
     setSelected(number);
     setCreating(false);
+  };
+  const closePR = (number: number) => {
+    reviewTabs.close(number);
+    if (selected === number && reviewTabs.items.length === 1) { setFocusMode(false); setCreating(false); }
   };
   const openNotice=async(notice:PullRequestNotice)=>{
     const target=Object.values(live.repositoryCards).find(repo=>repo.host?.toLowerCase()===notice.host.toLowerCase()&&repo.owner?.toLowerCase()===notice.owner.toLowerCase()&&repo.repo?.toLowerCase()===notice.repo.toLowerCase());
     if(!target){notify(`Open ${notice.owner}/${notice.repo} to view pull request #${notice.number}.`);return}
-    if(target.path!==live.repository?.root||!live.enabled)await live.openRepository(target.path);
-    navigate('inbox');setFilter(notice.type==='merged'?'merged':notice.type==='closed'?'closed':'open');setSelected(notice.number);setTab('conversation');
+    if(target.path!==live.repository?.root||!live.enabled) {
+      const id = newId();
+      setPendingReview({id,root:target.path,number:notice.number,ready:false});
+      try {
+        await live.openRepository(target.path);
+        setPendingReview(current => current?.id === id ? {...current,ready:true} : current);
+      } catch(issue) { setPendingReview(current => current?.id === id ? undefined : current); throw issue; }
+    } else reviewTabs.open(notice.number, 'conversation');
+    navigate('inbox');setFilter(notice.type==='merged'?'merged':notice.type==='closed'?'closed':'open');
   };
   const navTitles: Record<Destination, string> = {
     inbox: "Review inbox",
@@ -937,8 +957,11 @@ export default function App() {
           </section>
         )}
         {live.enabled && !live.repository && destination !== "settings" && <RepositoryWelcome live={live} onOpen={()=>void live.openRepository().catch(()=>{})} onDemo={live.useDemo}/>}
-        {isPRView && (!live.enabled || !!live.repository) &&
-          (creating ? (live.enabled ? <LiveCreatePullRequest key={JSON.stringify([live.repository?.root,live.identity])} live={live} onCancel={()=>setCreating(false)} onCreated={number=>{setSelected(number);setCreating(false);setTab('conversation');setFilter('open');setQuery('');setDestination('inbox')}}/> :
+        {isPRView && (!live.enabled || !!live.repository) && <section className="pr-tab-workspace" aria-label="Pull request workspace">
+          <PullRequestTabs tabs={reviewTabs.items} active={selected} prs={prs} onSelect={selectPR} onClose={closePR}/>
+          <div className="pr-tab-panel" id="open-pr-panel" role={reviewTabs.items.length && !creating ? "tabpanel" : undefined} aria-labelledby={selected && !creating ? `open-pr-tab-${selected}` : undefined}>
+          <ReviewSessionProvider key={`${tabScope}:${selected}`} session={reviewTabs.session}>
+          {creating ? (live.enabled ? <LiveCreatePullRequest key={JSON.stringify([live.repository?.root,live.identity])} live={live} onCancel={()=>setCreating(false)} onCreated={number=>{reviewTabs.open(number,'conversation');setCreating(false);setFilter('open');setQuery('');setDestination('inbox')}}/> :
             <CreatePullRequest
               prs={prs}
               onCancel={() => setCreating(false)}
@@ -947,13 +970,12 @@ export default function App() {
                 setRepository("all");
                 setFilter("open");
                 setDestination("inbox");
-                setSelected(next.number);
-                setTab("conversation");
+                reviewTabs.open(next.number, "conversation");
                 setCreating(false);
                 notify(`Created sample pull request #${next.number}.`);
               }}
             />
-          ) : pr && (live.enabled || visiblePRs.length) ? (
+          ) : pr ? (
             <section
               className="detail-pane"
               aria-label={`Pull request ${pr.number}`}
@@ -1062,10 +1084,10 @@ export default function App() {
           ) : live.enabled&&live.loadingPullRequests ? (<section className="detail-pane"><ReviewSkeleton label="Loading your review workspace…"/></section>) : (
             <section className="detail-pane empty-state">
               <Icon name="inbox" size={36} />
-              <h2>{live.enabled&&live.error?"Unable to load pull requests":"Your review queue is clear"}</h2>
+              <h2>{live.enabled&&live.error?"Unable to load pull requests":reviewTabs.initialized && !reviewTabs.items.length ? "No pull requests open" : "Your review queue is clear"}</h2>
               {live.enabled&&live.error&&<p className="form-error" role="alert">{live.error}</p>}
               <p>
-                {live.enabled?'Choose a different filter to explore your pull requests.':'Choose a different filter to explore the sample pull requests.'}
+                {reviewTabs.initialized && !reviewTabs.items.length ? 'Select a pull request from the inbox to open a tab. Your saved review drafts are kept.' : live.enabled ? 'Choose a different filter to explore your pull requests.' : 'Choose a different filter to explore the sample pull requests.'}
               </p>
               <button
                 className="btn"
@@ -1078,7 +1100,8 @@ export default function App() {
                 Show all pull requests
               </button>
             </section>
-          ))}
+          )}
+          </ReviewSessionProvider></div></section>}
         {destination === "actions" && (!live.enabled || !!live.repository) && <ActionsPage repository={live.enabled ? live.identity : undefined} account={live.account?.login}/>}
         {destination === "history" && (!live.enabled || !!live.repository) && (
           <HistoryView
@@ -1290,10 +1313,10 @@ function PullRequestHeader({
   busy?: boolean;
 }) {
   const [menu, setMenu] = useState(false),
-    [editing, setEditing] = useState(false),
-    [title, setTitle] = useState(pr.title),
-    [body, setBody] = useState(pr.body);
-  const [saving, setSaving] = useState(false), [error, setError] = useState("");
+    [editing, setEditing] = useReviewSessionState("header.editing", false),
+    [title, setTitle] = useReviewSessionState("header.title", pr.title),
+    [body, setBody] = useReviewSessionState("header.body", pr.body);
+  const [saving, setSaving] = useReviewSessionState("header.saving", false), [error, setError] = useReviewSessionState("header.error", "");
   const loaded = pr.provider?.detailLoaded !== false;
   const canEdit = loaded && pr.provider?.viewerCanUpdate !== false;
   const locked = busy || saving;
@@ -1305,11 +1328,10 @@ function PullRequestHeader({
   const menuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     setMenu(false);
-    setEditing(false);
-    setTitle(pr.title);
-    setBody(pr.body);
-    setError("");
   }, [pr.number]);
+  useEffect(() => {
+    if (!editing) { setTitle(pr.title); setBody(pr.body); }
+  }, [editing, pr.title, pr.body]);
   useEffect(() => {
     if (!menu) return;
     const close = (e: PointerEvent) => {
@@ -1548,14 +1570,14 @@ function Conversation({
   onMerge: (method: MergeMethod) => void | Promise<void>;
   busy?: boolean;
 }) {
-  const [comment, setComment] = useState(""),
-    [replyId, setReplyId] = useState<string | null>(null),
-    [reply, setReply] = useState(""),
+  const [comment, setComment] = useReviewSessionState("conversation.comment", ""),
+    [replyId, setReplyId] = useReviewSessionState<string | null>("conversation.replyId", null),
+    [reply, setReply] = useReviewSessionState("conversation.reply", ""),
     [confirmMerge, setConfirmMerge] = useState(false),
     [method, setMethod] = useState<MergeMethod>("squash");
-  const [saving, setSaving] = useState(false), [error, setError] = useState("");
-  const [editingMetadata, setEditingMetadata] = useState(false);
-  const [reviewers, setReviewers] = useState(""), [assignees, setAssignees] = useState(""), [labels, setLabels] = useState("");
+  const [saving, setSaving] = useReviewSessionState("conversation.saving", false), [error, setError] = useReviewSessionState("conversation.error", "");
+  const [editingMetadata, setEditingMetadata] = useReviewSessionState("conversation.editingMetadata", false);
+  const [reviewers, setReviewers] = useReviewSessionState("conversation.reviewers", ""), [assignees, setAssignees] = useReviewSessionState("conversation.assignees", ""), [labels, setLabels] = useReviewSessionState("conversation.labels", "");
   const loaded = pr.provider?.detailLoaded !== false;
   const locked = busy || saving;
   const canDiscuss = loaded && (!!pr.provider || ["open", "draft"].includes(pr.status));
@@ -1564,12 +1586,7 @@ function Conversation({
   const activeContext = useRef(contextKey); activeContext.current = contextKey;
   const allowedMethods = pr.provider ? pr.provider.allowedMergeMethods ?? [] : ["squash", "merge", "rebase"];
   useEffect(() => {
-    setComment("");
-    setReplyId(null);
-    setReply("");
     setConfirmMerge(false);
-    setEditingMetadata(false);
-    setError("");
   }, [pr.number]);
   useEffect(() => {
     if (allowedMethods.length && !allowedMethods.includes(method)) setMethod(allowedMethods[0] as MergeMethod);

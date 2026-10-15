@@ -24,7 +24,7 @@ Authentication reuses an existing GitHub CLI login or a validated token saved in
 
 Local and PR code share grammar highlighting, configurable font size, and four syntax themes per appearance. Installed PHP, TypeScript / JavaScript, and Vue language servers provide symbol hovers and definition navigation in isolated revision snapshots. Definitions open in a read-only viewer, including available dependency sources, without changing the user's checkout. Local analysis distinguishes staged and working tree content.
 
-Five inboxes distinguish all PRs, the user's PRs, requested reviews, assigned PRs, and drafts. Comments show account pictures, Bot badges, and Author badges. Editor launch actions support VSCode, PhpStorm, and Zed with remembered selection and a separate GitHub browser action.
+Five inboxes distinguish all PRs, the user's PRs, requested reviews, assigned PRs, and drafts. Opening a PR creates or selects its closable tab. Tabs remain available across inbox pages and filters, with a separate selected section, file, scroll position and unfinished comment/review text for each PR. Closing the last tab leaves an empty review pane; it never closes the PR on GitHub. Tab sessions last for the current repository and app session; saved pending review comments keep their existing persistence. Comments show account pictures, Bot badges, and Author badges. Editor launch actions support VSCode, PhpStorm, and Zed with remembered selection and a separate GitHub browser action.
 
 Repository notification preferences cover opened, closed, merged, and review-requested events. In-app toasts and all event types default on; desktop notifications default off. The initial imported snapshot establishes a silent baseline.
 

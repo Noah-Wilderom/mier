@@ -54,6 +54,8 @@ Repository access and token permissions determine which operations GitHub permit
 - Use the repository toolbar to create, switch, rename, or delete merged local branches, choose a remote, fetch, pull, and push. Pull uses fast-forward-only behavior; push sets upstream tracking and does not force-push. Delete confirmation never force-deletes unmerged work.
 - Compare committed branch changes in a read-only dialog and inspect individual history or PR commits without checking them out. Root commits compare against an empty tree; merge commits compare against the first parent.
 - Browse, search, and filter real open, draft, closed, and merged pull requests. The inbox requests 25 matching PRs at a time; choose **Load more** to fetch the next page. Filters and searches run on GitHub, and counts describe the full matching result rather than only the loaded rows. Inspect Conversation, Changes, Commits, and Checks.
+- Keep multiple PRs open in closable tabs above the review. Clicking an already opened PR selects its existing tab. Tabs stay available across inbox pages and filters, including expanded review. Use Left/Right, Home/End, and Delete while a tab is focused, or close with the × button or middle-click. Closing an active tab selects its neighbor; closing the final tab leaves the review pane empty.
+- Each PR remembers its section, selected file, diff options, scroll position, unfinished inline/conversation replies, review summary, metadata edits and AI pane/focus while using the same repository. Closing a tab keeps unfinished text in memory for reopening that PR. Switching repositories or restarting clears these tab sessions; explicitly saved pending comments continue to use the normal persisted draft store.
 - Use separate inboxes for all PRs, your PRs, requested reviews, PRs assigned to you, and drafts. Comment authors show profile pictures, an Author badge when appropriate, and a Bot badge for bot accounts.
 - Review split or unified diffs, filter files, mark files viewed, and expand code review to the full window. Selected files, viewed progress, and pending comments remain in place when expanding or returning to the inbox.
 - Read Markdown descriptions and comments with headings, lists, code fences, tables, task lists, and emoji shortcodes. External web links open in the browser; raw HTML is disabled.
@@ -61,6 +63,8 @@ Repository access and token permissions determine which operations GitHub permit
 - Create draft or open PRs with a committed comparison preview, edit titles and descriptions, change draft status, close or reopen PRs, and edit reviewers, assignees, and labels. Publish the compare branch before creating a PR. Commit messages and PR creation drafts are saved per repository across navigation and restart.
 - Merge with a strategy allowed by the repository. GitHub enforces checks, review requirements, permissions, and protection. Reviews and merges verify the expected head commit so an unseen revision cannot be submitted accidentally.
 - Open the current repository in VSCode, PhpStorm, or Zed using the editor split button. VSCode is the default; successful launches remember the last editor. A separate GitHub button opens the selected PR or repository in your browser.
+
+See the PR tabs in [dark appearance](../art/mier-pr-tabs-dark.png) and [expanded light appearance](../art/mier-pr-tabs-light.png). These screenshots use sample RPC data.
 
 ## Code highlighting and language intelligence
 

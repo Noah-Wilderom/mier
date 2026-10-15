@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { Icon } from './Icon'
 import { currentUser, latestReview, submitReview } from './data'
 import type { ChangedFile, DiffLine, PendingComment, PullRequest, ReviewDecision, Thread } from './data'
 import './review.css'
+import { useReviewSessionState, useReviewSessionRef } from './ReviewSession'
 import { Markdown } from './Markdown'
 import FileChangeIcon from './FileChangeIcon'
 import { ActorName, Avatar } from './Avatar'
@@ -87,11 +88,11 @@ function PersonAvatar({ author }: { author: string }) {
 }
 
 function ReviewThread({ thread, pr, onUpdate, onNotify, busy = false }: ReviewProps & { thread: Thread }) {
-  const [reply, setReply] = useState('')
-  const [replyOpen, setReplyOpen] = useState(false)
-  const [expanded, setExpanded] = useState(!thread.resolved)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
+  const [reply, setReply] = useReviewSessionState(`thread.${thread.id}.reply`, '')
+  const [replyOpen, setReplyOpen] = useReviewSessionState(`thread.${thread.id}.replyOpen`, false)
+  const [expanded, setExpanded] = useReviewSessionState(`thread.${thread.id}.expanded`, !thread.resolved)
+  const [saving, setSaving] = useReviewSessionState(`thread.${thread.id}.saving`, false)
+  const [error, setError] = useReviewSessionState(`thread.${thread.id}.error`, '')
   const editable = ['open', 'draft'].includes(pr.status) && pr.provider?.detailLoaded !== false
   const canResolve = editable && (thread.resolved ? thread.canUnresolve !== false : thread.canResolve !== false)
 
@@ -186,23 +187,25 @@ export default function ReviewWorkspace({ pr, onUpdate, onNotify, focusMode, onT
   const appearance = useSyncExternalStore(subscribeCodeAppearance, getCodeAppearance, () => 'light' as const)
   const syntaxTheme = effectiveCodeTheme(appearance, codePreferences)
   const [highlighted, setHighlighted] = useState<{ source: string; theme: string; result: HighlightedDiff } | null>(null)
-  const [activePath, setActivePath] = useState(() => requestedLocation && pr.files.some(item => item.path === requestedLocation.path) ? requestedLocation.path : pr.files[0]?.path ?? '')
-  const [query, setQuery] = useState('')
-  const [diffMode, setDiffMode] = useState<'split' | 'unified'>('split')
-  const [ignoreWhitespace, setIgnoreWhitespace] = useState(false)
-  const [wrapLines, setWrapLines] = useState(true)
-  const [filePaneWidth, setFilePaneWidth] = useState(218)
+  const [activePath, setActivePath] = useReviewSessionState('workspace.activePath', () => requestedLocation && pr.files.some(item => item.path === requestedLocation.path) ? requestedLocation.path : pr.files[0]?.path ?? '')
+  const [query, setQuery] = useReviewSessionState('workspace.query', '')
+  const [diffMode, setDiffMode] = useReviewSessionState<'split' | 'unified'>('workspace.diffMode', 'split')
+  const [ignoreWhitespace, setIgnoreWhitespace] = useReviewSessionState('workspace.ignoreWhitespace', false)
+  const [wrapLines, setWrapLines] = useReviewSessionState('workspace.wrapLines', true)
+  const [filePaneWidth, setFilePaneWidth] = useReviewSessionState('workspace.filePaneWidth', 218)
   const [resizingFiles, setResizingFiles] = useState(false)
-  const [commentAt, setCommentAt] = useState<LineLocation | null>(null)
-  const [commentBody, setCommentBody] = useState('')
-  const [composerHeadSha, setComposerHeadSha] = useState<string | null>(null)
-  const [composerPath, setComposerPath] = useState<string | null>(null)
+  const [commentAt, setCommentAt] = useReviewSessionState<LineLocation | null>('workspace.commentAt', null)
+  const [commentBody, setCommentBody] = useReviewSessionState('workspace.commentBody', '')
+  const [composerHeadSha, setComposerHeadSha] = useReviewSessionState<string | null>('workspace.composerHeadSha', null)
+  const [composerPath, setComposerPath] = useReviewSessionState<string | null>('workspace.composerPath', null)
   const [saving, setSaving] = useState(false)
   const [mutationError, setMutationError] = useState('')
   const diffScrollRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const resizeOrigin = useRef({ x: 0, width: 218 })
-  const requestedScrollPending = useRef(Boolean(requestedLocation))
+  const lastRequestedLocation = useReviewSessionRef<ReviewLocation | undefined>('workspace.lastLocation', undefined)
+  const requestedScrollPending = useRef(false)
+  const scrollPositions = useReviewSessionRef('workspace.scroll', new Map<string, {top: number; left: number}>())
   const file = pr.files.find(item => item.path === activePath) ?? pr.files[0]
   const syntaxSource = useMemo(() => file ? JSON.stringify([file.path, file.previousPath, file.lines]) : '', [file])
   const syntax = highlighted?.source === syntaxSource && highlighted?.theme === syntaxTheme ? highlighted.result : undefined
@@ -243,24 +246,25 @@ export default function ReviewWorkspace({ pr, onUpdate, onNotify, focusMode, onT
   const composerOutdated = composerHeadSha !== null && composerHeadSha !== pr.headSha
   const composerDetached = commentAt !== null && (composerPath !== file?.path || !file?.lines.some(line => commentAt.side === 'old' ? line.oldLine === commentAt.line : line.newLine === commentAt.line))
 
+  const previousPath = useRef(activePath)
   useEffect(() => {
-    setActivePath(requestedLocation && pr.files.some(item => item.path === requestedLocation.path) ? requestedLocation.path : pr.files[0]?.path ?? '')
-    setQuery('')
-    setCommentAt(null)
-    setCommentBody('')
-    setComposerHeadSha(null)
-    setComposerPath(null)
-  }, [pr.number])
-
-  useEffect(() => {
-    diffScrollRef.current?.scrollTo({ top: 0, left: 0 })
+    if (previousPath.current === activePath) return
+    previousPath.current = activePath
     setCommentAt(null)
     setCommentBody('')
     setComposerHeadSha(null)
     setComposerPath(null)
   }, [activePath])
 
+  const scrollKey = JSON.stringify([file?.path, diffMode])
+  useLayoutEffect(() => {
+    const saved = scrollPositions.current.get(scrollKey)
+    diffScrollRef.current?.scrollTo({ top: saved?.top ?? 0, left: saved?.left ?? 0 })
+  }, [scrollKey])
+
   useEffect(() => {
+    if (lastRequestedLocation.current === requestedLocation) return
+    lastRequestedLocation.current = requestedLocation
     requestedScrollPending.current = Boolean(requestedLocation)
     if (requestedLocation && pr.files.some(item => item.path === requestedLocation.path)) {
       setActivePath(requestedLocation.path)
@@ -421,7 +425,7 @@ export default function ReviewWorkspace({ pr, onUpdate, onNotify, focusMode, onT
             }}><Icon name="message-circle" size={13} />{activeThreads}</button>}<label className="review-viewed-control"><input type="checkbox" checked={pr.viewedFiles.includes(file.path)} disabled={busy || saving} onChange={event => setViewed(file.path, event.target.checked)} />Viewed</label><div className="review-file-navigation"><button className="icon-button" disabled={activeIndex <= 0} onClick={() => selectAdjacent(-1)} aria-label="Previous file" title="Previous file ([)"><Icon name="chevron-up" size={14} /></button><button className="icon-button" disabled={activeIndex < 0 || activeIndex >= navigableFiles.length - 1} onClick={() => selectAdjacent(1)} aria-label="Next file" title="Next file (])"><Icon name="chevron-down" size={14} /></button></div></div>
           </div>
           {file.truncated && file.lines.length > 0 && <div className="review-diff-notice"><Icon name="alert-circle" size={14} />This diff is truncated. Only the available patch lines are shown.</div>}
-          <div className="review-diff-scroll" ref={diffScrollRef} tabIndex={0} aria-label={`Code changes in ${file.path}`}>
+          <div className="review-diff-scroll" ref={diffScrollRef} onScroll={event => scrollPositions.current.set(scrollKey, {top:event.currentTarget.scrollTop,left:event.currentTarget.scrollLeft})} tabIndex={0} aria-label={`Code changes in ${file.path}`}>
             {file.lines.length ? <div className={`review-diff-content ${diffMode === 'split' ? 'is-split' : 'is-unified'} ${wrapLines ? 'wrap-lines' : ''}`}>
               {diffMode === 'split' ? <>
                 <div className="review-diff-column-labels"><span><Icon name="git-branch" size={12} />{pr.base}<span className="muted">Original</span></span><span><Icon name="git-branch" size={12} />{pr.head}<span className="muted">Changed</span></span></div>
@@ -451,11 +455,11 @@ export default function ReviewWorkspace({ pr, onUpdate, onNotify, focusMode, onT
 }
 
 export function ReviewFooter({ pr, onUpdate, onNotify, busy = false }: ReviewProps) {
-  const [expanded, setExpanded] = useState(false)
-  const [decision, setDecision] = useState<ReviewDecision>('commented')
-  const [body, setBody] = useState('')
-  const [error, setError] = useState('')
-  const [submitting, setSubmitting] = useState(false)
+  const [expanded, setExpanded] = useReviewSessionState('footer.expanded', false)
+  const [decision, setDecision] = useReviewSessionState<ReviewDecision>('footer.decision', 'commented')
+  const [body, setBody] = useReviewSessionState('footer.body', '')
+  const [error, setError] = useReviewSessionState('footer.error', '')
+  const [submitting, setSubmitting] = useReviewSessionState('footer.submitting', false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const editable = ['open', 'draft'].includes(pr.status) && pr.provider?.detailLoaded !== false
@@ -470,15 +474,10 @@ export function ReviewFooter({ pr, onUpdate, onNotify, busy = false }: ReviewPro
   const locked = busy || submitting || deletingId !== null
   const valid = editable && !locked && !hasNewCommits && !outdatedComments.length && !(selfAuthored && decision === 'approved') && !(isDraft && decision !== 'commented') && (decision !== 'changes_requested' || body.trim().length > 0) && (decision !== 'commented' || body.trim().length > 0 || pending > 0)
 
+  const wasExpanded = useRef(expanded)
   useEffect(() => {
-    setExpanded(false)
-    setBody('')
-    setDecision('commented')
-    setError('')
-  }, [pr.number])
-
-  useEffect(() => {
-    if (expanded) textareaRef.current?.focus()
+    if (expanded && !wasExpanded.current) textareaRef.current?.focus()
+    wasExpanded.current = expanded
   }, [expanded])
 
   useEffect(() => {

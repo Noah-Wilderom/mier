@@ -43,6 +43,8 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
   const repoRef=useRef<RepositorySnapshot|null>(null)
   const prsRef=useRef<PullRequest[]>([])
   const selectedRef=useRef(0)
+  const openedPullRequests=useRef(new Set<number>())
+  const retainPullRequests=useCallback((numbers:number[])=>{openedPullRequests.current=new Set(numbers)},[])
   const latestRevisions=useRef(new Map<number,PullRequest>())
   const drafts=useRef(initialDrafts)
   const detailRequests=useRef(new Map<number,Promise<void>>())
@@ -95,7 +97,7 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
       for(const pr of mapped){const index=items.findIndex(item=>item.number===pr.number);if(index>=0)items[index]=pr;else items.push(pr)}
       // Keep opened reviews separate from page membership. A newly created PR
       // may not appear in GitHub's listing immediately after its detail loads.
-      for(const retained of prsRef.current.filter(pr=>pr.provider?.detailLoaded||pr.number===selectedRef.current))if(!items.some(pr=>pr.number===retained.number))items.push(retained)
+      for(const retained of prsRef.current.filter(pr=>pr.provider?.detailLoaded||pr.number===selectedRef.current||openedPullRequests.current.has(pr.number)))if(!items.some(pr=>pr.number===retained.number))items.push(retained)
       pageNumbersRef.current=numbers;setPullRequestNumbers(numbers);setItems(items)
       pageCursor.current=page.nextCursor;setHasMorePullRequests(page.hasNextPage)
       setPullRequestTotal(page.totalCount);setOpenPullRequestCount(page.openCount);setPullRequestResultLimit(page.resultLimit??0)
@@ -114,7 +116,7 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
   const resetPullRequestPage=useCallback(()=>{
     ++pageGeneration.current;pageRequest.current=null;pageCursor.current='';pageNumbersRef.current=[];setPullRequestNumbers([])
     setHasMorePullRequests(false);setPullRequestTotal(null);setPullRequestResultLimit(0);setPullRequestPageError('');setLoadingMorePullRequests(false)
-    setItems(prsRef.current.filter(pr=>pr.provider?.detailLoaded||pr.number===selectedRef.current))
+    setItems(prsRef.current.filter(pr=>pr.provider?.detailLoaded||pr.number===selectedRef.current||openedPullRequests.current.has(pr.number)))
   },[setItems])
   const setPullRequestQuery=useCallback((next:PullRequestPageQuery)=>{
     if(JSON.stringify(next)===JSON.stringify(requestedQuery.current))return
@@ -140,7 +142,7 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
     const identity=repoRef.current&&identityFor(repoRef.current)
     const eventIdentity=update.host&&update.owner&&update.repo?{host:update.host,owner:update.owner,repo:update.repo}:undefined
     if(JSON.stringify(identity)!==JSON.stringify(eventIdentity)){
-      const epoch=++activeEpoch.current;authenticationError.current='';selectedRef.current=0;resetPullRequestPage();setItems([]);setSelected(0);setOpenPullRequestCount(null);setLoadingPullRequests(!!identity);setAccount(null);detailRequests.current.clear();latestRevisions.current.clear()
+      const epoch=++activeEpoch.current;authenticationError.current='';selectedRef.current=0;openedPullRequests.current.clear();resetPullRequestPage();setItems([]);setSelected(0);setOpenPullRequestCount(null);setLoadingPullRequests(!!identity);setAccount(null);detailRequests.current.clear();latestRevisions.current.clear()
       void services.sync.startWatch({path:update.path,host:identity?.host??'',owner:identity?.owner??'',repo:identity?.repo??''}).catch(issue=>{if(epoch===activeEpoch.current){setLoadingPullRequests(false);setError(String(issue))}})
       if(identity)void services.credentials.accountStatus(identity.host).then(status=>{if(epoch!==activeEpoch.current)return;setAccount(status);authenticationError.current=status.authenticated?'':status.error||`Connect your account for ${identity.host} to load pull requests.`;if(status.authenticated)configureGitHubAccount(status);else{setLoadingPullRequests(false);setError(authenticationError.current)}}).catch(issue=>{if(epoch===activeEpoch.current){authenticationError.current=issue instanceof Error?issue.message:String(issue);setLoadingPullRequests(false);setError(authenticationError.current)}})
       return
@@ -178,7 +180,7 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
       const epoch=++activeEpoch.current
       detailRequests.current.clear();localMutationAt.current=0
       authenticationError.current=''
-      repoRef.current=snapshot;setRepository(snapshot);enabledRef.current=true;setEnabled(true);setItems([]);setSelected(0);selectedRef.current=0;latestRevisions.current.clear();setError('');setAccount(null)
+      repoRef.current=snapshot;setRepository(snapshot);enabledRef.current=true;setEnabled(true);setItems([]);setSelected(0);selectedRef.current=0;openedPullRequests.current.clear();latestRevisions.current.clear();setError('');setAccount(null)
       resetPullRequestPage();setOpenPullRequestCount(null)
       const identity=identityFor(snapshot)
       setRepositoryCards(cards=>({...cards,[snapshot.root]:{...cards[snapshot.root],path:snapshot.root,name:snapshot.name,branch:snapshot.currentBranch,host:identity?.host,owner:identity?.owner,repo:identity?.repo}}))
@@ -210,6 +212,7 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
     selectedRef.current=number;setSelected(number)
     const repo=repoRef.current;if(!repo)return
     void services.sync.watchPullRequest(repo.root,number).catch(()=>{})
+    if(number<=0)return
     if(!prsRef.current.find(pr=>pr.number===number)?.provider?.detailLoaded&&!detailRequests.current.has(number)){
       const epoch=activeEpoch.current
       const request=loadDetail(number).catch(issue=>{if(epoch===activeEpoch.current)setError(issue instanceof Error?issue.message:String(issue))}).finally(()=>{if(detailRequests.current.get(number)===request)detailRequests.current.delete(number)})
@@ -324,7 +327,7 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
     },epoch)
   },[notify,perform])
   const commitDiff=useCallback(async(sha:string)=>{const repo=repoRef.current;if(!repo)throw new Error('Open a repository first.');return {files:(await services.repository.commitDiff(repo.root,sha)).map(mapRepositoryDiff)}},[])
-  const useDemo=useCallback(()=>{++activeEpoch.current;++openIntent.current;authenticationError.current='';enabledRef.current=false;repoRef.current=null;selectedRef.current=0;resetPullRequestPage();setRepository(null);setEnabled(false);setItems([]);setAccount(null);configureCurrentUser('noah');setError('')},[resetPullRequestPage,setItems])
+  const useDemo=useCallback(()=>{++activeEpoch.current;++openIntent.current;authenticationError.current='';enabledRef.current=false;repoRef.current=null;selectedRef.current=0;openedPullRequests.current.clear();resetPullRequestPage();setRepository(null);setEnabled(false);setItems([]);setAccount(null);configureCurrentUser('noah');setError('')},[resetPullRequestPage,setItems])
   useEffect(()=>{
     let initialized=false
     let canceled=false
@@ -353,5 +356,5 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
   const inboxPullRequests=useMemo(()=>{const byNumber=new Map(prs.map(pr=>[pr.number,pr]));return pullRequestNumbers.flatMap(number=>{const pr=byNumber.get(number);return pr?[pr]:[]})},[prs,pullRequestNumbers])
   const loadMorePullRequests=useCallback(()=>loadPullRequestPage(true),[loadPullRequestPage])
   const retryPullRequests=useCallback(()=>loadPullRequestPage(pageNumbersRef.current.length>0),[loadPullRequestPage])
-  return {available,enabled,repository,identity:repository?identityFor(repository):undefined,prs,inboxPullRequests,account,recent,repositoryCards,busy,openingRepository,loadingPullRequests,loadingMorePullRequests,hasMorePullRequests,pullRequestTotal,openPullRequestCount,pullRequestResultLimit,pullRequestPageError,setPullRequestQuery,loadMorePullRequests,retryPullRequests,error,updatedAt,selected,history:mapped?.history??emptyHistory,changes:mapped?.changes??emptyChanges,branch:mapped?.branch??'',openRepository,connect,selectPullRequest,updatePullRequest,appendAISuggestions,acceptNewCommits,merge,create,git,operate,diff,commitDiff,refresh,useDemo}
+  return {available,enabled,repository,identity:repository?identityFor(repository):undefined,prs,inboxPullRequests,account,recent,repositoryCards,busy,openingRepository,loadingPullRequests,loadingMorePullRequests,hasMorePullRequests,pullRequestTotal,openPullRequestCount,pullRequestResultLimit,pullRequestPageError,setPullRequestQuery,loadMorePullRequests,retryPullRequests,retainPullRequests,error,updatedAt,selected,history:mapped?.history??emptyHistory,changes:mapped?.changes??emptyChanges,branch:mapped?.branch??'',openRepository,connect,selectPullRequest,updatePullRequest,appendAISuggestions,acceptNewCommits,merge,create,git,operate,diff,commitDiff,refresh,useDemo}
 }
