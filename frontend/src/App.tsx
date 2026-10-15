@@ -26,6 +26,9 @@ import "./app.css";
 import { useLiveWorkspace } from "./useLiveWorkspace";
 import { AccountSettings, RepositoryWelcome, LiveCreatePullRequest } from "./LiveSetup";
 import LocalChangesView, {type LocalFile} from "./LocalChangesView";
+import {useGitHistory} from './useGitHistory';
+import {SignatureControl} from './RepositoryTools';
+import {HistoryOperations,CherryPickSelection} from './HistoryOperations';
 import RepositorySelector, {repositoryName} from "./RepositorySelector";
 import {InboxSkeleton, RepositorySkeleton, ReviewSkeleton} from "./Loading";
 import HistoryGraph from "./HistoryGraph";
@@ -43,7 +46,7 @@ import RepositoryToolbar from "./RepositoryToolbar";
 import GitOperationBanner from "./GitOperationBanner";
 import ReviewAssistant from "./ReviewAssistant";
 import AISettings from "./AISettings";
-import { CherryPickControl, useHistoryBranch } from "./GitCommitActions";
+import { CherryPickControl } from "./GitCommitActions";
 import type { GitMutation } from "./gitOperations";
 import type { RepositorySnapshot } from "./services";
 import CommitChanges, {type LoadCommitDiff} from "./CommitChanges";
@@ -1125,6 +1128,7 @@ export default function App() {
             branch={branch}
             root={live.enabled ? live.repository?.root : undefined}
             headSha={live.repository?.headSha}
+            headMessage={live.repository?.history?.filter(commit=>commit.sha===live.repository?.headSha).map(commit=>[commit.subject,commit.body].filter(Boolean).join('\n\n'))[0]}
             host={live.identity?.host}
             owner={live.identity?.owner}
             repo={live.identity?.repo}
@@ -2168,9 +2172,15 @@ function HistoryView({
   onOperate?:(mutation:GitMutation)=>Promise<unknown>;
   onConflicts?:()=>void;
 }) {
-  const source=useHistoryBranch(repository);
-  const filtered=useMemo(()=>repository&&source.commits?mapRepositorySnapshot({...repository,history:source.commits}).history:history,[repository,source.commits,history]);
+  const source=useGitHistory(repository);
+  const filtered=useMemo(()=>repository?mapRepositorySnapshot({...repository,history:source.commits}).history:history,[repository,source.commits,history]);
   const [selected, setSelected] = useState(history[0]?.sha);
+  const [picked,setPicked]=useState<string[]>([]);
+  useEffect(()=>setPicked([]),[source.key]);
+  const pick=(sha:string,range:boolean)=>{
+    if(range&&selected){const start=filtered.findIndex(commit=>commit.sha===selected),end=filtered.findIndex(commit=>commit.sha===sha);setPicked(previous=>[...new Set([...previous,...filtered.slice(Math.min(start,end),Math.max(start,end)+1).map(commit=>commit.sha)])])}
+    else setPicked(previous=>previous.includes(sha)?previous.filter(item=>item!==sha):[...previous,sha]);
+  };
   const commit = filtered.find((c) => c.sha === selected) || filtered[0];
   return (
     <section className="history-workspace">
@@ -2180,19 +2190,22 @@ function HistoryView({
           <Icon name="branch" size={14} />
           {branch}
         </code>
-        {repository&&<label className="history-branch-filter">History from<select aria-label="History branch" value={source.branch} onChange={e=>source.setBranch(e.target.value)}><option value="">All branches</option>{repository.branches?.filter(branch=>!branch.remote).map(branch=><option key={branch.name}>{branch.name}</option>)}</select></label>}
+        {repository&&<label className="history-branch-filter">History from<select aria-label="History branch" value={source.branch} onChange={e=>source.setBranch(e.target.value)}><option value="">All branches</option>{repository.branches?.map(branch=><option key={branch.name} value={branch.name}>{branch.name}{branch.remote?' (remote)':''}</option>)}</select></label>}
         <button className="btn" onClick={onReview}>
           <Icon name="pull-request" />
           Review pull requests
         </button>
       </div>
-      {source.error&&<div className="git-operation-error" role="alert">{source.error}<button className="btn" onClick={source.retry}>Retry branch history</button></div>}
-      {source.loading?<p role="status" className="comparison-empty">Loading branch history…</p>:<HistoryGraph commits={filtered} selectedSha={commit?.sha} onSelect={setSelected}/>}
+      {repository&&<form className="history-search" onSubmit={event=>{event.preventDefault();source.submit()}}><input type="search" aria-label="Search Git history" placeholder="Search commits…" value={source.query} onChange={e=>source.setQuery(e.target.value)}/><select aria-label="Search history by" value={source.search} onChange={e=>source.setSearch(e.target.value as 'message'|'author'|'sha')}><option value="message">Message</option><option value="author">Author</option><option value="sha">Commit ID</option></select><button className="btn" disabled={source.loading}>Search</button><button type="button" className="btn" disabled={source.loading} onClick={source.refresh}>Refresh history</button></form>}
+      {source.error&&<div className="git-operation-error" role="alert">{source.error}<button className="btn" onClick={source.refresh}>Retry history</button></div>}
+      {source.loading&&!filtered.length?<p role="status" className="comparison-empty">Loading history…</p>:<HistoryGraph commits={filtered} selectedSha={commit?.sha} onSelect={setSelected} pickedShas={picked} onPick={repository?pick:undefined}/>}
+      {repository&&<div className="history-pagination"><span>{filtered.length} commits loaded</span>{source.cursor&&<button className="btn" disabled={source.loading} onClick={()=>void source.more()}>{source.loading?'Loading…':'Load older commits'}</button>}{onOperate&&<CherryPickSelection commits={filtered.filter(commit=>picked.includes(commit.sha))} repository={repository} busy={busy} onOperate={onOperate} onConflicts={()=>onConflicts?.()} onClear={()=>setPicked([])}/>}<span>Ctrl/⌘ click or Shift-click to select commits.</span></div>}
       {commit && (
         <div className="commit-inspector">
           <div className="section-intro">
             <h2>{commit.subject}</h2>
             {repository&&onOperate&&<CherryPickControl commit={commit} repository={repository} busy={busy} onOperate={onOperate} onConflicts={()=>onConflicts?.()}/>}
+            {repository&&onOperate&&<HistoryOperations commit={commit} repository={repository} busy={busy} onOperate={onOperate} onConflicts={()=>onConflicts?.()}/>}
             <span>
               <Avatar user={commit.author} size={22} />
               {people[commit.author].name} · {relativeTime(commit.createdAt)}
@@ -2210,7 +2223,8 @@ function HistoryView({
               <code>{branch}</code>
             </dd>
           </dl>
-          {loadCommitDiff&&<CommitChanges requestKey={JSON.stringify([root,commit.sha])} sha={commit.sha} loadDiff={loadCommitDiff}/>}
+          {root&&<SignatureControl key={root+commit.sha} root={root} sha={commit.sha}/>}
+          {loadCommitDiff&&<CommitChanges requestKey={JSON.stringify([root,commit.sha])} sha={commit.sha} loadDiff={loadCommitDiff} root={root}/>}
         </div>
       )}
     </section>

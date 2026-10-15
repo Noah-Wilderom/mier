@@ -15,12 +15,25 @@ export interface ConflictFile { path: string; token: string; base: ConflictVersi
 export interface ResolveConflictRequest { path: string; token: string; choice: 'result' | 'current' | 'incoming' | 'delete'; content: string }
 export interface CherryPickRequest { sha: string; expectedHead: string; expectedBranch: string; mainline: number }
 export interface MergeBranchRequest { branch: string; expectedSource: string; expectedHead: string; expectedBranch: string }
-export interface StageHunkRequest { path: string; staged: boolean; hunk: number; expectedPatch: string }
+export interface StageHunkRequest { path: string; staged: boolean; hunk: number; expectedPatch: string; lines?:number[] }
 export type GitMutation =
   | { kind: 'cherry-pick'; request: CherryPickRequest }
   | { kind: 'merge'; request: MergeBranchRequest }
   | { kind: 'resolve'; request: ResolveConflictRequest }
   | { kind: 'hunk'; request: StageHunkRequest }
+  | { kind: 'stash-save'; request: import('./localGit').SaveStashRequest }
+  | { kind: 'stash'; request: import('./localGit').StashRequest }
+  | { kind: 'amend'; request: import('./localGit').AmendRequest }
+  | { kind: 'discard'; request: import('./localGit').DiscardRequest }
+  | { kind: 'restore-discard'; id:string }
+  | { kind: 'ignore'; path:string }
+  | { kind: 'tag'; request:import('./repositoryToolTypes').TagRequest }
+  | { kind: 'remote'; request:import('./repositoryToolTypes').RemoteRequest }
+  | { kind: 'signing'; request:import('./repositoryToolTypes').SigningConfig }
+  | { kind: 'reset'; request:import('./repositoryToolTypes').ResetRequest }
+  | { kind: 'recover-branch'; request:import('./repositoryToolTypes').RecoverBranchRequest }
+  | { kind: 'cherry-pick-many'; request:import('./repositoryToolTypes').CherryPickManyRequest }
+  | { kind: 'revert'; request:CherryPickRequest }
   | { kind: 'continue' | 'abort' | 'skip'; token: string }
 export const operationLabel = (kind: GitOperation['kind']) => ({ merge: 'Merge', 'cherry-pick': 'Cherry-pick', rebase: 'Rebase', revert: 'Revert', am: 'Apply patches' })[kind]
 

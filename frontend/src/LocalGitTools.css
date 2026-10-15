@@ -1,0 +1,24 @@
+.local-git-tools { display: flex; gap: 6px; margin-left: auto; }
+.local-git-dialog { display: flex; flex-direction: column; gap: 14px; padding: 20px; min-width: 0; max-height: min(76vh, 900px); overflow: auto; }
+.local-git-dialog > p { margin: 0; line-height: 1.6; }
+.local-git-dialog form { display: flex; flex-direction: column; gap: 12px; }
+.local-git-dialog h3 { margin: 0; font-size: 14px; }
+.local-git-dialog label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+.local-git-dialog input:not([type=checkbox]), .local-git-dialog select { width: 100%; min-width: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 8px; color: var(--text); }
+.local-git-dialog .git-check { flex-direction: row; align-items: center; }
+.git-tool-actions, .git-tool-heading { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.git-tool-heading { justify-content: space-between; }
+.git-confirm { border: 1px solid var(--border); padding: 12px; border-radius: 4px; }
+.git-confirm .btn + .btn { margin-left: 8px; }
+.git-patch-preview { max-height: 320px; overflow: auto; white-space: pre; font: 12px/1.6 var(--mono); background: var(--surface); border: 1px solid var(--border); border-radius: 4px; margin: 0; padding: 12px; }
+.patch-added { color: var(--green); }.patch-removed { color: var(--red); }.patch-section { color: var(--blue, #58a6ff); }
+.git-recovery-row { display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); padding: 10px 0; }
+.git-recovery-row > div { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.local-hunk-heading { gap: 8px; flex-wrap: wrap; }.local-hunk-heading > span { margin-right: auto; }
+.local-workspace .local-code-line:has(.local-line-select) { grid-template-columns: 25px 46px 20px minmax(0, 1fr); }
+.local-line-select { display: flex; align-items: center; justify-content: center; }
+.local-line-select input { width: 12px; height: 12px; margin: 0; accent-color: var(--blue, #58a6ff); }
+.local-code-line:has(input:checked) { outline: 1px solid var(--blue, #58a6ff); outline-offset: -1px; background: color-mix(in srgb, var(--blue, #58a6ff) 14%, transparent); }
+.commit-form .commit-options { display: flex; flex-direction: row; align-items: center; gap: 7px; font-size: 12px; }
+.commit-form .commit-options input { width: auto; }
+.commit-type { display: flex; align-items: center; gap: 6px; font-size: 12px; }.commit-type select { background: var(--surface); color: var(--text); border: 1px solid var(--border); padding: 4px; border-radius: 3px; }

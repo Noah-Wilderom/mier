@@ -17,6 +17,8 @@ export interface HistoryGraphProps {
   commits: readonly Commit[];
   selectedSha?: string;
   onSelect: (sha: string) => void;
+  pickedShas?:readonly string[];
+  onPick?:(sha:string,range:boolean)=>void;
 }
 
 const laneColors = ["var(--accent)", "var(--blue)", "var(--purple)", "var(--amber)", "var(--red)"];
@@ -35,7 +37,7 @@ function ancestryDescription(row: GraphRow<Commit>): string {
 }
 
 /** A bounded history graph, with no assumed connections beyond loaded parents. */
-export default function HistoryGraph({ commits, selectedSha, onSelect }: HistoryGraphProps) {
+export default function HistoryGraph({ commits, selectedSha, onSelect, pickedShas, onPick }: HistoryGraphProps) {
   const descriptionId = useId();
   const layout = useMemo(() => buildHistoryGraph(commits), [commits]);
   const buttons = useRef(new Map<string, HTMLButtonElement>());
@@ -49,14 +51,16 @@ export default function HistoryGraph({ commits, selectedSha, onSelect }: History
   const style = { "--history-graph-width": `${graphWidth}px` } as CSSProperties;
 
   function navigate(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    let next: number;
+    let next: number | undefined;
     switch (event.key) {
+      case ' ': if(onPick){event.preventDefault();onPick(layout.rows[index].commit.sha,event.shiftKey);return} break;
       case "ArrowDown": next = Math.min(layout.rows.length - 1, index + 1); break;
       case "ArrowUp": next = Math.max(0, index - 1); break;
       case "Home": next = 0; break;
       case "End": next = layout.rows.length - 1; break;
       default: return;
     }
+    if(next===undefined)return;
     event.preventDefault();
     const sha = layout.rows[next]?.commit.sha;
     if (sha) {
@@ -123,7 +127,7 @@ export default function HistoryGraph({ commits, selectedSha, onSelect }: History
             })}
           </svg>
         )}
-        <div role="listbox" aria-label="Repository commits" aria-describedby={descriptionId}>
+        <div role="listbox" aria-label="Repository commits" aria-describedby={descriptionId} aria-multiselectable={onPick?true:undefined}>
           {layout.rows.map((row) => {
             const commit = row.commit;
             const refs = commitRefs(commit);
@@ -131,7 +135,7 @@ export default function HistoryGraph({ commits, selectedSha, onSelect }: History
             const ancestry = ancestryDescription(row);
             return (
               <button
-                className={`history-row real-history-row ${commit.sha === selected ? "selected" : ""}`}
+                className={`history-row real-history-row ${commit.sha === selected ? "selected" : ""} ${pickedShas?.includes(commit.sha)?'picked':''}`}
                 key={commit.sha}
                 ref={(button) => {
                   if (button) buttons.current.set(commit.sha, button);
@@ -139,10 +143,10 @@ export default function HistoryGraph({ commits, selectedSha, onSelect }: History
                 }}
                 type="button"
                 role="option"
-                aria-selected={commit.sha === selected}
+                aria-selected={onPick?!!pickedShas?.includes(commit.sha):commit.sha === selected}
                 aria-label={`${commit.subject}. ${author}. Commit ${commit.sha.slice(0, 7)}.${refs.length ? ` References: ${refs.join(", ")}.` : ""} ${ancestry}`}
                 tabIndex={commit.sha === selected ? 0 : -1}
-                onClick={() => onSelect(commit.sha)}
+                onClick={event => {if(onPick&&(event.ctrlKey||event.metaKey||event.shiftKey))onPick(commit.sha,event.shiftKey);onSelect(commit.sha)}}
                 onKeyDown={(event) => navigate(event, row.index)}
               >
                 <span className="real-history-graph-cell" title={ancestry} aria-hidden="true" />

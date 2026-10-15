@@ -45,6 +45,7 @@ type Commit struct {
 	AuthorName  string   `json:"authorName"`
 	AuthorEmail string   `json:"authorEmail"`
 	CreatedAt   string   `json:"createdAt"`
+	FilePath    string   `json:"filePath,omitempty"`
 }
 
 type FileStatus struct {

@@ -1,0 +1,20 @@
+.repository-modal:has(.repository-tool-dialog) { width: min(900px,calc(100vw - 40px)); max-width: none; }
+.repository-tool-dialog { display: flex; flex-direction: column; min-height: 320px; height: min(75vh,850px); }
+.repository-tool-dialog > nav { display: flex; gap: 0; overflow-x: auto; flex-shrink: 0; border-bottom: 1px solid var(--border); }
+.repository-tool-dialog > nav > button { flex-shrink: 0; padding: 12px 16px; background: transparent; border: 0; border-bottom: 2px solid transparent; color: var(--muted); cursor: pointer; }
+.repository-tool-dialog > nav > button.selected { border-bottom-color: var(--accent); color: var(--text); }
+.repository-tool-panel { padding: 20px; overflow: auto; flex: 1; min-height: 0; }
+.repository-tool-panel > h3 { margin: 0 0 14px; }.repository-tool-panel p { font-size: 12px; line-height: 1.6; }
+.repository-tool-form, .repository-tool-confirm { display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding-bottom: 18px; }
+.repository-tool-confirm { padding: 14px; border: 1px solid var(--border); margin: 12px 0; background: var(--panel); }
+.repository-tool-form label,.repository-tool-confirm label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; }
+.repository-tool-form .git-check { flex-direction: row; align-items: center; }
+.repository-tool-panel input:not([type=checkbox]),.repository-tool-panel select,.repository-tool-panel textarea { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 8px; min-width: 0; }
+.repository-tool-form > .btn { align-self: flex-start; }
+.repository-tool-list { border-top: 1px solid var(--border); }
+.repository-tool-row { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); padding: 12px 0; flex-wrap: wrap; font-size: 12px; }
+.repository-tool-row > div:first-child { flex: 1; min-width: 120px; display: flex; flex-direction: column; gap: 5px; overflow-wrap: anywhere; }
+.repository-tool-row > div > span { color: var(--muted); }
+.repository-tool-dialog > .git-operation-error { margin: 0; padding: 12px 20px; border-top: 1px solid var(--border); font-size: 12px; }
+.signature-result { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
+.history-workspace .section-intro { flex-wrap: wrap; }.history-workspace .workspace-toolbar { flex-wrap: wrap; }.repository-toolbar-row { flex-wrap: wrap; }

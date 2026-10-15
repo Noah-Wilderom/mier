@@ -147,7 +147,7 @@ func statusName(index, worktree string, conflict bool) string {
 }
 
 func (c *Client) history(ctx context.Context, root string) ([]Commit, error) {
-	return c.historyFor(ctx, root, []string{"--all", "HEAD"})
+	return c.historyFor(ctx, root, []string{"--exclude=refs/stash", "--exclude=refs/mier/*", "--all", "HEAD"})
 }
 
 func (c *Client) historyFor(ctx context.Context, root string, revisions []string) ([]Commit, error) {
@@ -158,6 +158,10 @@ func (c *Client) historyFor(ctx context.Context, root string, revisions []string
 	if err != nil {
 		return nil, err
 	}
+	return parseCommits(output)
+}
+
+func parseCommits(output []byte) ([]Commit, error) {
 	fields := strings.Split(string(output), "\x00")
 	result := []Commit{}
 	for i := 0; i < len(fields); {

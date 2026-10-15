@@ -188,6 +188,9 @@ func (c *Client) CherryPick(ctx context.Context, path string, request CherryPick
 		if count <= 1 && request.Mainline != 0 {
 			return errors.New("A mainline parent is only used for merge commits")
 		}
+		if err := c.checkpoint(ctx, root, request.ExpectedHead, "cherry-pick"); err != nil {
+			return err
+		}
 		args := []string{"cherry-pick", "-x"}
 		if count > 1 {
 			args = append(args, "--mainline", fmt.Sprint(request.Mainline))
@@ -221,6 +224,9 @@ func (c *Client) MergeBranch(ctx context.Context, path string, request MergeBran
 		}
 		if sha != request.ExpectedSource {
 			return errors.New("The source branch changed. Refresh and preview it again")
+		}
+		if err := c.checkpoint(ctx, root, request.ExpectedHead, "merge"); err != nil {
+			return err
 		}
 		_, commandErr := c.execute(ctx, root, c.options.LocalTimeout, []string{"GIT_EDITOR=true"}, nil, "merge", "--no-edit", "--", sha)
 		result, err = c.operationResult(ctx, root)

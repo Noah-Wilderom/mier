@@ -72,7 +72,7 @@ test('abort requires a reviewable confirmation and duplicate clicks cannot issue
 
 test('branch history filters commits and cherry-pick carries immutable destination guards',async({desktop,page})=>{
   const repo=desktop.repositories.get(root)!;repo.changes=[]
-  desktop.handlers.set('main.RepositoryService.BranchCommits',args=>{expect(args).toEqual([root,'main',baseSHA]);return[repo.history![1]]})
+  desktop.handlers.set('main.RepositoryService.HistoryPage',args=>({commits:args[1].revision?[repo.history![1]]:repo.history!,nextCursor:''}))
   let release!:()=>void
   desktop.handlers.set('main.RepositoryService.CherryPick',async args=>{expect(args[1]).toEqual({sha:baseSHA,expectedHead:headSHA,expectedBranch:'feature',mainline:0});await new Promise<void>(resolve=>{release=resolve});repo.headSha=changedSHA;return{headSha:changedSHA}})
   await openFixture(desktop)

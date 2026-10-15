@@ -7,6 +7,7 @@ import BranchComparison from './BranchComparison'
 import { MergeBranchDialog } from './GitCommitActions'
 import type { GitMutation } from './gitOperations'
 import './RepositoryWorkspace.css'
+import RepositoryTools from './RepositoryTools'
 
 type RunGit = (action: GitAction, argument?: string | string[], remote?: string) => Promise<void>
 
@@ -14,7 +15,7 @@ export default function RepositoryToolbar({ repository, busy, onGit, onRefresh, 
   repository: RepositorySnapshot; busy: boolean; onGit: RunGit; onRefresh: () => Promise<void>; onOperate?: (mutation:GitMutation)=>Promise<unknown>; onConflicts?:()=>void
 }) {
   const [remote, setRemote] = useState(() => preferredRemote(repository))
-  const [dialog, setDialog] = useState<'branches' | 'compare' | null>(null)
+  const [dialog, setDialog] = useState<'branches' | 'compare' | 'tools' | null>(null)
   const [mergeBranch, setMergeBranch] = useState<RepositoryBranch>()
   const [error, setError] = useState('')
   const [pending, setPending] = useState('')
@@ -42,10 +43,12 @@ export default function RepositoryToolbar({ repository, busy, onGit, onRefresh, 
       <button className="btn" disabled={locked || !remote || !repository.hasHead || repository.detached} title={!repository.hasHead ? 'Create the first commit before publishing' : repository.detached ? 'Check out a branch before pushing' : `Push ${repository.currentBranch} to ${remote}`} onClick={() => void run('push').catch(() => {})}><Icon name="upload"/><span>{pending === 'push' ? 'Pushing…' : repository.upstream ? 'Push' : 'Publish branch'}</span></button>
       <button className="btn" disabled={locked || !repository.hasHead} onClick={event => { event.currentTarget.focus(); setDialog('compare') }}><Icon name="files"/><span>Compare branches</span></button>
       <button className="icon-button" aria-label="Refresh repository" title="Refresh repository status" disabled={locked} onClick={() => { setError(''); void onRefresh() }}><Icon name="refresh" size={15}/></button>
+      {onOperate&&<button className="btn" disabled={locked} onClick={()=>setDialog('tools')}>Repository tools…</button>}
     </div>
     {error && <div className="repository-operation-error" role="alert"><Icon name="alert-circle"/><span>{error}</span><button className="btn btn-ghost" disabled={locked} onClick={() => { setError(''); void onRefresh() }}>Refresh status</button></div>}
     {dialog === 'branches' && <Modal title="Manage branches" onClose={() => setDialog(null)}><BranchManager repository={repository} busy={locked} onGit={run} onMerge={onOperate?branch=>{setDialog(null);setMergeBranch(branch)}:undefined}/></Modal>}
     {dialog === 'compare' && <Modal title="Compare branches" onClose={() => setDialog(null)}><BranchComparison repository={repository}/></Modal>}
+    {dialog === 'tools' && onOperate && <RepositoryTools repository={repository} busy={locked} onOperate={onOperate} onClose={()=>setDialog(null)}/>}
     {mergeBranch&&onOperate&&<MergeBranchDialog branch={mergeBranch} repository={repository} busy={locked} onClose={()=>setMergeBranch(undefined)} onOperate={onOperate} onConflicts={()=>onConflicts?.()}/>}
   </section>
 }

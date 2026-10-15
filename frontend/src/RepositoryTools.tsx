@@ -1,0 +1,76 @@
+import { useEffect, useRef, useState } from 'react'
+import Modal from './Modal'
+import { services, type RepositoryRemote, type RepositorySnapshot } from './services'
+import type { GitMutation } from './gitOperations'
+import type { Checkpoint, CommitSignature, ReflogEntry, SigningConfig, Tag } from './repositoryToolTypes'
+import './RepositoryTools.css'
+
+type Tab='tags'|'remotes'|'signing'|'activity'
+interface PanelProps { repository:RepositorySnapshot; locked:boolean; reload:number; run:(mutation:GitMutation)=>Promise<boolean>; onError:(message:string)=>void }
+const errorText=(issue:unknown)=>issue instanceof Error?issue.message:String(issue)
+
+export default function RepositoryTools({repository,busy,onOperate,onClose}:{repository:RepositorySnapshot;busy:boolean;onOperate:(mutation:GitMutation)=>Promise<unknown>;onClose:()=>void}){
+  const [tab,setTab]=useState<Tab>('tags')
+  const [pending,setPending]=useState(false)
+  const [error,setError]=useState('')
+  const [reload,setReload]=useState(0)
+  const guard=useRef(false)
+  const locked=busy||pending
+  const run=async(mutation:GitMutation)=>{
+    if(locked||guard.current)return false
+    guard.current=true;setPending(true);setError('')
+    try{await onOperate(mutation);setReload(n=>n+1);return true}catch(issue){setError(errorText(issue));return false}finally{guard.current=false;setPending(false)}
+  }
+  const props:PanelProps={repository,locked,reload,run,onError:setError}
+  return <Modal title="Repository tools" onClose={()=>{if(!locked)onClose()}}><div className="repository-tool-dialog"><nav aria-label="Repository tools">{(['tags','remotes','signing','activity'] as Tab[]).map(item=><button className={tab===item?'selected':''} aria-pressed={tab===item} key={item} disabled={locked} onClick={()=>{setTab(item);setError('')}}>{({tags:'Tags',remotes:'Remotes',signing:'Commit signing',activity:'Activity & recovery'})[item]}</button>)}</nav><section aria-label={`${tab} tools`} className="repository-tool-panel">{tab==='tags'?<TagsPanel {...props}/>:tab==='remotes'?<RemotesPanel {...props}/>:tab==='signing'?<SigningPanel {...props}/>:<ActivityPanel {...props}/>}</section>{error&&<p className="git-operation-error" role="alert">{error}</p>}</div></Modal>
+}
+
+function TagsPanel({repository,locked,reload,run,onError}:PanelProps){
+  const [tags,setTags]=useState<Tag[]>()
+  const [name,setName]=useState('')
+  const [sha,setSha]=useState(repository.headSha??'')
+  const [message,setMessage]=useState('')
+  const [remote,setRemote]=useState(repository.remotes?.[0]?.name??'')
+  const [editing,setEditing]=useState<{tag:Tag;action:'rename'|'delete'|'push'}>()
+  const [newName,setNewName]=useState('')
+  useEffect(()=>{let canceled=false;void services.repository.tags(repository.root).then(items=>{if(!canceled)setTags(items??[])}).catch(issue=>{if(!canceled)onError(errorText(issue))});return()=>{canceled=true}},[repository.root,reload])
+  const change=async()=>{if(!editing)return;const ok=await run({kind:'tag',request:{action:editing.action,name:editing.tag.name,newName,sha:editing.tag.commit,message:'',expectedObject:editing.tag.object,remote}});if(ok)setEditing(undefined)}
+  return <><h3>Tags</h3><form className="repository-tool-form" onSubmit={async e=>{e.preventDefault();if(await run({kind:'tag',request:{action:'create',name,sha,message,newName:'',expectedObject:'',remote:''}})){setName('');setMessage('')}}}><label>Tag name<input required value={name} disabled={locked} onChange={e=>setName(e.target.value)} placeholder="v1.0.0"/></label><label>Commit ID<input required value={sha} disabled={locked} onChange={e=>setSha(e.target.value)} spellCheck={false}/></label><label>Annotation (optional)<textarea value={message} disabled={locked} onChange={e=>setMessage(e.target.value)} placeholder="Leave empty for a lightweight tag"/></label><button className="btn btn-primary" disabled={locked||!name.trim()||!sha}>Create local tag</button></form>
+    {editing&&<form className="repository-tool-confirm" onSubmit={e=>{e.preventDefault();void change()}}><p>{editing.action==='delete'?'Delete local tag':editing.action==='rename'?'Rename local tag':'Push tag'} <strong>{editing.tag.name}</strong> · <code>{editing.tag.object.slice(0,12)}</code>?</p>{editing.action==='delete'&&<p className="muted">The remote tag is kept.</p>}{editing.action==='rename'&&<label>New tag name<input required value={newName} onChange={e=>setNewName(e.target.value)} disabled={locked}/></label>}{editing.action==='push'&&<label>Destination remote<select value={remote} onChange={e=>setRemote(e.target.value)} disabled={locked}>{repository.remotes?.map(item=><option key={item.name}>{item.name}</option>)}</select></label>}<div className="git-tool-actions"><button type="button" className="btn" disabled={locked} onClick={()=>setEditing(undefined)}>Cancel</button><button className="btn" disabled={locked||(editing.action==='rename'&&!newName.trim())||(editing.action==='push'&&!remote)}>{editing.action==='delete'?'Delete local tag':editing.action==='rename'?'Rename tag':'Push tag'}</button></div></form>}
+    <div className="repository-tool-list">{!tags?<p role="status">Loading tags…</p>:!tags.length?<p className="muted">No local tags.</p>:tags.map(tag=><div key={tag.name} className="repository-tool-row"><div><strong>{tag.name}</strong><span>{tag.annotated?'Annotated':'Lightweight'} · {tag.commit.slice(0,12)}</span>{tag.annotated&&<span>{tag.message}</span>}</div>{(['rename','push','delete'] as const).map(action=><button key={action} className="btn btn-ghost" disabled={locked||(action==='push'&&!repository.remotes?.length)} aria-label={`${action} tag ${tag.name}`} onClick={()=>{setEditing({tag,action});setNewName(tag.name)}}>{action==='rename'?'Rename…':action==='push'?'Push…':'Delete…'}</button>)}</div>)}</div></>
+}
+
+function RemotesPanel({repository,locked,run}:PanelProps){
+  const [name,setName]=useState('')
+  const [url,setUrl]=useState('')
+  const [editing,setEditing]=useState<{remote:RepositoryRemote;action:'url'|'push-url'|'rename'|'remove'}>()
+  const [value,setValue]=useState('')
+  const save=async()=>{if(!editing)return;const item=editing.remote;const ok=await run({kind:'remote',request:{action:editing.action,name:item.name,newName:editing.action==='rename'?value:'',url:editing.action==='url'||editing.action==='push-url'?value:'',expectedFetchUrl:item.fetchUrl,expectedPushUrl:item.pushUrl}});if(ok)setEditing(undefined)}
+  return <><h3>Remotes</h3><form className="repository-tool-form" onSubmit={async e=>{e.preventDefault();if(await run({kind:'remote',request:{action:'add',name,url,newName:'',expectedFetchUrl:'',expectedPushUrl:''}})){setName('');setUrl('')}}}><label>Remote name<input value={name} required disabled={locked} onChange={e=>setName(e.target.value)} placeholder="upstream"/></label><label>Fetch URL<input value={url} required disabled={locked} onChange={e=>setUrl(e.target.value)} placeholder="git@github.com:owner/repo.git" spellCheck={false}/></label><button className="btn btn-primary" disabled={locked||!name.trim()||!url.trim()}>Add remote</button></form>
+    {editing&&<form className="repository-tool-confirm" onSubmit={e=>{e.preventDefault();void save()}}><p>{editing.action==='remove'?'Remove':editing.action==='rename'?'Rename':'Edit'} remote <strong>{editing.remote.name}</strong>?</p>{editing.action==='remove'?<p className="muted">This removes its local tracking refs and configuration. The server repository is kept.</p>:<label>{editing.action==='rename'?'New remote name':editing.action==='url'?'New fetch URL':'New push URL'}<input required value={value} disabled={locked} onChange={e=>setValue(e.target.value)} spellCheck={false}/></label>}<div className="git-tool-actions"><button type="button" className="btn" disabled={locked} onClick={()=>setEditing(undefined)}>Cancel</button><button className="btn" disabled={locked||(editing.action!=='remove'&&!value.trim())}>{editing.action==='remove'?'Remove remote':'Save remote'}</button></div></form>}
+    <div className="repository-tool-list">{!repository.remotes?.length?<p className="muted">No remotes configured.</p>:repository.remotes.map(remote=><div className="repository-tool-row" key={remote.name}><div><strong>{remote.name}</strong><code title="Fetch URL">{remote.fetchUrl}</code>{remote.pushUrl!==remote.fetchUrl&&<code title="Push URL">Push: {remote.pushUrl}</code>}</div><div className="git-tool-actions">{(['url','push-url','rename','remove'] as const).map(action=><button key={action} className="btn btn-ghost" disabled={locked} aria-label={`${action} remote ${remote.name}`} onClick={()=>{setEditing({remote,action});setValue(action==='rename'?remote.name:'')}}>{({url:'Fetch URL…','push-url':'Push URL…',rename:'Rename…',remove:'Remove…'})[action]}</button>)}</div></div>)}</div></>
+}
+
+function SigningPanel({repository,locked,reload,run,onError}:PanelProps){
+  const [config,setConfig]=useState<SigningConfig>()
+  useEffect(()=>{let canceled=false;void services.repository.signingConfig(repository.root).then(value=>{if(!canceled)setConfig(value)}).catch(issue=>{if(!canceled)onError(errorText(issue))});return()=>{canceled=true}},[repository.root,reload])
+  return <><h3>Commit signing</h3><p className="muted">Settings apply to this repository. Git uses your installed signing program and existing key. Private key contents are never stored in M.I.E.R.</p>{config?<form className="repository-tool-form" onSubmit={e=>{e.preventDefault();void run({kind:'signing',request:config})}}><label className="git-check"><input type="checkbox" checked={config.enabled} onChange={e=>setConfig({...config,enabled:e.target.checked})} disabled={locked}/>Sign new commits</label><label>Signing format<select value={config.format} disabled={locked} onChange={e=>setConfig({...config,format:e.target.value as SigningConfig['format']})}><option value="openpgp">OpenPGP (GPG)</option><option value="ssh">SSH</option><option value="x509">X.509</option></select></label><label>Signing key<input value={config.key} disabled={locked} onChange={e=>setConfig({...config,key:e.target.value})} placeholder={config.format==='ssh'?'Path to your SSH public key':'GPG key ID or fingerprint'} spellCheck={false}/></label><button className="btn btn-primary" disabled={locked||(config.enabled&&!config.key.trim())}>Save signing settings</button></form>:<p role="status">Loading signing settings…</p>}</>
+}
+
+function ActivityPanel({repository,locked,reload,run,onError}:PanelProps){
+  const [data,setData]=useState<{checkpoints:Checkpoint[];reflog:ReflogEntry[]}>()
+  const [selected,setSelected]=useState<{sha:string;label:string}>()
+  const [name,setName]=useState('')
+  const [refresh,setRefresh]=useState(0)
+  useEffect(()=>{let canceled=false;void Promise.all([services.repository.checkpoints(repository.root),services.repository.reflog(repository.root)]).then(([checkpoints,reflog])=>{if(!canceled)setData({checkpoints:checkpoints??[],reflog:reflog??[]})}).catch(issue=>{if(!canceled)onError(errorText(issue))});return()=>{canceled=true}},[repository.root,repository.headSha,reload,refresh])
+  return <><div className="git-tool-heading"><h3>Activity & recovery</h3><button className="btn" disabled={locked} onClick={()=>setRefresh(n=>n+1)}>Refresh activity</button></div><p className="muted">Recover a commit into a new branch without changing your working files. Checkpoints keep the old HEAD before M.I.E.R. rewrites history; the reflog also records Git actions from other clients.</p>{selected&&<form className="repository-tool-confirm" onSubmit={async e=>{e.preventDefault();if(await run({kind:'recover-branch',request:{sha:selected.sha,name}})){setSelected(undefined);setName('')}}}><p>Recover <strong>{selected.label}</strong> · <code>{selected.sha.slice(0,12)}</code></p><label>New recovery branch<input required value={name} onChange={e=>setName(e.target.value)} disabled={locked} placeholder="recovery/my-work"/></label><div className="git-tool-actions"><button type="button" className="btn" disabled={locked} onClick={()=>setSelected(undefined)}>Cancel</button><button className="btn btn-primary" disabled={locked||!name.trim()}>Create recovery branch</button></div></form>}{!data?<p role="status">Loading Git activity…</p>:<><h4>Checkpoints</h4>{!data.checkpoints.length&&<p className="muted">No history changes checkpointed yet.</p>}{data.checkpoints.map(item=><div className="repository-tool-row" key={item.ref}><div><strong>Before {item.label}</strong><span>{item.createdAt&&new Date(item.createdAt).toLocaleString()} · {item.sha.slice(0,12)}</span></div><button className="btn" disabled={locked} onClick={()=>setSelected({sha:item.sha,label:`before ${item.label}`})}>Recover…</button></div>)}<h4>HEAD reflog</h4>{data.reflog.map(item=><div className="repository-tool-row" key={item.selector}><div><strong>{item.message}</strong><span>{item.selector} · {item.actor} · {item.sha.slice(0,12)}</span></div><button className="btn btn-ghost" disabled={locked} onClick={()=>setSelected({sha:item.sha,label:item.message})}>Recover…</button></div>)}</>}</>
+}
+
+export function SignatureControl({root,sha}:{root:string;sha:string}){
+  const [result,setResult]=useState<CommitSignature>()
+  const [error,setError]=useState('')
+  const [pending,setPending]=useState(false)
+  const verify=async()=>{if(pending)return;setPending(true);setError('');try{setResult(await services.repository.commitSignature(root,sha))}catch(issue){setError(errorText(issue))}finally{setPending(false)}}
+  const labels:Record<string,string>={G:'Good signature',B:'Bad signature',U:'Good signature; unknown trust',X:'Expired signature',Y:'Expired signing key',R:'Revoked signing key',E:'Signature could not be verified',N:'Unsigned'}
+  return <div className="signature-result"><button className="btn btn-ghost" disabled={pending} onClick={()=>void verify()}>{pending?'Verifying…':result?'Verify again':'Verify signature'}</button>{result&&<span title={result.key}>{labels[result.status]??'Unknown signature status'}{result.signer&&` · ${result.signer}`}</span>}{error&&<span role="alert" className="git-operation-error">{error}</span>}</div>
+}

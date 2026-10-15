@@ -378,6 +378,7 @@ export interface RepositoryBranch {
 }
 
 export interface RepositoryCommit {
+  filePath?:string;
   sha: string;
   parents: string[] | null;
   refs?: string[] | null;
@@ -612,6 +613,32 @@ export const services = {
     setLabels: async (host: string, owner: string, repo: string, number: number, labels: string[]) => (await invoke<string[] | null>("main.GitHubService.SetLabels", host, owner, repo, number, labels)) ?? [],
   },
   repository: {
+    compareExact:async(root:string,base:string,head:string)=>(await invoke<RepositoryDiff[]|null>('main.RepositoryService.CompareExact',root,base,head))??[],
+    tags:(root:string)=>invoke<import('./repositoryToolTypes').Tag[]>('main.RepositoryService.Tags',root),
+    mutateTag:(root:string,request:import('./repositoryToolTypes').TagRequest)=>invoke<void>('main.RepositoryService.MutateTag',root,request),
+    mutateRemote:(root:string,request:import('./repositoryToolTypes').RemoteRequest)=>invoke<void>('main.RepositoryService.MutateRemote',root,request),
+    signingConfig:(root:string)=>invoke<import('./repositoryToolTypes').SigningConfig>('main.RepositoryService.SigningConfig',root),
+    saveSigningConfig:(root:string,request:import('./repositoryToolTypes').SigningConfig)=>invoke<void>('main.RepositoryService.SaveSigningConfig',root,request),
+    commitSignature:(root:string,sha:string)=>invoke<import('./repositoryToolTypes').CommitSignature>('main.RepositoryService.CommitSignature',root,sha),
+    checkpoints:(root:string)=>invoke<import('./repositoryToolTypes').Checkpoint[]>('main.RepositoryService.Checkpoints',root),
+    reflog:(root:string)=>invoke<import('./repositoryToolTypes').ReflogEntry[]>('main.RepositoryService.Reflog',root),
+    reset:(root:string,request:import('./repositoryToolTypes').ResetRequest)=>invoke<import('./gitOperations').GitOperationResult>('main.RepositoryService.Reset',root,request),
+    recoverBranch:(root:string,request:import('./repositoryToolTypes').RecoverBranchRequest)=>invoke<void>('main.RepositoryService.RecoverBranch',root,request),
+    cherryPickMany:(root:string,request:import('./repositoryToolTypes').CherryPickManyRequest)=>invoke<import('./gitOperations').GitOperationResult>('main.RepositoryService.CherryPickMany',root,request),
+    revert:(root:string,request:import('./gitOperations').CherryPickRequest)=>invoke<import('./gitOperations').GitOperationResult>('main.RepositoryService.Revert',root,request),
+    historyPage:(root:string,query:import('./gitHistory').HistoryQuery)=>invoke<import('./gitHistory').HistoryPage>('main.RepositoryService.HistoryPage',root,query),
+    revisionFile:(root:string,revision:string,path:string)=>invoke<import('./gitHistory').RevisionFile>('main.RepositoryService.RevisionFile',root,revision,path),
+    blame:(root:string,revision:string,path:string)=>invoke<import('./gitHistory').BlameLine[]>('main.RepositoryService.Blame',root,revision,path),
+    stashes:(root:string)=>invoke<import('./localGit').Stash[]>('main.RepositoryService.Stashes',root),
+    stashDiff:(root:string,sha:string)=>invoke<string>('main.RepositoryService.StashDiff',root,sha),
+    saveStash:(root:string,request:import('./localGit').SaveStashRequest)=>invoke<void>('main.RepositoryService.SaveStash',root,request),
+    mutateStash:(root:string,request:import('./localGit').StashRequest)=>invoke<void>('main.RepositoryService.MutateStash',root,request),
+    amend:(root:string,request:import('./localGit').AmendRequest)=>invoke<string>('main.RepositoryService.Amend',root,request),
+    previewDiscard:(root:string,path:string)=>invoke<import('./localGit').DiscardPreview>('main.RepositoryService.PreviewDiscard',root,path),
+    discard:(root:string,request:import('./localGit').DiscardRequest)=>invoke<void>('main.RepositoryService.Discard',root,request),
+    discardBackups:(root:string)=>invoke<import('./localGit').DiscardBackup[]>('main.RepositoryService.DiscardBackups',root),
+    restoreDiscard:(root:string,id:string)=>invoke<void>('main.RepositoryService.RestoreDiscard',root,id),
+    ignoreFile:(root:string,path:string)=>invoke<void>('main.RepositoryService.IgnoreFile',root,path),
     cherryPick: (root: string, request: import('./gitOperations').CherryPickRequest) => invoke<import('./gitOperations').GitOperationResult>("main.RepositoryService.CherryPick", root, request),
     mergeBranch: (root: string, request: import('./gitOperations').MergeBranchRequest) => invoke<import('./gitOperations').GitOperationResult>("main.RepositoryService.MergeBranch", root, request),
     controlOperation: (root: string, token: string, action: string) => invoke<import('./gitOperations').GitOperationResult>("main.RepositoryService.ControlOperation", root, token, action),

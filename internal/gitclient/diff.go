@@ -15,6 +15,16 @@ import (
 func (c *Client) Diff(ctx context.Context, path, selectedPath string, staged bool) (ChangedFile, error) {
 	var result ChangedFile
 	err := c.withRepository(ctx, path, c.options.LocalTimeout, func(ctx context.Context, root string) error {
+		var err error
+		result, err = c.diff(ctx, root, selectedPath, staged)
+		return err
+	})
+	return result, err
+}
+
+func (c *Client) diff(ctx context.Context, root, selectedPath string, staged bool) (ChangedFile, error) {
+	result := ChangedFile{}
+	err := func() error {
 		selected, err := validateFile(root, selectedPath)
 		if err != nil {
 			return err
@@ -65,7 +75,7 @@ func (c *Client) Diff(ctx context.Context, path, selectedPath string, staged boo
 		}
 		result.RawPatch = string(output)
 		return parsePatch(&result)
-	})
+	}()
 	return result, err
 }
 

@@ -312,6 +312,19 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
           case 'merge':result=await services.repository.mergeBranch(repo.root,mutation.request);break
           case 'resolve':await services.repository.resolveConflict(repo.root,mutation.request);break
           case 'hunk':await services.repository.stageHunk(repo.root,mutation.request);break
+          case 'stash-save':await services.repository.saveStash(repo.root,mutation.request);break
+          case 'stash':await services.repository.mutateStash(repo.root,mutation.request);break
+          case 'amend':await services.repository.amend(repo.root,mutation.request);break
+          case 'discard':await services.repository.discard(repo.root,mutation.request);break
+          case 'restore-discard':await services.repository.restoreDiscard(repo.root,mutation.id);break
+          case 'ignore':await services.repository.ignoreFile(repo.root,mutation.path);break
+          case 'tag':await services.repository.mutateTag(repo.root,mutation.request);break
+          case 'remote':await services.repository.mutateRemote(repo.root,mutation.request);break
+          case 'signing':await services.repository.saveSigningConfig(repo.root,mutation.request);break
+          case 'reset':result=await services.repository.reset(repo.root,mutation.request);break
+          case 'recover-branch':await services.repository.recoverBranch(repo.root,mutation.request);break
+          case 'cherry-pick-many':result=await services.repository.cherryPickMany(repo.root,mutation.request);break
+          case 'revert':result=await services.repository.revert(repo.root,mutation.request);break
           default:result=await services.repository.controlOperation(repo.root,mutation.token,mutation.kind)
         }
       } catch(issue){failure=issue}

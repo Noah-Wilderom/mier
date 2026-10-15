@@ -66,6 +66,13 @@ export async function desktopFixture(page: Page) {
         case 'main.WorkspaceService.RecentRepositories': result = fixture.recent; break
         case 'main.WorkspaceService.RememberRepository': fixture.recent = [...new Set([...fixture.recent, args[0]])]; result = null; break
         case 'main.RepositoryService.Open': case 'main.RepositoryService.Snapshot': result = fixture.repositories.get(args[0]); break
+        case 'main.RepositoryService.HistoryPage': {
+          const query=args[1], repo=fixture.repositories.get(args[0])!
+          let commits=repo.history??[]
+          if(query.revision) commits=commits.slice(commits.findIndex(item=>item.sha===query.revision))
+          if(query.query) commits=commits.filter(item=>(query.search==='author'?`${item.authorName} ${item.authorEmail}`:query.search==='sha'?item.sha:item.subject+' '+item.body).toLowerCase().includes(query.query.toLowerCase()))
+          result={commits,nextCursor:''};break
+        }
         case 'main.WorkspaceSyncService.StartWatch': case 'main.WorkspaceSyncService.WatchPullRequest': case 'main.WorkspaceSyncService.StopWatch': result = null; break
         case 'main.WorkspaceSyncService.Refresh': await fixture.emit(); result = null; break
         case 'main.CredentialService.AccountStatus': result = { host: args[0], login: 'reviewer', authenticated: true, source: 'gh', name: 'Reviewer', avatarUrl: '', url: 'https://github.com/reviewer', error: '' }; break
@@ -93,7 +100,7 @@ export async function desktopFixture(page: Page) {
         }
         case 'main.GitHubService.GetPullRequest': result = { ...fixture.currentDetail, pullRequest: args[3] === fixture.currentDetail.pullRequest.number ? fixture.currentDetail.pullRequest : fixture.listed.get(args[3]) ?? fixture.prs.find(pr => pr.number === args[3]) ?? summary(headSHA, args[3]) }; break
         case 'main.RepositoryService.Diff': result = diff(args[1]); break
-        case 'main.RepositoryService.Compare': case 'main.RepositoryService.CommitDiff': result = [diff()]; break
+        case 'main.RepositoryService.Compare': case 'main.RepositoryService.CompareExact': case 'main.RepositoryService.CommitDiff': result = [diff()]; break
         case 'main.GitHubService.GetCommitDiff': result = { sha: args[3], files: [{ path: 'src/feature.ts', status: 'modified', additions: 1, deletions: 1, patch: diff().rawPatch }], warnings: [] }; break
         case 'main.RepositoryService.CreateAndCheckoutBranch': case 'main.RepositoryService.CreateBranch': {
           const repo = fixture.repositories.get(args[0])!, checkout = name.endsWith('CreateAndCheckoutBranch')

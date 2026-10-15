@@ -18,6 +18,14 @@ import * as gitclient$0 from "./internal/gitclient/models.js";
 // @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
+export function Amend(path: string, request: gitclient$0.AmendRequest): $CancellablePromise<string> {
+    return $Call.ByID(3705028016, path, request);
+}
+
+export function Blame(path: string, revision: string, file: string): $CancellablePromise<gitclient$0.BlameLine[] | null> {
+    return $Call.ByID(457949556, path, revision, file);
+}
+
 export function BranchCommits(path: string, branch: string, expectedTip: string): $CancellablePromise<gitclient$0.Commit[] | null> {
     return $Call.ByID(2260958381, path, branch, expectedTip);
 }
@@ -30,8 +38,16 @@ export function CheckoutPullRequest(path: string, $number: number, remote: strin
     return $Call.ByID(4036037655, path, $number, remote);
 }
 
+export function Checkpoints(path: string): $CancellablePromise<gitclient$0.Checkpoint[] | null> {
+    return $Call.ByID(869117268, path);
+}
+
 export function CherryPick(path: string, request: gitclient$0.CherryPickRequest): $CancellablePromise<gitclient$0.OperationResult> {
     return $Call.ByID(365531009, path, request);
+}
+
+export function CherryPickMany(path: string, request: gitclient$0.CherryPickManyRequest): $CancellablePromise<gitclient$0.OperationResult> {
+    return $Call.ByID(2203951086, path, request);
 }
 
 export function Clone(url: string, directory: string): $CancellablePromise<$models.RepositorySnapshot> {
@@ -46,8 +62,16 @@ export function CommitDiff(path: string, revision: string): $CancellablePromise<
     return $Call.ByID(2272119163, path, revision);
 }
 
+export function CommitSignature(path: string, sha: string): $CancellablePromise<gitclient$0.CommitSignature> {
+    return $Call.ByID(3728015542, path, sha);
+}
+
 export function Compare(path: string, base: string, head: string): $CancellablePromise<$models.ChangedFile[] | null> {
     return $Call.ByID(2889286020, path, base, head);
+}
+
+export function CompareExact(path: string, base: string, head: string): $CancellablePromise<gitclient$0.ChangedFile[] | null> {
+    return $Call.ByID(1449707687, path, base, head);
 }
 
 export function Conflict(path: string, file: string): $CancellablePromise<gitclient$0.ConflictFile> {
@@ -74,16 +98,48 @@ export function Diff(path: string, file: string, staged: boolean): $CancellableP
     return $Call.ByID(1105282698, path, file, staged);
 }
 
+export function Discard(path: string, request: gitclient$0.DiscardRequest): $CancellablePromise<void> {
+    return $Call.ByID(2835078865, path, request);
+}
+
+export function DiscardBackups(path: string): $CancellablePromise<gitclient$0.DiscardBackup[] | null> {
+    return $Call.ByID(2916663168, path);
+}
+
 export function Fetch(path: string, remote: string): $CancellablePromise<void> {
     return $Call.ByID(1738008659, path, remote);
+}
+
+export function HistoryPage(path: string, query: gitclient$0.HistoryQuery): $CancellablePromise<gitclient$0.HistoryPage> {
+    return $Call.ByID(455601620, path, query);
+}
+
+export function IgnoreFile(path: string, file: string): $CancellablePromise<void> {
+    return $Call.ByID(3675811309, path, file);
 }
 
 export function MergeBranch(path: string, request: gitclient$0.MergeBranchRequest): $CancellablePromise<gitclient$0.OperationResult> {
     return $Call.ByID(3469450919, path, request);
 }
 
+export function MutateRemote(path: string, request: gitclient$0.RemoteRequest): $CancellablePromise<void> {
+    return $Call.ByID(3227306969, path, request);
+}
+
+export function MutateStash(path: string, request: gitclient$0.StashRequest): $CancellablePromise<void> {
+    return $Call.ByID(3980221788, path, request);
+}
+
+export function MutateTag(path: string, request: gitclient$0.TagRequest): $CancellablePromise<void> {
+    return $Call.ByID(488804945, path, request);
+}
+
 export function Open(path: string): $CancellablePromise<$models.RepositorySnapshot> {
     return $Call.ByID(1633465945, path);
+}
+
+export function PreviewDiscard(path: string, file: string): $CancellablePromise<gitclient$0.DiscardPreview> {
+    return $Call.ByID(1837746491, path, file);
 }
 
 export function Pull(path: string, remote: string): $CancellablePromise<void> {
@@ -94,12 +150,48 @@ export function Push(path: string, remote: string): $CancellablePromise<void> {
     return $Call.ByID(3195577453, path, remote);
 }
 
+export function RecoverBranch(path: string, request: gitclient$0.RecoverBranchRequest): $CancellablePromise<void> {
+    return $Call.ByID(2170828995, path, request);
+}
+
+export function Reflog(path: string): $CancellablePromise<gitclient$0.ReflogEntry[] | null> {
+    return $Call.ByID(2421412280, path);
+}
+
 export function RenameBranch(path: string, branch: string, name: string): $CancellablePromise<void> {
     return $Call.ByID(2385371099, path, branch, name);
 }
 
+export function Reset(path: string, request: gitclient$0.ResetRequest): $CancellablePromise<gitclient$0.OperationResult> {
+    return $Call.ByID(4147546992, path, request);
+}
+
 export function ResolveConflict(path: string, request: gitclient$0.ResolveConflictRequest): $CancellablePromise<void> {
     return $Call.ByID(1171076569, path, request);
+}
+
+export function RestoreDiscard(path: string, id: string): $CancellablePromise<void> {
+    return $Call.ByID(3586515957, path, id);
+}
+
+export function Revert(path: string, request: gitclient$0.CherryPickRequest): $CancellablePromise<gitclient$0.OperationResult> {
+    return $Call.ByID(3330483827, path, request);
+}
+
+export function RevisionFile(path: string, revision: string, file: string): $CancellablePromise<gitclient$0.RevisionFile> {
+    return $Call.ByID(3298565406, path, revision, file);
+}
+
+export function SaveSigningConfig(path: string, request: gitclient$0.SigningConfig): $CancellablePromise<void> {
+    return $Call.ByID(1625856053, path, request);
+}
+
+export function SaveStash(path: string, request: gitclient$0.SaveStashRequest): $CancellablePromise<void> {
+    return $Call.ByID(2513663577, path, request);
+}
+
+export function SigningConfig(path: string): $CancellablePromise<gitclient$0.SigningConfig> {
+    return $Call.ByID(505923074, path);
 }
 
 export function Snapshot(path: string): $CancellablePromise<$models.RepositorySnapshot> {
@@ -112,6 +204,18 @@ export function Stage(path: string, files: string[] | null): $CancellablePromise
 
 export function StageHunk(path: string, request: gitclient$0.StageHunkRequest): $CancellablePromise<void> {
     return $Call.ByID(2014341425, path, request);
+}
+
+export function StashDiff(path: string, sha: string): $CancellablePromise<string> {
+    return $Call.ByID(3387627049, path, sha);
+}
+
+export function Stashes(path: string): $CancellablePromise<gitclient$0.Stash[] | null> {
+    return $Call.ByID(4046282418, path);
+}
+
+export function Tags(path: string): $CancellablePromise<gitclient$0.Tag[] | null> {
+    return $Call.ByID(2791865360, path);
 }
 
 export function Unstage(path: string, files: string[] | null): $CancellablePromise<void> {
