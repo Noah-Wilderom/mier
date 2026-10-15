@@ -10,16 +10,14 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"net/http"
 	"path"
 	"strings"
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/updater"
-	"github.com/wailsapp/wails/v3/pkg/updater/providers/endpoint"
 	"golang.org/x/mod/semver"
 )
-
-const ManifestURL = "https://github.com/Noah-Wilderom/mier/releases/latest/download/manifest.json"
 
 // Package managers own system installations. AppImages run the executable
 // inside a read-only mount, which Wails' binary replacement cannot update.
@@ -33,24 +31,50 @@ func SupportsSelfUpdate(goos, executable, appImage string) bool {
 }
 
 func NewConfig(version string, key []byte) (updater.Config, error) {
+	return newConfig(version, key, nil)
+}
+
+func newConfig(version string, key []byte, client *http.Client) (updater.Config, error) {
 	version = strings.TrimPrefix(version, "v")
-	if !semver.IsValid("v" + version) {
-		return updater.Config{}, errors.New("updates require a release version")
+	channel, err := releaseChannel(version)
+	if err != nil {
+		return updater.Config{}, err
 	}
 	publicKey, err := parsePublicKey(key)
 	if err != nil {
 		return updater.Config{}, err
 	}
-	provider, err := endpoint.New(endpoint.Config{URL: ManifestURL, Channel: "stable"})
+	provider, err := newGitHubProvider(channel, client)
 	if err != nil {
 		return updater.Config{}, err
 	}
 	return updater.Config{
 		CurrentVersion: version,
+		Channel:        channel,
 		PublicKey:      publicKey,
 		Providers:      []updater.Provider{&signedProvider{Provider: provider, key: publicKey}},
 		CheckInterval:  6 * time.Hour,
 	}, nil
+}
+
+// Release tags and install.sh use these four channels. Unknown prereleases
+// must not silently subscribe to stable updates.
+func releaseChannel(version string) (string, error) {
+	version = strings.TrimPrefix(version, "v")
+	base := strings.SplitN(strings.SplitN(version, "+", 2)[0], "-", 2)[0]
+	if !semver.IsValid("v"+version) || strings.Count(base, ".") != 2 {
+		return "", errors.New("updates require a complete release version")
+	}
+	prerelease := semver.Prerelease("v" + version)
+	if prerelease == "" {
+		return "stable", nil
+	}
+	channel := strings.SplitN(strings.TrimPrefix(prerelease, "-"), ".", 2)[0]
+	switch channel {
+	case "alpha", "beta", "rc":
+		return channel, nil
+	}
+	return "", fmt.Errorf("unsupported update channel in version %q", version)
 }
 
 func parsePublicKey(key []byte) (ed25519.PublicKey, error) {

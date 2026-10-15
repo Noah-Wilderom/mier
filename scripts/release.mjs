@@ -18,6 +18,21 @@ export function parseTag(tag) {
   return { version: tag.replace(/^v/, ''), numericVersion: match.slice(1, 4).join('.') };
 }
 
+export function releaseChannel(tag) {
+  const { version } = parseTag(tag);
+  const prerelease = version.split('+')[0].split('-').slice(1).join('-');
+  if (!prerelease) return 'stable';
+  const channel = prerelease.split('.')[0];
+  if (!['alpha', 'beta', 'rc'].includes(channel)) throw new Error('Supported release channels are stable, alpha, beta, and rc.');
+  return channel;
+}
+
+export function validateReleaseChannel(tag, prerelease) {
+  const channel = releaseChannel(tag);
+  if (prerelease !== (channel !== 'stable')) throw new Error('GitHub prerelease status must match the release tag channel (alpha, beta, or rc).');
+  return channel;
+}
+
 export function archiveName(version, platform, arch) {
   parseTag(version);
   if (!targets.includes(`${platform}-${arch}`)) throw new Error(`Unsupported release target: ${platform}-${arch}`);
@@ -238,6 +253,7 @@ export function validateInstallerLayout(directory, version) {
 
 function publishManifest(tag) {
   const { version } = parseTag(tag);
+  const channel = releaseChannel(tag);
   const privatePEM = process.env.UPDATER_PRIVATE_KEY;
   validateSigningKey(privatePEM, readFileSync(publicKeyPath));
   validateUpdateLayout('dist/updates', version);
@@ -253,7 +269,7 @@ function publishManifest(tag) {
     writeFileSync(privateKeyPath, privatePEM, { mode: 0o600 });
     const event = process.env.GITHUB_EVENT_PATH ? JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')) : {};
     const notes = process.env.MIER_RELEASE_NOTES_FILE ? readFileSync(process.env.MIER_RELEASE_NOTES_FILE, 'utf8') : event.release?.body || '';
-    run('wails3', ['updater', 'manifest', '-version', version, '-channel', 'stable', '-name', `M.I.E.R. ${version}`, '-notes', notes, '-key', privateKeyPath, '-url-prefix', `https://github.com/${repository}/releases/download/${encodeURIComponent(tag)}/`, '-output', 'dist/manifest.json', 'dist/updates']);
+    run('wails3', ['updater', 'manifest', '-version', version, '-channel', channel, '-name', `M.I.E.R. ${version}`, '-notes', notes, '-key', privateKeyPath, '-url-prefix', `https://github.com/${repository}/releases/download/${encodeURIComponent(tag)}/`, '-output', 'dist/manifest.json', 'dist/updates']);
     run('wails3', ['updater', 'verify', '-manifest', 'dist/manifest.json', '-publickey', publicKeyPath, '-dir', 'dist/updates']);
     const files = ['updates', 'installers'].flatMap(dir => readdirSync(`dist/${dir}`).map(name => `dist/${dir}/${name}`)).sort();
     writeFileSync('dist/SHA256SUMS', files.map(file => `${createHash('sha256').update(readFileSync(file)).digest('hex')}  ${basename(file)}`).join('\n') + '\n');
@@ -265,6 +281,9 @@ function publishManifest(tag) {
 function main(args) {
   if (args[0] === 'validate') {
     const { version } = parseTag(args[1]);
+    releaseChannel(args[1]);
+    const event = process.env.GITHUB_EVENT_PATH ? JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')) : {};
+    if (event.release) validateReleaseChannel(args[1], event.release.prerelease);
     validateSigningKey(process.env.UPDATER_PRIVATE_KEY, readFileSync(publicKeyPath));
     validateMacOSCredentials();
     if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);

@@ -1,6 +1,6 @@
 # Releases and automatic updates
 
-Publishing a GitHub release runs `.github/workflows/release.yml`. Use a SemVer tag such as `v0.1.0`, and ensure the tag contains the workflow, public updater key, and release scripts. The workflow builds macOS, Linux, and Windows for both `amd64` and `arm64`, tests each build, and attaches the resulting assets to that release.
+Publishing a GitHub release runs `.github/workflows/release.yml`. Use a SemVer tag such as `v0.1.0`, and ensure the tag contains the workflow, public updater key, and release scripts. Prerelease tags use `alpha`, `beta`, or `rc`, such as `v0.2.0-beta.1`, and must be marked as prereleases on GitHub; stable tags must not be marked as prereleases. Validation checks this before building. The workflow builds macOS, Linux, and Windows for both `amd64` and `arm64`, tests each build, and attaches the resulting assets to that release.
 
 ## Signing setup
 
@@ -85,7 +85,7 @@ Each release contains:
 
 DMGs and setup installers are for first installation. Wails updates use the ZIP or `tar.gz` archives, because its updater does not install DMGs or NSIS packages. Windows setup installs for the current user, allowing the updater to replace the executable without elevation. Linux needs the GTK 4 and WebKitGTK 6 runtime libraries; its archive does not bundle them. All six targets now use a matching native runner architecture. Linux releases build in a pinned Ubuntu 24.04 container on Ubuntu 26.04 hosts to retain the glibc 2.39 compatibility baseline; the native test matrix also tests Ubuntu 26.04 directly.
 
-All six archives must exist before the workflow signs the feed, including signed Mac archives while notarization is pending. It verifies every archive with the pinned public key, uploads the downloads and status, then uploads the manifest last. A notarization resume regenerates checksums and signatures after stapling changes the Mac files. Release version metadata is written into the executable, macOS bundle, and Windows installer.
+All six archives must exist before the workflow signs the feed, including signed Mac archives while notarization is pending. Its manifest channel is derived from the tag: `stable`, `alpha`, `beta`, or `rc`. It verifies every archive with the pinned public key, uploads the downloads and status, then uploads the manifest last. A notarization resume regenerates checksums and signatures after stapling changes the Mac files. Release version metadata is written into the executable, macOS bundle, and Windows installer.
 
 ## Command-line installation
 
@@ -107,9 +107,11 @@ Linux selects pacman, dnf, or apt when available and lets that manager install t
 
 **About M.I.E.R.** shows the installed GitHub release version, including any alpha, beta, or rc suffix. The version is embedded from the release tag when the app is built; development builds show `dev`.
 
-Portable release builds check the latest stable release quietly on startup and use Wails' periodic checks every six hours. **M.I.E.R. → Check for Updates…** on macOS, or **Help → Check for Updates…** on Windows and Linux, checks manually. Wails displays the download and restart flow when an update is found. Development builds disable updates. Linux packages installed under `/usr` or `/opt` use their package manager for upgrades; AppImages are replaced as whole files. Those installations disable the binary-replacement updater. See [Linux installation](LINUX.md) for CLI commands.
+Portable release builds check their installed version's channel quietly on startup and use Wails' periodic checks every six hours. Stable builds receive stable updates; alpha, beta, and RC builds receive newer releases in their respective channel. This matches `install.sh`: channels never switch automatically. To switch channels, install the desired channel explicitly. **M.I.E.R. → Check for Updates…** on macOS, or **Help → Check for Updates…** on Windows and Linux, checks the same channel manually. Wails displays the download and restart flow when an update is found. Development builds disable updates. Linux packages installed under `/usr` or `/opt` use their package manager for upgrades; AppImages are replaced as whole files. Those installations disable the binary-replacement updater. See [Linux installation](LINUX.md) for CLI commands.
 
-The endpoint is `https://github.com/Noah-Wilderom/mier/releases/latest/download/manifest.json`. The app rejects unsigned feeds and incorrect signatures before downloading, then Wails verifies the downloaded bytes before staging and replacing the installed application. Prereleases can have downloadable assets, but GitHub's latest stable release endpoint does not offer them to this channel.
+The app discovers updates through GitHub's paginated releases API and chooses the highest newer SemVer in its channel, including numeric prerelease ordering (`alpha.10` follows `alpha.2`). Drafts, unpublished releases, mismatched GitHub prerelease flags, and releases without an uploaded `manifest.json` are excluded. It fetches that release's manifest, checks the version against its tag and channel, and selects the running OS and architecture. Lookup errors are reported as errors instead of claiming the app is up to date. The app rejects unsigned manifests and incorrect signatures before downloading, then Wails verifies the downloaded bytes before staging and replacing the installed application.
+
+Older alpha releases incorrectly declared their manifest channel as `stable`. These manifests remain usable only when their version matches the selected prerelease tag and their artifact passes the pinned signing-key verification. Apps built before this channel-aware updater require one manual upgrade to a release containing it; their existing stable-only updater cannot discover alpha releases.
 
 ## Local checks
 

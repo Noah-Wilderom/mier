@@ -4,12 +4,28 @@ import { generateKeyPairSync } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { archiveName, archPackageVersion, createArchRecipe, linuxPackageName, parseTag, prepareMetadata, targets, validateBinary, validateInstallerLayout, validateSigningKey, validateUpdateLayout } from './release.mjs';
+import { archiveName, archPackageVersion, createArchRecipe, linuxPackageName, parseTag, prepareMetadata, releaseChannel, targets, validateBinary, validateInstallerLayout, validateReleaseChannel, validateSigningKey, validateUpdateLayout } from './release.mjs';
 
 test('release tags reject invalid versions and command injection', () => {
   assert.deepEqual(parseTag('v1.2.3'), { version: '1.2.3', numericVersion: '1.2.3' });
   assert.deepEqual(parseTag('v1.2.3-beta.1'), { version: '1.2.3-beta.1', numericVersion: '1.2.3' });
   for (const tag of ['main', 'v1.2', 'v01.2.3', 'v1.2.3-beta.01', 'v65536.2.3', 'v1.2.3;echo bad', 'v1.2.3\nkey=value']) assert.throws(() => parseTag(tag));
+});
+
+test('update manifests follow the release tag channel, including prerelease counters', () => {
+  for (const [tag, channel] of [
+    ['v1.2.3', 'stable'], ['1.2.3+build.alpha', 'stable'],
+    ['v1.2.3-alpha', 'alpha'], ['v1.2.3-alpha.10+build.4', 'alpha'],
+    ['v1.2.3-beta.2', 'beta'], ['v1.2.3-rc.1', 'rc'],
+  ]) {
+    assert.equal(releaseChannel(tag), channel);
+    assert.equal(validateReleaseChannel(tag, channel !== 'stable'), channel);
+    assert.throws(() => validateReleaseChannel(tag, channel === 'stable'), /prerelease status/);
+  }
+  for (const tag of ['dev', 'v1.2', 'v1.2.3-alpha.01', 'v1.2.3-preview.1', 'v1.2.3-alpha1', 'v1.2.3-RC.1']) {
+    assert.throws(() => releaseChannel(tag));
+  }
+  assert.throws(() => validateReleaseChannel('v1.2.3', undefined), /prerelease status/);
 });
 
 test('all six update targets have distinct supported archive formats', () => {
