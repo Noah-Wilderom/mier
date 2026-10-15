@@ -102,7 +102,7 @@ npm run dev
 
 Open `http://127.0.0.1:9245`. Running only Vite uses sample data and local browser storage; it does not connect to Git or send provider actions. The native welcome screen also offers **Explore the demo workspace**. Demo data remains separate from live repository data.
 
-The native app supplies platform window decorations, application menus, folder selection, and full screen. Both interfaces support System, Light, and Dark appearance.
+The native app supplies platform window decorations, application menus, folder selection, and full screen. It remembers the normal window size and maximised state across restarts. Both interfaces support System, Light, and Dark appearance.
 
 Keyboard shortcuts:
 

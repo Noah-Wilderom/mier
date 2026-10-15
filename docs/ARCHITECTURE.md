@@ -65,7 +65,9 @@ Managed language tools live in the user configuration directory's `mag-ik-een-re
 
 ## Preferences and delivery
 
-OS configuration lives below the platform's user configuration directory in `mag-ik-een-review/`: `accounts.json`, `workspace.json`, `notifications.json`, `editor.json`, `language-servers.json`, `jira.json`, and `linear.json`. Secrets live separately in the OS credential store. Configuration writers use atomic replacement and private file permissions where supported. LSP session data uses the OS user cache directory.
+OS configuration lives below the platform's user configuration directory in `mag-ik-een-review/`: `accounts.json`, `workspace.json`, `notifications.json`, `editor.json`, `language-servers.json`, `jira.json`, `linear.json`, and `window-state.json`. Secrets live separately in the OS credential store. Configuration writers use atomic replacement and private file permissions where supported. LSP session data uses the OS user cache directory.
+
+`window_state.go` restores the main window's normal width/height and maximised state before creation. Native state sampling is debounced; close hooks and application shutdown capture and flush pending changes. Minimise/fullscreen preserve the normal dimensions. Invalid or oversized preferences fall back to 1440 × 900 with the existing 1000 × 650 minimum. Native reads run on the UI thread; settings writes are serialized and atomic. The implementation follows [Wails window events](https://v3.wails.io/features/windows/events/). The pinned Wails GTK4 implementation can report the default size and omit ordinary resize events, so `window_size_gtk4.go` reads the current GTK allocation and enables an infrequent fallback sampler after the window is shown. Other targets use Wails' size API and native events.
 
 Frontend storage includes `mag-ik-een-review.appearance`, `mier.code-review.preferences.v1`, `mag-ik-een-review.review-drafts.v1`, `mier.commit-draft.v1:<root>`, and `mier.pull-request-draft.v1:<identity>`. Demo draft keys are separate. Do not merge demo state into live repository state or erase saved drafts when changing appearance or navigation.
 

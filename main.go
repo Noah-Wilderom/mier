@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"runtime"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -74,6 +76,18 @@ func main() {
 		},
 	})
 	workspace.app = app
+	windowPreferencesPath := ""
+	if directory, err := os.UserConfigDir(); err == nil {
+		windowPreferencesPath = filepath.Join(directory, "mag-ik-een-review", "window-state.json")
+	} else {
+		log.Printf("Window preferences are unavailable: %v", err)
+	}
+	windowPreferences := newWindowStateStore(windowPreferencesPath)
+	windowState := windowPreferences.State()
+	startState := application.WindowStateNormal
+	if windowState.Maximised {
+		startState = application.WindowStateMaximised
+	}
 
 	inset := "0px"
 	if runtime.GOOS == "darwin" {
@@ -82,10 +96,11 @@ func main() {
 	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name:             "main",
 		Title:            "M.I.E.R.",
-		Width:            1440,
-		Height:           900,
-		MinWidth:         1000,
-		MinHeight:        650,
+		Width:            windowState.Width,
+		Height:           windowState.Height,
+		MinWidth:         minimumWindowWidth,
+		MinHeight:        minimumWindowHeight,
+		StartState:       startState,
 		URL:              "/",
 		BackgroundColour: application.NewRGB(245, 246, 248),
 		JS: fmt.Sprintf(
@@ -98,6 +113,7 @@ func main() {
 			Appearance:              application.DefaultAppearance,
 		},
 	})
+	rememberWindowState(app, window, windowPreferences)
 
 	updatesEnabled := configureUpdates(app)
 	defer app.Updater.StopPeriodicCheck()
