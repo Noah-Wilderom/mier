@@ -46,6 +46,10 @@ macOS release apps and DMGs are signed with Developer ID, notarized by Apple, an
 
 Apple certificate and account setup is maintained outside this repository. The release workflow requires that setup and stops if credentials, signing, or notarization fail. Windows certificate, Linux package-signing, and AUR credentials are not required. A personal access token is not required for uploading assets to this repository's release. [GitHub's automatic workflow token](https://docs.github.com/en/actions/concepts/security/github_token) and [repository secret setup](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets).
 
+Apple notarization submits each artifact once, then waits on that submission ID in four 15-minute intervals. A wait timeout is followed by a status check; `In Progress` is pending, not a rejection. The ID and status are written to the job log and summary. Publication requires an explicit `Accepted` response, stapling, and verification. The macOS job allows three hours for the build and the separate app and DMG submissions; other platform jobs retain their 90-minute limit.
+
+Use **Actions → Apple notarization status → Run workflow** to check up to ten existing submission IDs, separated by spaces or commas. This reads Apple's status without uploading a new artifact, importing a signing certificate, or publishing release assets. Apple may continue processing after the packaging job stops. Some submissions receive additional analysis and take longer; see [Apple's explanation](https://developer.apple.com/forums/thread/811968).
+
 ## Retrying a failed release
 
 A missing signing secret causes **Validate release and signing key** to fail. GitHub then skips its dependent packaging and publication jobs. The packaging job uses GitHub's default matrix names, such as `package (linux, amd64, ubuntu-26.04)`, and displays `package` when skipped before expansion. The packaging step also explicitly names its platform and architecture. [GitHub job dependencies](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-jobs#defining-prerequisite-jobs).
@@ -56,9 +60,7 @@ After configuring the secret, open the failed run under **Actions** and choose *
 gh run rerun RUN_ID --repo Noah-Wilderom/mier
 ```
 
-Reruns use the original workflow and commit. Workflow changes pushed to `master` apply to releases whose tags include those changes; leave existing release tags in place. [GitHub rerun documentation](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs).
-
-Reruns use the workflow revision from the original run. To use updated action pins and runner labels, publish a new release tag containing those workflow changes; rerunning an older tag does not pick up master automatically.
+Reruns use the original workflow and commit. Changes pushed to `master` do not change that run's scripts, actions, or runner labels. To use a code or workflow fix, publish a new release tag containing it; leave existing release tags in place. [GitHub rerun documentation](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs).
 
 ## Release assets
 

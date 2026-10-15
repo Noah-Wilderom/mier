@@ -1,5 +1,11 @@
 # Validation record
 
+## Apple notarization queue handling — 2026-10-15
+
+The `v0.1.2-alpha.1` release run completed Developer ID signing for both macOS architectures but its combined upload/wait command timed out after 20 minutes. The timeout JSON contained a submission UUID and no rejection status. A regression reproduced the previous behavior: a pending response was treated as rejection. Packaging now submits once and waits on that ID, checking its status after timeouts and blocking publication unless Apple explicitly accepts it. Pending IDs are retained in the Actions summary; rejection logs are requested only for terminal rejections. A separate manual workflow reads existing submission statuses without uploading, importing a certificate, or publishing.
+
+`node --test scripts/macos-sign.test.mjs scripts/release.test.mjs` passed 30 tests on Linux with one native macOS-only test skipped. Coverage includes timeout followed by acceptance without reupload, acceptance between a timeout and status query, bounded pending submissions, terminal rejections, malformed/mismatched status responses, read-only status queries, and credential cleanup/redaction. Actionlint passed for all three workflows. Native notarization and Apple processing time depend on the live service; local fake-tool tests do not establish Apple's acceptance of a release.
+
 ## Local Git workflows — 2026-10-14
 
 - All **61 frontend unit tests** and **116 Chromium/WebKit browser tests** passed after adding section staging, local branch commit selection, cherry-pick, merge preview and the conflict editor.

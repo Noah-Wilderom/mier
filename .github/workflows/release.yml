@@ -81,7 +81,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     # Preserve the Ubuntu 24.04 / glibc 2.39 release baseline on current hosts.
     container: ${{ matrix.platform == 'linux' && 'ubuntu:24.04@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55' || '' }}
-    timeout-minutes: 90
+    # macOS notarizes the app and DMG separately, with a bounded hour for each.
+    timeout-minutes: ${{ matrix.platform == 'darwin' && 180 || 90 }}
     strategy:
       fail-fast: false
       matrix:

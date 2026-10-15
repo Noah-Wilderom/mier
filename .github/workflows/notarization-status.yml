@@ -1,0 +1,32 @@
+name: Apple notarization status
+
+on:
+  workflow_dispatch:
+    inputs:
+      submission_ids:
+        description: Existing Apple submission UUIDs, separated by spaces or commas (up to 10)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  status:
+    name: Check existing Apple submissions
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Read notarization status without uploading or publishing
+        env:
+          SUBMISSION_IDS: ${{ inputs.submission_ids }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: node scripts/macos-sign.mjs status "$SUBMISSION_IDS"

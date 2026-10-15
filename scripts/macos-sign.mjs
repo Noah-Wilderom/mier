@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -11,6 +11,8 @@ export const macOSSecrets = [
 ];
 const entitlements = resolve('build/darwin/entitlements.plist');
 const signingDirectoryName = 'mier-macos-signing';
+const submissionIDPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+const notarizationStatuses = new Set(['Accepted', 'In Progress', 'Invalid', 'Rejected']);
 
 export function withoutSigningSecrets(env) {
   const result = { ...env };
@@ -112,7 +114,7 @@ export function withMacOSSigning(operation, { env = process.env, tool = createMa
     const profile = 'mier-release-notarization';
     tool('xcrun', ['notarytool', 'store-credentials', profile, '--apple-id', credentials.appleID,
       '--team-id', credentials.teamID, '--password', credentials.password, '--keychain', keychain]);
-    return operation({ identity, teamID: credentials.teamID, keychain, profile, directory, tool });
+    return operation({ identity, teamID: credentials.teamID, keychain, profile, directory, tool, summaryPath: env.GITHUB_STEP_SUMMARY });
   } catch (error) {
     failure = error;
     throw error;
@@ -125,23 +127,75 @@ export function withMacOSSigning(operation, { env = process.env, tool = createMa
   }
 }
 
-export function notarizeAndStaple(artifact, stapleTarget, signing) {
-  const { tool, keychain, profile } = signing;
-  const authentication = ['--keychain-profile', profile, '--keychain', keychain];
-  const result = tool('xcrun', ['notarytool', 'submit', artifact, ...authentication,
-    '--wait', '--timeout', '20m', '--output-format', 'json'], { allowFailure: true, timeout: 21 * 60_000 });
-  let response;
-  try { response = JSON.parse(result.stdout); } catch { /* Report the safe tool output below. */ }
-  const validID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(response?.id || '');
-  if (result.status !== 0 || response?.status !== 'Accepted' || !validID) {
-    if (validID) {
-      const log = tool('xcrun', ['notarytool', 'log', response.id, ...authentication], { allowFailure: true });
-      console.error(log.diagnostic || log.stdout || log.stderr);
-    }
-    throw new Error('Apple notarization did not accept ' + basename(artifact) + ': ' +
-      (response?.status || result.diagnostic || 'no valid response') + '.');
+function notarizationResponse(result, expectedID) {
+  try {
+    const response = JSON.parse(result.stdout);
+    if (result.status === 0 && submissionIDPattern.test(response?.id || '') &&
+        (!expectedID || response.id.toLowerCase() === expectedID.toLowerCase())) return response;
+  } catch { /* The caller reports the redacted tool diagnostic. */ }
+}
+
+function reportNotarization(id, status, summaryPath) {
+  const message = 'Apple notarization ' + id + ': ' + status + '.';
+  console.log(message);
+  if (summaryPath) appendFileSync(summaryPath, '- ' + message + '\n');
+}
+
+function readNotarizationStatus(id, tool, authentication) {
+  const result = tool('xcrun', ['notarytool', 'info', id, ...authentication, '--output-format', 'json'],
+    { allowFailure: true, timeout: 30_000 });
+  const response = notarizationResponse(result, id);
+  if (!response || !notarizationStatuses.has(response.status)) {
+    throw new Error('Could not check Apple notarization ' + id + ': ' + (result.diagnostic || 'no valid status response') + '.');
   }
-  console.log('Apple accepted ' + basename(artifact) + ' (' + response.id + ').');
+  return response;
+}
+
+// This read-only command needs no signing certificate and never uploads a file.
+export function checkNotarizationStatus(ids, { env = process.env, tool = createMacOSTool(env) } = {}) {
+  if (!Array.isArray(ids) || ids.length < 1 || ids.length > 10 || ids.some(id => typeof id !== 'string' || !submissionIDPattern.test(id))) {
+    throw new Error('Provide between one and ten existing Apple notarization submission UUIDs.');
+  }
+  for (const key of ['APPLE_ID', 'APPLE_TEAM_ID', 'APPLE_APP_PASSWORD']) {
+    if (!env[key]?.trim()) throw new Error('Missing notarization credential: ' + key + '.');
+  }
+  const authentication = ['--apple-id', env.APPLE_ID.trim(), '--team-id', env.APPLE_TEAM_ID.trim(), '--password', env.APPLE_APP_PASSWORD];
+  return ids.map(id => {
+    const response = readNotarizationStatus(id, tool, authentication);
+    reportNotarization(response.id, response.status, env.GITHUB_STEP_SUMMARY);
+    return response;
+  });
+}
+
+export function notarizeAndStaple(artifact, stapleTarget, signing) {
+  const { tool, keychain, profile, summaryPath } = signing;
+  const authentication = ['--keychain-profile', profile, '--keychain', keychain];
+  const result = tool('xcrun', ['notarytool', 'submit', artifact, ...authentication, '--output-format', 'json'],
+    { allowFailure: true, timeout: 10 * 60_000 });
+  let response = notarizationResponse(result);
+  if (!response) throw new Error('Could not submit ' + basename(artifact) + ' to Apple notarization: ' + (result.diagnostic || 'no valid submission response') + '.');
+  const id = response.id;
+  reportNotarization(id, 'Submitted ' + basename(artifact), summaryPath);
+  // A wait timeout does not cancel Apple's submission. Keep its ID and wait
+  // again; uploading the archive again would create another queued submission.
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const waiting = tool('xcrun', ['notarytool', 'wait', id, ...authentication,
+      '--timeout', '15m', '--output-format', 'json'], { allowFailure: true, timeout: 16 * 60_000 });
+    response = notarizationResponse(waiting, id);
+    if (!response || !notarizationStatuses.has(response.status)) response = readNotarizationStatus(id, tool, authentication);
+    reportNotarization(id, response.status, summaryPath);
+    if (response.status === 'Accepted') break;
+    if (response.status !== 'In Progress') {
+      const log = tool('xcrun', ['notarytool', 'log', id, ...authentication], { allowFailure: true });
+      console.error(log.diagnostic || log.stdout || log.stderr);
+      throw new Error('Apple rejected ' + basename(artifact) + ' (' + id + '): ' + response.status + '.');
+    }
+  }
+  if (response.status !== 'Accepted') {
+    throw new Error('Apple notarization is still In Progress for ' + basename(artifact) + ' (' + id +
+      ') after four 15-minute waits. The submission has not been rejected; publication remains blocked. ' +
+      'Use the Apple notarization status workflow to check this existing ID.');
+  }
   tool('xcrun', ['stapler', 'staple', stapleTarget]);
   tool('xcrun', ['stapler', 'validate', stapleTarget]);
 }
@@ -249,7 +303,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   try {
     if (process.platform !== 'darwin') throw new Error('macOS signing tools require a macOS host.');
     if (process.argv[2] === 'cleanup') cleanupMacOSSigning();
+    else if (process.argv[2] === 'status') checkNotarizationStatus(process.argv.slice(3).flatMap(value => value.split(/[\s,]+/u)).filter(Boolean));
     else if (process.argv[2] === 'smoke' && process.argv[3]) await smokeTest(resolve(process.argv[3]));
-    else throw new Error('Usage: macos-sign.mjs cleanup | smoke APP_BUNDLE');
+    else throw new Error('Usage: macos-sign.mjs cleanup | status SUBMISSION_IDS | smoke APP_BUNDLE');
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }
