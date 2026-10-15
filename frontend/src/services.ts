@@ -613,6 +613,11 @@ export const services = {
     setLabels: async (host: string, owner: string, repo: string, number: number, labels: string[]) => (await invoke<string[] | null>("main.GitHubService.SetLabels", host, owner, repo, number, labels)) ?? [],
   },
   repository: {
+    worktrees:(root:string)=>invoke<import('./repositoryToolTypes').Worktree[]>('main.RepositoryService.Worktrees',root),
+    mutateWorktree:(root:string,request:import('./repositoryToolTypes').WorktreeRequest)=>invoke<void>('main.RepositoryService.MutateWorktree',root,request),
+    previewMerge:(root:string,request:import('./gitOperations').MergeBranchRequest)=>invoke<import('./gitOperations').MergePreflight>('main.RepositoryService.PreviewMerge',root,request),
+    previewRebase:(root:string,request:import('./repositoryToolTypes').RebasePreviewRequest)=>invoke<import('./repositoryToolTypes').RebasePreview>('main.RepositoryService.PreviewRebase',root,request),
+    rebase:(root:string,request:import('./repositoryToolTypes').RebaseRequest)=>invoke<import('./gitOperations').GitOperationResult>('main.RepositoryService.Rebase',root,request),
     compareExact:async(root:string,base:string,head:string)=>(await invoke<RepositoryDiff[]|null>('main.RepositoryService.CompareExact',root,base,head))??[],
     tags:(root:string)=>invoke<import('./repositoryToolTypes').Tag[]>('main.RepositoryService.Tags',root),
     mutateTag:(root:string,request:import('./repositoryToolTypes').TagRequest)=>invoke<void>('main.RepositoryService.MutateTag',root,request),

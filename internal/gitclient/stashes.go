@@ -175,14 +175,27 @@ func (c *Client) MutateStash(ctx context.Context, path string, request StashRequ
 }
 
 type AmendRequest struct {
-	Message      string `json:"message"`
-	ExpectedHead string `json:"expectedHead"`
+	Message        string `json:"message"`
+	ExpectedHead   string `json:"expectedHead"`
+	OperationToken string `json:"operationToken,omitempty"`
 }
 
 func (c *Client) Amend(ctx context.Context, path string, request AmendRequest) (string, error) {
 	var sha string
 	err := c.withRepository(ctx, path, c.options.LocalTimeout, func(ctx context.Context, root string) error {
-		if _, err := c.requireIdleHead(ctx, root, request.ExpectedHead); err != nil {
+		if request.OperationToken != "" {
+			state, err := c.status(ctx, root)
+			if err != nil {
+				return err
+			}
+			op, err := c.operation(ctx, root, state)
+			if err != nil {
+				return err
+			}
+			if state.HeadSHA != request.ExpectedHead || op == nil || op.Token != request.OperationToken || !op.PausedForEdit {
+				return errors.New("The paused edit changed. Refresh the rebase before amending")
+			}
+		} else if _, err := c.requireIdleHead(ctx, root, request.ExpectedHead); err != nil {
 			return err
 		}
 		message := strings.TrimSpace(request.Message)

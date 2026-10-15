@@ -5,6 +5,13 @@ import (
 	"mag-ik-een-review/internal/gitclient"
 )
 
+func (s *RepositoryService) PreviewMerge(ctx context.Context, path string, request gitclient.MergeBranchRequest) (gitclient.MergePreflight, error) {
+	if s.initErr != nil {
+		return gitclient.MergePreflight{}, s.initErr
+	}
+	return s.client.PreviewMerge(ctx, path, request)
+}
+
 func (s *RepositoryService) CherryPick(ctx context.Context, path string, request gitclient.CherryPickRequest) (gitclient.OperationResult, error) {
 	if s.initErr != nil {
 		return gitclient.OperationResult{}, s.initErr

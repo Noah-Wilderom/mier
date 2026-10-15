@@ -11,8 +11,8 @@ import RepositoryTools from './RepositoryTools'
 
 type RunGit = (action: GitAction, argument?: string | string[], remote?: string) => Promise<void>
 
-export default function RepositoryToolbar({ repository, busy, onGit, onRefresh, onOperate, onConflicts }: {
-  repository: RepositorySnapshot; busy: boolean; onGit: RunGit; onRefresh: () => Promise<void>; onOperate?: (mutation:GitMutation)=>Promise<unknown>; onConflicts?:()=>void
+export default function RepositoryToolbar({ repository, busy, onGit, onRefresh, onOperate, onConflicts, onOpenRepository }: {
+  repository: RepositorySnapshot; busy: boolean; onGit: RunGit; onRefresh: () => Promise<void>; onOperate?: (mutation:GitMutation)=>Promise<unknown>; onConflicts?:()=>void; onOpenRepository?:(path:string)=>void
 }) {
   const [remote, setRemote] = useState(() => preferredRemote(repository))
   const [dialog, setDialog] = useState<'branches' | 'compare' | 'tools' | null>(null)
@@ -48,7 +48,7 @@ export default function RepositoryToolbar({ repository, busy, onGit, onRefresh, 
     {error && <div className="repository-operation-error" role="alert"><Icon name="alert-circle"/><span>{error}</span><button className="btn btn-ghost" disabled={locked} onClick={() => { setError(''); void onRefresh() }}>Refresh status</button></div>}
     {dialog === 'branches' && <Modal title="Manage branches" onClose={() => setDialog(null)}><BranchManager repository={repository} busy={locked} onGit={run} onMerge={onOperate?branch=>{setDialog(null);setMergeBranch(branch)}:undefined}/></Modal>}
     {dialog === 'compare' && <Modal title="Compare branches" onClose={() => setDialog(null)}><BranchComparison repository={repository}/></Modal>}
-    {dialog === 'tools' && onOperate && <RepositoryTools repository={repository} busy={locked} onOperate={onOperate} onClose={()=>setDialog(null)}/>}
+    {dialog === 'tools' && onOperate && <RepositoryTools repository={repository} busy={locked} onOperate={onOperate} onClose={()=>setDialog(null)} onPaused={onConflicts} onOpenRepository={onOpenRepository}/>}
     {mergeBranch&&onOperate&&<MergeBranchDialog branch={mergeBranch} repository={repository} busy={locked} onClose={()=>setMergeBranch(undefined)} onOperate={onOperate} onConflicts={()=>onConflicts?.()}/>}
   </section>
 }

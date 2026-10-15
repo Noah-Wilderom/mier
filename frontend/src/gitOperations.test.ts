@@ -7,6 +7,7 @@ test('conflict choices preserve surrounding code, multiple sections, and CRLF',(
   const chunks=conflictChunks(source)
   assert.equal(chunks.length,2)
   const next=resolveChunk(source,chunks[0],'both')
+  assert.ok(resolveChunk(source,chunks[0],'incoming-first').startsWith('before\r\nincoming\r\ncurrent\r\nafter\r\n'))
   assert.ok(next.startsWith('before\r\ncurrent\r\nincoming\r\nafter\r\n'))
   assert.equal(conflictChunks(next).length,1)
   const final=resolveChunk(next,conflictChunks(next)[0],'incoming')

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"mag-ik-een-review/internal/gitclient"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -28,6 +29,13 @@ type nativeCommand struct {
 }
 
 func main() {
+	if handled, err := gitclient.HandleGitEditor(os.Args); handled {
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
 	updater.HandleHelperMode()
 	credentials := NewCredentialService()
 	repositories := NewRepositoryService(credentials)

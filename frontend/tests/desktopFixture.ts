@@ -101,6 +101,7 @@ export async function desktopFixture(page: Page) {
         case 'main.GitHubService.GetPullRequest': result = { ...fixture.currentDetail, pullRequest: args[3] === fixture.currentDetail.pullRequest.number ? fixture.currentDetail.pullRequest : fixture.listed.get(args[3]) ?? fixture.prs.find(pr => pr.number === args[3]) ?? summary(headSHA, args[3]) }; break
         case 'main.RepositoryService.Diff': result = diff(args[1]); break
         case 'main.RepositoryService.Compare': case 'main.RepositoryService.CompareExact': case 'main.RepositoryService.CommitDiff': result = [diff()]; break
+        case 'main.RepositoryService.PreviewMerge':result={head:args[1].expectedHead,source:args[1].expectedSource,clean:true,fastForward:false,conflicts:[]};break
         case 'main.GitHubService.GetCommitDiff': result = { sha: args[3], files: [{ path: 'src/feature.ts', status: 'modified', additions: 1, deletions: 1, patch: diff().rawPatch }], warnings: [] }; break
         case 'main.RepositoryService.CreateAndCheckoutBranch': case 'main.RepositoryService.CreateBranch': {
           const repo = fixture.repositories.get(args[0])!, checkout = name.endsWith('CreateAndCheckoutBranch')

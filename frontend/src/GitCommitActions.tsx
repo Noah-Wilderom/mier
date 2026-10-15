@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Commit } from './data'
 import { services, type RepositoryBranch, type RepositorySnapshot } from './services'
-import type { GitMutation } from './gitOperations'
+import type { GitMutation, MergePreflight } from './gitOperations'
 import Modal from './Modal'
 import { ComparisonPreview, useBranchComparison } from './BranchComparison'
 import './GitOperations.css'
@@ -31,6 +31,14 @@ export function MergeBranchDialog({ branch, repository, busy, onClose, onOperate
   const [target] = useState({head:repository.headSha??'',branch:repository.currentBranch,source:branch.commitSha})
   const comparison = useBranchComparison(repository,target.branch,branch.name)
   const [error,setError] = useState(''),[pending,setPending] = useState(false)
+  const [preflight,setPreflight]=useState<MergePreflight>()
+  const [preflightError,setPreflightError]=useState('')
+  const [retry,setRetry]=useState(0)
+  useEffect(()=>{
+    let canceled=false;setPreflight(undefined);setPreflightError('')
+    void services.repository.previewMerge(repository.root,{branch:branch.name,expectedSource:target.source,expectedHead:target.head,expectedBranch:target.branch}).then(value=>{if(!canceled)setPreflight(value)}).catch(issue=>{if(!canceled)setPreflightError(issue instanceof Error?issue.message:String(issue))})
+    return()=>{canceled=true}
+  },[repository.root,branch.name,target.source,target.head,target.branch,retry])
   const guard = useRef(false)
   const changed=target.head!==repository.headSha||target.branch!==repository.currentBranch||target.source!==repository.branches?.find(item=>!item.remote&&item.name===branch.name)?.commitSha
   const locked=busy||pending
@@ -39,7 +47,7 @@ export function MergeBranchDialog({ branch, repository, busy, onClose, onOperate
     guard.current=true;setPending(true);setError('')
     try{const result=await onOperate({kind:'merge',request:{branch:branch.name,expectedSource:target.source,expectedHead:target.head,expectedBranch:target.branch}}) as {operation?:unknown}|undefined;onClose();if(result?.operation)onConflicts()}catch(issue){setError(issue instanceof Error?issue.message:String(issue))}finally{guard.current=false;setPending(false)}
   }
-  return <Modal title="Merge local branch" onClose={()=>{if(!locked)onClose()}}><div className="git-commit-dialog"><p>Merge <strong>{branch.name}</strong> into <strong>{target.branch}</strong>.</p><p className="muted">A fast-forward is used when possible. Otherwise Git creates a merge commit and preserves both branches’ history.</p><ComparisonPreview {...comparison} valid={true}/>{!!repository.changes?.length&&<p className="git-operation-error">Commit or stash local changes before merging.</p>}{changed&&<p className="git-operation-error">A branch changed. Close this dialog and preview again.</p>}{error&&<p className="git-operation-error" role="alert">{error}</p>}<div className="git-dialog-actions"><button className="btn" disabled={locked} onClick={onClose}>Cancel</button><button className="btn btn-primary" disabled={locked||changed||!!repository.changes?.length||!!repository.operation||repository.detached||!comparison.files||!!comparison.error} onClick={()=>void run()}>{pending?'Merging…':`Merge into ${target.branch}`}</button></div></div></Modal>
+  return <Modal title="Merge local branch" onClose={()=>{if(!locked)onClose()}}><div className="git-commit-dialog"><p>Merge <strong>{branch.name}</strong> into <strong>{target.branch}</strong>.</p><p className="muted">A fast-forward is used when possible. Otherwise Git creates a merge commit and preserves both branches’ history.</p>{preflight?<div className={preflight.clean?'merge-preflight':'merge-preflight has-conflicts'} role="status"><strong>{preflight.fastForward?'Ready to fast-forward':preflight.clean?'No merge conflicts predicted':`${preflight.conflicts.length} files may need conflict resolution`}</strong>{preflight.conflicts.length>0&&<ul>{preflight.conflicts.map(path=><li key={path}><code>{path}</code></li>)}</ul>}<span className="muted">Based on the two displayed commits. Working files and the index were not changed.</span></div>:preflightError?<div className="git-operation-error" role="alert">{preflightError}<button className="btn" disabled={locked} onClick={()=>setRetry(n=>n+1)}>Retry merge preflight</button></div>:<p role="status">Checking for merge conflicts…</p>}<ComparisonPreview {...comparison} valid={true}/>{!!repository.changes?.length&&<p className="git-operation-error">Commit or stash local changes before merging.</p>}{changed&&<p className="git-operation-error">A branch changed. Close this dialog and preview again.</p>}{error&&<p className="git-operation-error" role="alert">{error}</p>}<div className="git-dialog-actions"><button className="btn" disabled={locked} onClick={onClose}>Cancel</button><button className="btn btn-primary" disabled={locked||changed||!!repository.changes?.length||!!repository.operation||repository.detached||!comparison.files||!!comparison.error||!preflight} onClick={()=>void run()}>{pending?'Merging…':`Merge into ${target.branch}`}</button></div></div></Modal>
 }
 
 export function useHistoryBranch(repository?:RepositorySnapshot) {

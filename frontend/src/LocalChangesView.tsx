@@ -49,7 +49,7 @@ export default function LocalChangesView({ changes, branch, onChange, onCommit, 
   const [selection, setSelection] = useState<{ hunk:number; rows:number[] }>({ hunk:-1, rows:[] })
   const [discard, setDiscard] = useState<{ path:string; hunk?:number; lines?:number[]; expectedPatch?:string }>()
   const [amend, setAmend] = useState(false)
-  const [confirmAmend, setConfirmAmend] = useState<{ head:string; message:string }>()
+  const [confirmAmend, setConfirmAmend] = useState<{ head:string; message:string; operationToken?:string }>()
   const mutationPending = useRef(false)
   const preferences = useSyncExternalStore(subscribeCodeReviewPreferences, getCodeReviewPreferences, () => DEFAULT_CODE_REVIEW_PREFERENCES)
   const appearance = useSyncExternalStore(subscribeCodeAppearance, getCodeAppearance, () => 'light' as const)
@@ -108,8 +108,8 @@ export default function LocalChangesView({ changes, branch, onChange, onCommit, 
   }
 
   const commit = async () => {
-    if ((!staged.length&&!amend) || !message.trim() || busy || mutationPending.current || operation || changes.some(file=>file.conflict)) return
-    if (amend && onOperate && headSha) { setConfirmAmend({head:headSha,message}); return }
+    if ((!staged.length&&!amend) || !message.trim() || busy || mutationPending.current || (operation&&!(amend&&operation.pausedForEdit)) || changes.some(file=>file.conflict)) return
+    if (amend && onOperate && headSha) { setConfirmAmend({head:headSha,message,operationToken:operation?.pausedForEdit?operation.token:undefined}); return }
     mutationPending.current = true
     setMutating(true)
     setActionError('')
@@ -127,7 +127,7 @@ export default function LocalChangesView({ changes, branch, onChange, onCommit, 
   const amendCommit = async () => {
     if (!confirmAmend || !onOperate || locked || mutationPending.current) return
     mutationPending.current=true;setMutating(true);setActionError('')
-    try { await onOperate({kind:'amend',request:{message:confirmAmend.message,expectedHead:confirmAmend.head}});setMessage('');setAmend(false);setConfirmAmend(undefined) }
+    try { await onOperate({kind:'amend',request:{message:confirmAmend.message,expectedHead:confirmAmend.head,operationToken:confirmAmend.operationToken}});setMessage('');setAmend(false);setConfirmAmend(undefined) }
     catch(issue){setActionError(issue instanceof Error?issue.message:String(issue));setConfirmAmend(undefined)}
     finally {mutationPending.current=false;setMutating(false)}
   }
@@ -168,7 +168,7 @@ export default function LocalChangesView({ changes, branch, onChange, onCommit, 
       </section>)}
       {discard&&root&&onOperate&&<DiscardDialog root={root} {...discard} busy={locked} onOperate={onOperate} onClose={()=>{setDiscard(undefined);setReload(n=>n+1)}}/>}
       {confirmAmend&&<Modal title="Amend last commit" onClose={()=>{if(!locked)setConfirmAmend(undefined)}}><div className="local-git-dialog"><p>Replace commit <code>{confirmAmend.head.slice(0,12)}</code> with the staged changes and this message?</p><p className="muted">Amending changes the commit ID. Coordinate with others before rewriting a published commit.</p><pre className="git-patch-preview">{confirmAmend.message}</pre><div className="git-tool-actions"><button className="btn" disabled={locked} onClick={()=>setConfirmAmend(undefined)}>Cancel</button><button className="btn btn-primary" disabled={locked||headSha!==confirmAmend.head} onClick={()=>void amendCommit()}>Amend commit</button></div></div></Modal>}
-      <form className="commit-form" onSubmit={event => { event.preventDefault(); void commit() }}><div className="commit-type"><span>Commit type</span><select aria-label="Conventional commit type" value="" disabled={locked} onChange={e=>{if(e.target.value)setMessage(e.target.value+': '+message.replace(/^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]*\))?!?:\s*/,''))}}><option value="">Optional…</option>{['feat','fix','docs','refactor','perf','test','build','ci','chore','revert'].map(type=><option key={type} value={type}>{type}</option>)}</select></div><label>Commit message<textarea aria-label="Commit message" rows={4} placeholder="What changed?" value={message} onChange={event => setMessage(event.target.value)} disabled={locked} /></label>{onOperate&&headSha&&<label className="commit-options"><input type="checkbox" checked={amend} disabled={locked||!!operation} onChange={e=>{setAmend(e.target.checked);if(e.target.checked&&!message.trim()&&headMessage)setMessage(headMessage)}}/>Amend last commit</label>}<button className="btn btn-primary" disabled={locked || (!staged.length&&!amend) || !message.trim()||!!operation||changes.some(file=>file.conflict)}><Icon name="git-commit" />{locked ? 'Working…' : operation?'Use Continue above':amend?'Amend last commit…':'Commit ' + (staged.length ? staged.length + ' staged files' : 'staged changes')}</button>{!onStage && <span className="prototype-note">Commits stay in the sample workspace.</span>}</form>
+      <form className="commit-form" onSubmit={event => { event.preventDefault(); void commit() }}><div className="commit-type"><span>Commit type</span><select aria-label="Conventional commit type" value="" disabled={locked} onChange={e=>{if(e.target.value)setMessage(e.target.value+': '+message.replace(/^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]*\))?!?:\s*/,''))}}><option value="">Optional…</option>{['feat','fix','docs','refactor','perf','test','build','ci','chore','revert'].map(type=><option key={type} value={type}>{type}</option>)}</select></div><label>Commit message<textarea aria-label="Commit message" rows={4} placeholder="What changed?" value={message} onChange={event => setMessage(event.target.value)} disabled={locked} /></label>{onOperate&&headSha&&<label className="commit-options"><input type="checkbox" checked={amend} disabled={locked||(!!operation&&!operation.pausedForEdit)} onChange={e=>{setAmend(e.target.checked);if(e.target.checked&&!message.trim()&&headMessage)setMessage(headMessage)}}/>Amend last commit</label>}<button className="btn btn-primary" disabled={locked || (!staged.length&&!amend) || !message.trim()||(!!operation&&!(amend&&operation.pausedForEdit))||changes.some(file=>file.conflict)}><Icon name="git-commit" />{locked ? 'Working…' : operation&&!(amend&&operation.pausedForEdit)?'Use Continue above':amend?'Amend last commit…':'Commit ' + (staged.length ? staged.length + ' staged files' : 'staged changes')}</button>{!onStage && <span className="prototype-note">Commits stay in the sample workspace.</span>}</form>
     </div><div className="local-diff">{status?.conflict&&root&&onOperate?<ConflictEditor key={root+status.path} root={root} path={status.path} operationToken={operation?.token} busy={locked} onOperate={onOperate}/>:loadDiff && root ? <CodeIntelligence root={root} host={host} owner={owner} repo={repo} headSha={headSha || ''} headRevision={currentStage ? 'index' : 'working'} baseRevision={currentStage ? headSha || '' : 'index'} revisionKey={JSON.stringify([requestKey, file?.rawPatch || source])} onOpenSettings={onOpenSettings}>{diff}</CodeIntelligence> : diff}</div></div>
   </section>
 }

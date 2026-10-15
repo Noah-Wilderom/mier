@@ -64,3 +64,22 @@ test('selected commits can be reordered before a multiple cherry-pick',async({de
   await dialog.getByRole('button',{name:'Cherry-pick 2 commits',exact:true}).click()
   await expect(dialog).not.toBeVisible()
 })
+
+test('a checkpoint can restore the current branch through a previewed reset',async({desktop,page})=>{
+  const repo=desktop.repositories.get(root)!;repo.changes=[]
+  desktop.handlers.set('main.RepositoryService.Tags',()=>[])
+  desktop.handlers.set('main.RepositoryService.Checkpoints',()=>[{ref:'refs/mier/checkpoints/one',sha:baseSHA,label:'amend',createdAt:'2026-10-15T12:00:00Z'}])
+  desktop.handlers.set('main.RepositoryService.Reflog',()=>[])
+  desktop.handlers.set('main.RepositoryService.Reset',args=>{expect(args).toEqual([root,{sha:baseSHA,mode:'hard',expectedHead:headSHA,expectedBranch:'feature'}]);repo.headSha=baseSHA;return{headSha:baseSHA}})
+  await openFixture(desktop)
+  await page.getByRole('button',{name:'Repository tools…'}).click()
+  const tools=page.getByRole('dialog',{name:'Repository tools',exact:true})
+  await tools.getByRole('button',{name:'Activity & recovery',exact:true}).click()
+  await tools.getByRole('button',{name:'Restore branch to before amend',exact:true}).click()
+  const reset=page.getByRole('dialog',{name:'Reset branch',exact:true})
+  await reset.getByLabel('Reset mode').selectOption('hard')
+  await reset.getByLabel('Replace tracked files with this commit').check()
+  await reset.getByRole('button',{name:'Reset branch',exact:true}).click()
+  await expect(reset).not.toBeVisible()
+  await expect.poll(()=>desktop.calls.filter(call=>call.name.endsWith('.Reset')).length).toBe(1)
+})

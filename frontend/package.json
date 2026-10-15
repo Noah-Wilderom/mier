@@ -10,13 +10,18 @@
     "build": "tsc && vite build --mode production",
     "preview": "vite preview",
     "test": "node --test src/*.test.ts",
-    "test:ui": "tsc -p tsconfig.ui.json && playwright test"
+    "test:ui": "tsc && tsc -p tsconfig.ui.json && playwright test"
   },
   "dependencies": {
     "@assistant-ui/react": "0.15.28",
+    "@codemirror/language": "6.13.1",
+    "@codemirror/language-data": "6.5.2",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/theme-one-dark": "6.1.3",
     "@shikijs/langs": "^4.5.0",
     "@shikijs/themes": "^4.5.0",
     "@wailsio/runtime": "3.0.0-beta.29",
+    "codemirror": "6.0.2",
     "radix-ui": "1.7.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

@@ -38,7 +38,7 @@ Ctrl/Command-click or Shift-click history rows to select multiple commits. **Che
 
 **Revert commit…** creates a new commit undoing the selected commit. **Reset to commit…** previews the exact tree difference and offers soft (keep changes staged), mixed (keep changes unstaged), or hard (replace files) modes. Reset requires a clean worktree, checks the destination again, and refuses hard resets that would replace ignored files. Hard reset also requires an explicit file-replacement acknowledgement.
 
-**Repository tools → Activity & recovery** lists HEAD reflog entries and M.I.E.R. checkpoints. Recovering creates a new branch at the selected immutable commit without changing working files. Checkpoints preserve HEAD before amend, cherry-pick, merge, reset, and revert. They are local Git refs, excluded from normal history and normal branch pushes. This is scoped recovery, not a claim that every Git or filesystem action can be undone.
+**Repository tools → Activity & recovery** lists HEAD reflog entries and M.I.E.R. checkpoints. Recovering creates a new branch at the selected immutable commit without changing working files. **Restore branch…** instead opens the guarded reset preview for that checkpoint or reflog entry. Checkpoints preserve HEAD before amend, cherry-pick, merge, rebase, reset, and revert; restoring through reset creates another checkpoint for returning to the newer state. They are local Git refs, excluded from normal history and normal branch pushes. This is scoped recovery, not a claim that every Git or filesystem action can be undone.
 
 ## Tags, remotes, and signing
 
@@ -52,11 +52,27 @@ The same dialog adds, renames or removes remotes and edits their fetch/push URLs
 
 Open the branch selector, then **Merge…** beside a local branch. Preview its changes relative to your current branch and confirm the destination. Git fast-forwards when possible and otherwise creates a merge commit. Source and destination revisions are checked again before merging.
 
+The preview also runs Git's merge calculation to predict conflicted paths or a fast-forward. It may write temporary Git objects, but does not change the index, working files, or start a merge. This requires Git 2.38 or newer. The actual merge refuses to overwrite ignored files.
+
+## Rebase and compose history
+
+**Repository tools → Rebase** previews the current branch's commits after a selected base, replayed onto a destination commit. Leaving the base empty uses the common ancestor. Every previewed commit appears exactly once in the plan. Reorder rows and choose pick, reword, edit, squash, fixup, or drop; reworded messages are editable. The first retained commit cannot squash/fixup. Linear ranges up to 100 commits are supported; merge topology requires an external client.
+
+The branch and immutable plan token are checked again before applying. A checkpoint preserves the old HEAD. Rebase uses Git's real sequencer, including normal conflict resolution, skip and abort. Approved messages are stored privately in the Git directory and continue to work after a conflict pause or app restart. Neither messages nor caller-provided shell commands are interpolated into a rebase todo.
+
+An **edit** step pauses after its commit. In Changes, use **Amend last commit**, then Continue in the operation bar. A message-only amendment is supported while paused at an edit step. Unrelated Git operations cannot use this exception.
+
+## Worktrees
+
+**Repository tools → Worktrees** lists the primary and linked worktrees, branches, lock reasons, and changed-file counts. Create a separate directory using a new branch, an existing branch, or detached HEAD, then **Open** it as a repository. The starting commit is explicit and current working files are preserved.
+
+Worktrees can be locked and unlocked. Removal previews its directory and keeps the branch and commits. It refuses the current/primary worktree, stale entries, locked or dirty worktrees, and unregistered directories. Git may also refuse submodule-containing worktrees. Removal deletes ignored build files with the directory. Worktree creation preserves existing directories and refuses nested/overlapping worktrees, including paths reached through directory symlinks.
+
 ## Resolve conflicts
 
 An operation bar appears for merges, cherry-picks, rebases, reverts and patch application, including operations started in another client. Choose **Resolve conflicts** to open Changes.
 
-The conflict editor shows the current and incoming versions above an editable result. Accept either side per section, accept both in current-first order, inspect the common ancestor, or edit the result yourself. **Undo choice** reverses a section choice. **Whole file** also handles binary versions and delete/modify conflicts. Saving checks for remaining markers, writes the result and stages the file.
+The conflict editor shows aligned current/incoming sections with synchronized scrolling above a CodeMirror result editor with line numbers, syntax highlighting, and editing history. Accept either side per section, accept both in either order, inspect the common ancestor, or edit the result yourself. **Undo choice** reverses a section choice. Alt+Up/Down navigates sections; Alt+1/2 accepts a side and Alt+3/4 accepts both in each order. **Whole file** also handles binary versions and delete/modify conflicts. Saving checks for remaining markers, writes the result and stages the file.
 
 Unsaved resolutions remain in memory when switching files or views. They do not survive quitting the app. If another editor changes the file or index, saving is rejected and your edited result stays available to copy. Reloading a dirty result asks before discarding it.
 

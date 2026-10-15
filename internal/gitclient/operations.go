@@ -15,15 +15,16 @@ import (
 // Operation describes Git's actual sequencer state, including operations begun
 // in another Git client. Token guards against continuing a different operation.
 type Operation struct {
-	Kind         string `json:"kind"`
-	Token        string `json:"token"`
-	SourceSHA    string `json:"sourceSha"`
-	SourceLabel  string `json:"sourceLabel"`
-	CurrentLabel string `json:"currentLabel"`
-	Conflicts    int    `json:"conflicts"`
-	Message      string `json:"message"`
-	CanSkip      bool   `json:"canSkip"`
-	Empty        bool   `json:"empty"`
+	Kind          string `json:"kind"`
+	Token         string `json:"token"`
+	SourceSHA     string `json:"sourceSha"`
+	SourceLabel   string `json:"sourceLabel"`
+	CurrentLabel  string `json:"currentLabel"`
+	Conflicts     int    `json:"conflicts"`
+	Message       string `json:"message"`
+	CanSkip       bool   `json:"canSkip"`
+	Empty         bool   `json:"empty"`
+	PausedForEdit bool   `json:"pausedForEdit,omitempty"`
 }
 
 type OperationResult struct {
@@ -88,6 +89,15 @@ func (c *Client) operation(ctx context.Context, root string, status RepositorySn
 		op.SourceLabel = "Replayed commit " + shortSHA(op.SourceSHA)
 		op.CurrentLabel = "Rebased result (onto " + shortSHA(read(dir+"onto")) + ")"
 		identity = read(dir+"orig-head") + "\x00" + read(dir+"onto") + "\x00" + read(dir+"head-name")
+		if op.Kind == "rebase" {
+			done := strings.Fields(read(dir + "done"))
+			for i := len(done) - 1; i >= 0; i-- {
+				if objectID.MatchString(done[i]) && i > 0 {
+					op.PausedForEdit = (done[i-1] == "edit" || done[i-1] == "e") && exists(dir+"stopped-sha")
+					break
+				}
+			}
+		}
 	case exists("CHERRY_PICK_HEAD") || (exists("sequencer/todo") && strings.HasPrefix(read("sequencer/todo"), "pick ")):
 		op.Kind, op.CanSkip = "cherry-pick", true
 		op.SourceSHA = read("CHERRY_PICK_HEAD")
@@ -120,6 +130,9 @@ func (c *Client) operation(ctx context.Context, root string, status RepositorySn
 		if file.Conflict {
 			op.Conflicts++
 		}
+	}
+	if op.Conflicts > 0 {
+		op.PausedForEdit = false
 	}
 	op.Empty = op.Kind == "cherry-pick" && len(status.Changes) == 0
 	op.Token = digest(root, op.Kind, status.HeadSHA, op.SourceSHA, identity)
@@ -228,7 +241,7 @@ func (c *Client) MergeBranch(ctx context.Context, path string, request MergeBran
 		if err := c.checkpoint(ctx, root, request.ExpectedHead, "merge"); err != nil {
 			return err
 		}
-		_, commandErr := c.execute(ctx, root, c.options.LocalTimeout, []string{"GIT_EDITOR=true"}, nil, "merge", "--no-edit", "--", sha)
+		_, commandErr := c.execute(ctx, root, c.options.LocalTimeout, []string{"GIT_EDITOR=true"}, nil, "merge", "--no-edit", "--no-overwrite-ignore", "--", sha)
 		result, err = c.operationResult(ctx, root)
 		if err != nil {
 			return err
@@ -243,7 +256,7 @@ func (c *Client) MergeBranch(ctx context.Context, path string, request MergeBran
 
 func (c *Client) ControlOperation(ctx context.Context, path, token, action string) (OperationResult, error) {
 	var result OperationResult
-	err := c.withRepository(ctx, path, c.options.LocalTimeout, func(ctx context.Context, root string) error {
+	err := c.withRepository(ctx, path, c.options.RemoteTimeout, func(ctx context.Context, root string) error {
 		var err error
 		result, err = c.operationResult(ctx, root)
 		if err != nil {
@@ -280,10 +293,25 @@ func (c *Client) ControlOperation(ctx context.Context, path, token, action strin
 		if op.Kind == "merge" && action == "continue" {
 			args = []string{"commit", "--no-edit"}
 		}
-		_, commandErr := c.execute(ctx, root, c.options.LocalTimeout, []string{"GIT_EDITOR=true", "GIT_SEQUENCE_EDITOR=true"}, nil, args...)
+		env := []string{"GIT_EDITOR=true", "GIT_SEQUENCE_EDITOR=true"}
+		planPath := ""
+		if op.Kind == "rebase" {
+			var envErr error
+			env, planPath, envErr = c.rebaseEnvironment(ctx, root)
+			if envErr != nil {
+				if action != "abort" {
+					return envErr
+				}
+				env = []string{"GIT_EDITOR=true", "GIT_SEQUENCE_EDITOR=true"}
+			}
+		}
+		_, commandErr := c.execute(ctx, root, c.options.RemoteTimeout, env, nil, args...)
 		result, err = c.operationResult(ctx, root)
 		if err != nil {
 			return err
+		}
+		if op.Kind == "rebase" && result.Operation == nil && planPath != "" {
+			_ = os.Remove(planPath)
 		}
 		// A new conflict in a sequenced operation is returned for immediate review.
 		if commandErr != nil && !(action == "continue" && result.Operation != nil && result.Operation.Conflicts > 0 && result.Operation.Token != token) {

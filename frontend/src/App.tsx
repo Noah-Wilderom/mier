@@ -799,7 +799,7 @@ export default function App() {
         )}
       </header>
 
-      {live.enabled && live.repository && !focusMode && destination !== 'settings' && <div className="repository-tools"><RepositoryToolbar key={live.repository.root} repository={live.repository} busy={live.busy} onGit={live.git} onRefresh={live.refresh} onOperate={live.operate} onConflicts={()=>navigate('local-changes')}/>{live.repository.operation&&<GitOperationBanner key={live.repository.root+live.repository.operation.token} operation={live.repository.operation} busy={live.busy} onOperate={live.operate} onResolve={()=>navigate('local-changes')}/>}</div>}
+      {live.enabled && live.repository && !focusMode && destination !== 'settings' && <div className="repository-tools"><RepositoryToolbar key={live.repository.root} repository={live.repository} busy={live.busy} onGit={live.git} onRefresh={live.refresh} onOperate={live.operate} onConflicts={()=>navigate('local-changes')} onOpenRepository={path=>void live.openRepository(path).catch(()=>{})}/>{live.repository.operation&&<GitOperationBanner key={live.repository.root+live.repository.operation.token} operation={live.repository.operation} busy={live.busy} onOperate={live.operate} onResolve={()=>navigate('local-changes')}/>}</div>}
 
       <main
         aria-busy={!!live.openingRepository||(isPRView&&live.loadingPullRequests)}

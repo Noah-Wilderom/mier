@@ -13,7 +13,7 @@ export function HistoryOperations({commit,...props}:Props&{commit:Commit}){
   const [intent,setIntent]=useState<{kind:'reset'|'revert';commit:Commit}>()
   return <><button className="btn" disabled={props.busy||!!props.repository.operation||props.repository.detached} onClick={()=>setIntent({kind:'revert',commit})}>Revert commit…</button><button className="btn" disabled={props.busy||!!props.repository.operation||props.repository.detached} onClick={()=>setIntent({kind:'reset',commit})}>Reset to commit…</button>{intent&&<ChangeHistoryDialog {...props} kind={intent.kind} commit={intent.commit} onClose={()=>setIntent(undefined)}/>}</>
 }
-function ChangeHistoryDialog({repository,busy,onOperate,onConflicts,kind,commit,onClose}:Props&{kind:'reset'|'revert';commit:Commit;onClose:()=>void}){
+export function ChangeHistoryDialog({repository,busy,onOperate,onConflicts,kind,commit,onClose}:Props&{kind:'reset'|'revert';commit:Pick<Commit,'sha'|'subject'|'parents'>;onClose:()=>void}){
   const [target]=useState({head:repository.headSha??'',branch:repository.currentBranch})
   const [mode,setMode]=useState<'soft'|'mixed'|'hard'>('soft')
   const [mainline,setMainline]=useState(0)

@@ -8,3 +8,9 @@ export interface ReflogEntry { sha:string; selector:string; message:string; acto
 export interface ResetRequest { sha:string; mode:'soft'|'mixed'|'hard'; expectedHead:string; expectedBranch:string }
 export interface RecoverBranchRequest { sha:string; name:string }
 export interface CherryPickManyRequest { shas:string[]; expectedHead:string; expectedBranch:string }
+export interface RebasePreviewRequest { onto:string; upstream:string; expectedHead:string; expectedBranch:string }
+export interface RebasePreview { token:string; onto:string; upstream:string; head:string; branch:string; commits:import('./services').RepositoryCommit[] }
+export interface RebaseStep { sha:string; action:'pick'|'reword'|'edit'|'squash'|'fixup'|'drop'; message:string }
+export interface RebaseRequest { preview:RebasePreviewRequest; token:string; steps:RebaseStep[] }
+export interface Worktree { path:string;sha:string;branch:string;token:string;primary:boolean;current:boolean;locked:boolean;lockReason:string;prunable:boolean;changes:number;error:string }
+export interface WorktreeRequest { action:'add'|'lock'|'unlock'|'remove';path:string;mode:'new'|'existing'|'detached';branch:string;startSha:string;expectedHead:string;expectedBranch:string;token:string;reason:string }

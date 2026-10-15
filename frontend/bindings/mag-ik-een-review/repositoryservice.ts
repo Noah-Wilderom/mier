@@ -134,6 +134,10 @@ export function MutateTag(path: string, request: gitclient$0.TagRequest): $Cance
     return $Call.ByID(488804945, path, request);
 }
 
+export function MutateWorktree(path: string, request: gitclient$0.WorktreeRequest): $CancellablePromise<void> {
+    return $Call.ByID(3858902514, path, request);
+}
+
 export function Open(path: string): $CancellablePromise<$models.RepositorySnapshot> {
     return $Call.ByID(1633465945, path);
 }
@@ -142,12 +146,24 @@ export function PreviewDiscard(path: string, file: string): $CancellablePromise<
     return $Call.ByID(1837746491, path, file);
 }
 
+export function PreviewMerge(path: string, request: gitclient$0.MergeBranchRequest): $CancellablePromise<gitclient$0.MergePreflight> {
+    return $Call.ByID(2881320317, path, request);
+}
+
+export function PreviewRebase(path: string, request: gitclient$0.RebasePreviewRequest): $CancellablePromise<gitclient$0.RebasePreview> {
+    return $Call.ByID(954628067, path, request);
+}
+
 export function Pull(path: string, remote: string): $CancellablePromise<void> {
     return $Call.ByID(3095647214, path, remote);
 }
 
 export function Push(path: string, remote: string): $CancellablePromise<void> {
     return $Call.ByID(3195577453, path, remote);
+}
+
+export function Rebase(path: string, request: gitclient$0.RebaseRequest): $CancellablePromise<gitclient$0.OperationResult> {
+    return $Call.ByID(2054232293, path, request);
 }
 
 export function RecoverBranch(path: string, request: gitclient$0.RecoverBranchRequest): $CancellablePromise<void> {
@@ -220,4 +236,8 @@ export function Tags(path: string): $CancellablePromise<gitclient$0.Tag[] | null
 
 export function Unstage(path: string, files: string[] | null): $CancellablePromise<void> {
     return $Call.ByID(1871728836, path, files);
+}
+
+export function Worktrees(path: string): $CancellablePromise<gitclient$0.Worktree[] | null> {
+    return $Call.ByID(4056804497, path);
 }

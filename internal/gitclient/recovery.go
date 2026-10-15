@@ -213,7 +213,7 @@ type CherryPickManyRequest struct {
 
 func (c *Client) CherryPickMany(ctx context.Context, path string, request CherryPickManyRequest) (OperationResult, error) {
 	var result OperationResult
-	err := c.withRepository(ctx, path, c.options.LocalTimeout, func(ctx context.Context, root string) error {
+	err := c.withRepository(ctx, path, c.options.RemoteTimeout, func(ctx context.Context, root string) error {
 		if len(request.SHAs) < 1 || len(request.SHAs) > 100 {
 			return errors.New("Choose between 1 and 100 commits")
 		}
@@ -237,7 +237,7 @@ func (c *Client) CherryPickMany(ctx context.Context, path string, request Cherry
 		if err := c.checkpoint(ctx, root, request.ExpectedHead, "cherry-pick"); err != nil {
 			return err
 		}
-		_, commandErr := c.execute(ctx, root, c.options.LocalTimeout, []string{"GIT_EDITOR=true"}, nil, append([]string{"cherry-pick", "-x"}, request.SHAs...)...)
+		_, commandErr := c.execute(ctx, root, c.options.RemoteTimeout, []string{"GIT_EDITOR=true"}, nil, append([]string{"cherry-pick", "-x"}, request.SHAs...)...)
 		var err error
 		result, err = c.operationResult(ctx, root)
 		if err != nil {

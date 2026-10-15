@@ -21,8 +21,13 @@ export type {
     HistoryPage,
     HistoryQuery,
     MergeBranchRequest,
+    MergePreflight,
     Operation,
     OperationResult,
+    RebasePreview,
+    RebasePreviewRequest,
+    RebaseRequest,
+    RebaseStep,
     RecoverBranchRequest,
     ReflogEntry,
     Remote,
@@ -37,5 +42,7 @@ export type {
     Stash,
     StashRequest,
     Tag,
-    TagRequest
+    TagRequest,
+    Worktree,
+    WorktreeRequest
 } from "./models.js";

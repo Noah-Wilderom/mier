@@ -325,6 +325,8 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
           case 'recover-branch':await services.repository.recoverBranch(repo.root,mutation.request);break
           case 'cherry-pick-many':result=await services.repository.cherryPickMany(repo.root,mutation.request);break
           case 'revert':result=await services.repository.revert(repo.root,mutation.request);break
+          case 'rebase':result=await services.repository.rebase(repo.root,mutation.request);break
+          case 'worktree':await services.repository.mutateWorktree(repo.root,mutation.request);break
           default:result=await services.repository.controlOperation(repo.root,mutation.token,mutation.kind)
         }
       } catch(issue){failure=issue}

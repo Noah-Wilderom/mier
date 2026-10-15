@@ -8,6 +8,7 @@ export interface GitOperation {
   message: string
   canSkip: boolean
   empty?: boolean
+  pausedForEdit?:boolean
 }
 export interface GitOperationResult { headSha: string; operation?: GitOperation }
 export interface ConflictVersion { exists: boolean; sha: string; mode: string; content: string; binary: boolean }
@@ -15,6 +16,7 @@ export interface ConflictFile { path: string; token: string; base: ConflictVersi
 export interface ResolveConflictRequest { path: string; token: string; choice: 'result' | 'current' | 'incoming' | 'delete'; content: string }
 export interface CherryPickRequest { sha: string; expectedHead: string; expectedBranch: string; mainline: number }
 export interface MergeBranchRequest { branch: string; expectedSource: string; expectedHead: string; expectedBranch: string }
+export interface MergePreflight { head:string;source:string;clean:boolean;fastForward:boolean;conflicts:string[] }
 export interface StageHunkRequest { path: string; staged: boolean; hunk: number; expectedPatch: string; lines?:number[] }
 export type GitMutation =
   | { kind: 'cherry-pick'; request: CherryPickRequest }
@@ -34,6 +36,8 @@ export type GitMutation =
   | { kind: 'recover-branch'; request:import('./repositoryToolTypes').RecoverBranchRequest }
   | { kind: 'cherry-pick-many'; request:import('./repositoryToolTypes').CherryPickManyRequest }
   | { kind: 'revert'; request:CherryPickRequest }
+  | { kind: 'rebase'; request:import('./repositoryToolTypes').RebaseRequest }
+  | { kind: 'worktree'; request:import('./repositoryToolTypes').WorktreeRequest }
   | { kind: 'continue' | 'abort' | 'skip'; token: string }
 export const operationLabel = (kind: GitOperation['kind']) => ({ merge: 'Merge', 'cherry-pick': 'Cherry-pick', rebase: 'Rebase', revert: 'Revert', am: 'Apply patches' })[kind]
 
@@ -64,7 +68,7 @@ export function conflictChunks(source: string): ConflictChunk[] {
   }
   return chunks
 }
-export function resolveChunk(source: string, chunk: ConflictChunk, choice: 'current' | 'incoming' | 'both'): string {
-  return source.slice(0, chunk.start) + (choice === 'current' ? chunk.current : choice === 'incoming' ? chunk.incoming : chunk.current + chunk.incoming) + source.slice(chunk.end)
+export function resolveChunk(source: string, chunk: ConflictChunk, choice: 'current' | 'incoming' | 'both' | 'incoming-first'): string {
+  return source.slice(0, chunk.start) + (choice === 'current' ? chunk.current : choice === 'incoming' ? chunk.incoming : choice==='incoming-first'?chunk.incoming+chunk.current:chunk.current + chunk.incoming) + source.slice(chunk.end)
 }
 export const containsConflictMarkers = (source: string) => /^(?:<{7,}|={7,}|>{7,}|\|{7,})(?:[ \t\r].*)?$/m.test(source)

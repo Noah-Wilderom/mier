@@ -11,12 +11,12 @@ An unchecked item is planned, not a supported capability. AI additions come last
 - [x] Searchable, paginated history and reference filtering
 - [x] File history, revision contents, and blame
 - [x] Multiple-commit cherry-pick
-- [ ] Rebase and interactive history composition
+- [x] Rebase and interactive history composition
 - [x] Reset, revert, recovery checkpoints, and activity
 - [x] Tags, remotes, and signing configuration
-- [ ] Conflict editor alignment, result highlighting, both orderings, and shortcuts
-- [ ] Merge conflict preflight
-- [ ] Worktree management
+- [x] Conflict editor alignment, result highlighting, both orderings, and shortcuts
+- [x] Merge conflict preflight
+- [x] Worktree management
 - [ ] Submodules and Git LFS
 - [ ] Patch import and export
 - [ ] Gitflow and bisect

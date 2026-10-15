@@ -123,6 +123,16 @@ func (c *Client) execute(ctx context.Context, root string, timeout time.Duration
 }
 
 func (c *Client) executeInput(ctx context.Context, root string, timeout time.Duration, extraEnv, secrets []string, input []byte, args ...string) ([]byte, error) {
+	output, err := c.executeInputResult(ctx, root, timeout, extraEnv, secrets, input, args...)
+	if err != nil {
+		return nil, err
+	}
+	return output, nil
+}
+
+// Some Git commands (merge-tree, bisect) return useful structured stdout with
+// a documented non-zero exit code. Normal calls retain their existing contract.
+func (c *Client) executeInputResult(ctx context.Context, root string, timeout time.Duration, extraEnv, secrets []string, input []byte, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	global := []string{"--no-pager", "--literal-pathspecs", "-c", "core.quotepath=false", "-c", "color.ui=false", "-c", "protocol.ext.allow=never"}
@@ -177,7 +187,7 @@ func (c *Client) executeInput(ctx context.Context, root string, timeout time.Dur
 		if detail == "" {
 			detail = err.Error()
 		}
-		return nil, &CommandError{Operation: operation, Detail: detail, ExitCode: code, cause: err}
+		return stdout.Bytes(), &CommandError{Operation: operation, Detail: detail, ExitCode: code, cause: err}
 	}
 	return stdout.Bytes(), nil
 }

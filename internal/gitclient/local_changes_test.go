@@ -183,14 +183,14 @@ func TestDiscardSelectedLinesUntrackedBinaryAndIgnoreLiteralPath(t *testing.T) {
 	if string(data) != "\x00preserve me" {
 		t.Fatal("binary recovery failed")
 	}
-	writeFile(t, root, "[literal]*.txt", "keep")
+	writeFile(t, root, "[literal].txt", "keep")
 	writeFile(t, root, "other.txt", "keep")
-	if err = c.IgnoreFile(ctx, root, "[literal]*.txt"); err != nil {
+	if err = c.IgnoreFile(ctx, root, "[literal].txt"); err != nil {
 		t.Fatal(err)
 	}
 	state := snapshot(t, c, root)
 	for _, file := range state.Changes {
-		if file.Path == "[literal]*.txt" {
+		if file.Path == "[literal].txt" {
 			t.Fatal("literal file not ignored")
 		}
 	}

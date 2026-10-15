@@ -4,6 +4,7 @@
 export interface AmendRequest {
     "message": string;
     "expectedHead": string;
+    "operationToken"?: string;
 }
 
 export interface BlameLine {
@@ -161,6 +162,14 @@ export interface MergeBranchRequest {
     "expectedBranch": string;
 }
 
+export interface MergePreflight {
+    "head": string;
+    "source": string;
+    "clean": boolean;
+    "fastForward": boolean;
+    "conflicts": string[] | null;
+}
+
 /**
  * Operation describes Git's actual sequencer state, including operations begun
  * in another Git client. Token guards against continuing a different operation.
@@ -175,11 +184,40 @@ export interface Operation {
     "message": string;
     "canSkip": boolean;
     "empty": boolean;
+    "pausedForEdit"?: boolean;
 }
 
 export interface OperationResult {
     "headSha": string;
     "operation"?: Operation | null;
+}
+
+export interface RebasePreview {
+    "token": string;
+    "onto": string;
+    "upstream": string;
+    "head": string;
+    "branch": string;
+    "commits": Commit[] | null;
+}
+
+export interface RebasePreviewRequest {
+    "onto": string;
+    "upstream": string;
+    "expectedHead": string;
+    "expectedBranch": string;
+}
+
+export interface RebaseRequest {
+    "preview": RebasePreviewRequest;
+    "token": string;
+    "steps": RebaseStep[] | null;
+}
+
+export interface RebaseStep {
+    "sha": string;
+    "action": string;
+    "message": string;
 }
 
 export interface RecoverBranchRequest {
@@ -312,4 +350,30 @@ export interface TagRequest {
     "message": string;
     "expectedObject": string;
     "remote": string;
+}
+
+export interface Worktree {
+    "path": string;
+    "sha": string;
+    "branch": string;
+    "token": string;
+    "primary": boolean;
+    "current": boolean;
+    "locked": boolean;
+    "lockReason": string;
+    "prunable": boolean;
+    "changes": number;
+    "error": string;
+}
+
+export interface WorktreeRequest {
+    "action": string;
+    "path": string;
+    "mode": string;
+    "branch": string;
+    "startSha": string;
+    "expectedHead": string;
+    "expectedBranch": string;
+    "token": string;
+    "reason": string;
 }
