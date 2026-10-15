@@ -8,7 +8,15 @@ Choose **Quick** for high-impact correctness bugs, **Balanced** for behavior and
 
 See the review chat in [light](../art/mier-ai-chat-light.png) and [dark](../art/mier-ai-chat-dark.png) appearance. These screenshots use a sample PR and simulated provider responses.
 
-Starting a review sends the captured PR description, changes, and source requested by the reviewer to your selected provider. Review only repositories you are allowed to share with that provider. Nothing runs until you start a review.
+Starting a review sends the captured PR description, changes, requested source, and requested linked ticket content from connected Jira or Linear accounts to your selected provider. Review only code and ticket information you are allowed to share with that provider. Nothing runs until you start a review.
+
+## Linked ticket context
+
+The reviewer can read Jira and Linear tickets linked through the PR branch, title or description, plus tickets you added manually. Only connected providers participate. Repository project/team filters and personally hidden tickets are respected when the review starts. `get_review_context` lists the captured provider/key pairs; `read_review_ticket` reads one of those pairs. Arbitrary ticket searches, unrelated keys, attachments, linked web pages and ticket changes are unavailable.
+
+Ticket reads include the summary, status, assignee, priority, labels, description, configured Jira acceptance criteria and up to ten recent comments. Jira document content is converted to readable text; Linear Markdown is preserved. Reads are lazy and use the existing memory-only provider caches, which can retain details for two minutes. Each result includes its read time and the provider's update time when available. Ticket contents can change independently of the captured Git commit. Missing comments and truncated content are marked explicitly; inaccessible tickets do not prevent code review.
+
+There are at most 25 captured references per provider, 30 ticket reads per review and 32 KiB of ticket text per read, with smaller individual field limits. Changing the linked site/workspace, repository filters or authorization invalidates the existing provider access, including cached details. Start a new review to capture new links or changed settings. Ticket text is untrusted context, never agent instructions. Read access cannot create, edit, transition or comment on tickets, or change their personal links.
 
 ## Connect your provider
 
@@ -50,7 +58,7 @@ See [manual finding actions in dark appearance](../art/mier-ai-actions-dark.png)
 
 ## Activity and usage
 
-Expand **Activity and usage** in a review to see executed review tools, running/completed/failed/cancelled states, durations, repository paths and requested line ranges. Successful source reads report the actual returned lines and bytes. Aggregate counts include all calls; the timeline retains the latest 200. File-read totals count successful reads, not the patches returned with PR context. Raw tool arguments/results, source text, provider logs and credentials are excluded from telemetry.
+Expand **Activity and usage** in a review to see executed review tools, running/completed/failed/cancelled states, durations, repository paths and requested line ranges. Successful source reads report the actual returned lines and bytes. Ticket reads show the provider, key and returned text bytes, with separate totals for successful reads and unique tickets. Aggregate counts include all calls; the timeline retains the latest 200. File-read totals count successful reads, not the patches returned with PR context. Raw tool arguments/results, source and ticket text, provider logs and credentials are excluded from telemetry.
 
 Token and billing values come from each provider rather than estimates:
 
@@ -62,18 +70,19 @@ Activity and usage stay in memory with the review while the app is running. Brow
 
 ## Connect an external MCP client
 
-In a PR's assistant choose **Connect an MCP client… → Create MCP connection**. Copy the generated configuration into a local client supporting Streamable HTTP and bearer headers. M.I.E.R. exposes exactly four tools:
+In a PR's assistant choose **Connect an MCP client… → Create MCP connection**. Copy the generated configuration into a local client supporting Streamable HTTP and bearer headers. M.I.E.R. exposes exactly five tools:
 
 | Tool | Access |
 | --- | --- |
-| `get_review_context` | Captured PR metadata and patches |
+| `get_review_context` | Captured PR metadata, patches and allowed ticket references |
 | `read_review_file` | Bounded source at captured revisions |
+| `read_review_ticket` | Read-only content for a captured linked Jira/Linear ticket |
 | `add_review_comment` | Stage an anchored finding in the assistant for human approval |
 | `finish_review` | Record a summary and finish the external review |
 
-The loopback endpoint and bearer are unique to that review. Keep the connection configuration private: it permits reading that repository's captured source and proposing findings until **Stop review**, completion, app exit, or the 30-minute expiry. Reopening the pane restores the same active connection. Tokens stay in memory and are not saved to browser storage. This is a local review server, not a remotely reachable general workspace server.
+The loopback endpoint and bearer are unique to that review. Keep the connection configuration private: it permits reading that repository's captured source and linked tickets, and proposing findings until **Stop review**, completion, app exit, or the 30-minute expiry. Reopening the pane restores the same active connection. Tokens stay in memory and are not saved to browser storage. This is a local review server, not a remotely reachable general workspace server.
 
-Codex consumes the MCP bridge directly. The Copilot SDK registers these four capabilities as explicitly allowed custom tools, forwarding their calls through an authenticated MCP client. Copilot's built-in MCP servers, commands, filesystem tools, repository instructions, plugins and remote session export are disabled for this reviewer. Starting a review authorizes only these scoped proposal tools; it does not authorize importing findings or publishing comments.
+Codex consumes the MCP bridge directly. The Copilot SDK registers these five capabilities as explicitly allowed custom tools, forwarding their calls through an authenticated MCP client. Copilot's built-in MCP servers, commands, filesystem tools, repository instructions, plugins and remote session export are disabled for this reviewer. Starting a review authorizes only these scoped proposal tools; it does not authorize importing findings or publishing comments.
 
 ## Integration references and validation
 

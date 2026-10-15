@@ -8,6 +8,9 @@ export interface ActivityTotals {
     "filesRead": number;
     "linesRead": number;
     "bytesRead": number;
+    "ticketReads": number;
+    "ticketsRead": number;
+    "ticketBytesRead": number;
     "omitted": number;
 }
 
@@ -62,7 +65,7 @@ export interface RunSnapshot {
 
 /**
  * Activity deliberately excludes tool arguments, results, source, and errors.
- * Only the four executed review tools and bounded repository locations appear.
+ * Only executed review tools and bounded repository/ticket locations appear.
  */
 export interface ToolActivity {
     "id": string;
@@ -70,6 +73,8 @@ export interface ToolActivity {
     "state": string;
     "path"?: string;
     "side"?: string;
+    "ticketProvider"?: string;
+    "ticketKey"?: string;
     "startLine"?: number;
     "endLine"?: number;
     "lines": number;

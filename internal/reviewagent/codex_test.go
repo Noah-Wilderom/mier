@@ -90,7 +90,7 @@ func fakeCodex() {
 			if err != nil {
 				os.Exit(14)
 			}
-			for _, call := range []*mcp.CallToolParams{{Name: "get_review_context", Arguments: Empty{}}, {Name: "add_review_comment", Arguments: Finding{Path: "source.ts", Side: "new", Line: 3, Body: "Check the new behavior.", Severity: "bug"}}, {Name: "finish_review", Arguments: SummaryInput{Summary: "One suggestion; no tests were run."}}} {
+			for _, call := range []*mcp.CallToolParams{{Name: "get_review_context", Arguments: Empty{}}, {Name: "read_review_ticket", Arguments: ReadTicketInput{Provider: "jira", Key: "ENG-7"}}, {Name: "add_review_comment", Arguments: Finding{Path: "source.ts", Side: "new", Line: 3, Body: "Check the new behavior.", Severity: "bug"}}, {Name: "finish_review", Arguments: SummaryInput{Summary: "One suggestion; no tests were run."}}} {
 				result, err := session.CallTool(ctx, call)
 				if err != nil || result.IsError {
 					os.Exit(15)
@@ -122,7 +122,10 @@ func TestCodexHarnessUsesMCPAndRejectsWriteApproval(t *testing.T) {
 	binary, _ := os.Executable()
 	scope := reviewFixture()
 	scope.Intensity = "high"
-	run := NewRun("codex", "model-from-provider", scope, nil)
+	scope.Tickets = []TicketReference{{Provider: "jira", Key: "ENG-7"}}
+	run := NewRun("codex", "model-from-provider", scope, nil, func(ctx context.Context, provider, key string) (TicketContent, error) {
+		return TicketContent{Provider: provider, Key: key, Description: "Linked ticket requirement"}, nil
+	})
 	bridge, err := StartBridge(run)
 	if err != nil {
 		t.Fatal(err)
@@ -139,7 +142,7 @@ func TestCodexHarnessUsesMCPAndRejectsWriteApproval(t *testing.T) {
 	if usage := run.Snapshot().Usage; usage.TotalTokens == nil || *usage.TotalTokens != 1200 {
 		t.Fatal("provider usage notifications were missed or counted twice", usage)
 	}
-	if run.Snapshot().ActivityTotals.ToolCalls != 3 {
+	if run.Snapshot().ActivityTotals.ToolCalls != 4 || run.Snapshot().ActivityTotals.TicketReads != 1 {
 		t.Fatal("executed MCP calls were not tracked")
 	}
 }

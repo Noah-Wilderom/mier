@@ -49,7 +49,7 @@ func TestReviewMCPUsesRealTransportAndOnlyAcceptsCapturedAnchors(t *testing.T) {
 	session := connectBridge(t, bridge)
 	ctx := context.Background()
 	tools, err := session.ListTools(ctx, &mcp.ListToolsParams{})
-	if err != nil || len(tools.Tools) != 4 {
+	if err != nil || len(tools.Tools) != 5 {
 		t.Fatal("unexpected tool surface", tools, err)
 	}
 	for _, tool := range tools.Tools {

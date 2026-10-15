@@ -381,15 +381,30 @@ test("activity shows actual tool outcomes, file reads and provider usage without
 }) => {
   let current = review({
     activityTotals: {
-      toolCalls: 4,
+      toolCalls: 5,
       failedCalls: 1,
       fileReads: 1,
       filesRead: 1,
       linesRead: 12,
       bytesRead: 1250,
+      ticketReads: 1,
+      ticketsRead: 1,
+      ticketBytesRead: 422,
       omitted: 1,
     },
     activity: [
+      {
+        id: "tool-ticket",
+        tool: "read_review_ticket",
+        state: "completed",
+        ticketProvider: "linear",
+        ticketKey: "ENG-7",
+        lines: 0,
+        bytes: 422,
+        startedAt: "2026-10-14T12:00:00Z",
+        finishedAt: "2026-10-14T12:00:01Z",
+        durationMs: 1000,
+      },
       {
         id: "tool-2",
         tool: "read_review_file",
@@ -440,6 +455,12 @@ test("activity shows actual tool outcomes, file reads and provider usage without
   desktop.handlers.set("main.AIService.GetReview", () => current);
   desktop.handlers.set("main.AIService.SavePreferences", () => null);
   await openReview(desktop);
+  await expect(page.locator(".ai-review-disclosure")).toContainText(
+    "linked ticket content from connected Jira or Linear accounts",
+  );
+  await expect(page.locator(".ai-review-disclosure")).toContainText(
+    "Ticket access is read only",
+  );
   await page
     .getByRole("button", { name: "Start AI review", exact: true })
     .click();
@@ -462,6 +483,10 @@ test("activity shows actual tool outcomes, file reads and provider usage without
   await expect(activity).toContainText("src/feature.ts:1–20 · Changed");
   await expect(activity).toContainText("12 lines returned · 1,250 bytes");
   await expect(activity).toContainText("1 unique file · 12 source lines");
+  await expect(activity).toContainText("Read linked ticket");
+  await expect(activity).toContainText("Linear · ENG-7");
+  await expect(activity).toContainText("422 ticket bytes returned · read only");
+  await expect(activity).toContainText("1 unique ticket · 422 ticket bytes");
   await expect(activity.locator('li[data-state="failed"]')).toContainText(
     "src/missing.ts",
   );
@@ -618,6 +643,7 @@ test("external MCP connections require an explicit start and restore without per
     tools: [
       "get_review_context",
       "read_review_file",
+      "read_review_ticket",
       "add_review_comment",
       "finish_review",
     ],

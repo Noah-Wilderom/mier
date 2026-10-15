@@ -13,29 +13,34 @@ import (
 const MaxActivity = 200
 
 // Activity deliberately excludes tool arguments, results, source, and errors.
-// Only the four executed review tools and bounded repository locations appear.
+// Only executed review tools and bounded repository/ticket locations appear.
 type ToolActivity struct {
-	ID         string `json:"id"`
-	Tool       string `json:"tool"`
-	State      string `json:"state"`
-	Path       string `json:"path,omitempty"`
-	Side       string `json:"side,omitempty"`
-	StartLine  int    `json:"startLine,omitempty"`
-	EndLine    int    `json:"endLine,omitempty"`
-	Lines      int    `json:"lines"`
-	Bytes      int    `json:"bytes"`
-	StartedAt  string `json:"startedAt"`
-	FinishedAt string `json:"finishedAt,omitempty"`
-	DurationMs int64  `json:"durationMs"`
+	ID             string `json:"id"`
+	Tool           string `json:"tool"`
+	State          string `json:"state"`
+	Path           string `json:"path,omitempty"`
+	Side           string `json:"side,omitempty"`
+	TicketProvider string `json:"ticketProvider,omitempty"`
+	TicketKey      string `json:"ticketKey,omitempty"`
+	StartLine      int    `json:"startLine,omitempty"`
+	EndLine        int    `json:"endLine,omitempty"`
+	Lines          int    `json:"lines"`
+	Bytes          int    `json:"bytes"`
+	StartedAt      string `json:"startedAt"`
+	FinishedAt     string `json:"finishedAt,omitempty"`
+	DurationMs     int64  `json:"durationMs"`
 }
 type ActivityTotals struct {
-	ToolCalls   int `json:"toolCalls"`
-	FailedCalls int `json:"failedCalls"`
-	FileReads   int `json:"fileReads"`
-	FilesRead   int `json:"filesRead"`
-	LinesRead   int `json:"linesRead"`
-	BytesRead   int `json:"bytesRead"`
-	Omitted     int `json:"omitted"`
+	ToolCalls       int `json:"toolCalls"`
+	FailedCalls     int `json:"failedCalls"`
+	FileReads       int `json:"fileReads"`
+	FilesRead       int `json:"filesRead"`
+	LinesRead       int `json:"linesRead"`
+	BytesRead       int `json:"bytesRead"`
+	TicketReads     int `json:"ticketReads"`
+	TicketsRead     int `json:"ticketsRead"`
+	TicketBytesRead int `json:"ticketBytesRead"`
+	Omitted         int `json:"omitted"`
 }
 type toolCall struct {
 	id      string
@@ -73,6 +78,25 @@ func (r *Run) beginTool(tool, file, side string, start, count int) toolCall {
 	return call
 }
 func (r *Run) endTool(call toolCall, source *Source, err error) {
+	r.completeTool(call, source, nil, err)
+}
+func (r *Run) beginTicketTool(provider, key string) toolCall {
+	call := r.beginTool("read_review_ticket", "", "", 0, 0)
+	// Do not retain arbitrary arguments from rejected ticket requests.
+	if r.ticketAllowed(provider, key) {
+		r.mu.Lock()
+		for i := range r.snapshot.Activity {
+			if r.snapshot.Activity[i].ID == call.id {
+				r.snapshot.Activity[i].TicketProvider = provider
+				r.snapshot.Activity[i].TicketKey = key
+				break
+			}
+		}
+		r.mu.Unlock()
+	}
+	return call
+}
+func (r *Run) completeTool(call toolCall, source *Source, ticket *TicketContent, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for _, entry := range r.snapshot.Activity {
@@ -105,6 +129,15 @@ func (r *Run) endTool(call toolCall, source *Source, err error) {
 			r.readFiles[call.path] = true
 		}
 		r.snapshot.ActivityTotals.FilesRead = len(r.readFiles)
+	} else if ticket != nil {
+		bytes = ticket.TextBytes()
+		r.snapshot.ActivityTotals.TicketReads++
+		r.snapshot.ActivityTotals.TicketBytesRead += bytes
+		if r.readTickets == nil {
+			r.readTickets = map[string]bool{}
+		}
+		r.readTickets[ticket.Provider+"/"+ticket.Key] = true
+		r.snapshot.ActivityTotals.TicketsRead = len(r.readTickets)
 	}
 	for i := range r.snapshot.Activity {
 		entry := &r.snapshot.Activity[i]

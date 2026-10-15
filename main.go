@@ -30,6 +30,10 @@ func main() {
 	credentials := NewCredentialService()
 	repositories := NewRepositoryService(credentials)
 	github := NewGitHubService(credentials)
+	jira := NewIntegrationService()
+	linear := NewLinearService()
+	ai := NewAIService(github, credentials)
+	ai.jira, ai.linear = jira, linear
 	workspace := NewWorkspaceService()
 	var app *application.App
 	desktop := NewDesktopNotificationService()
@@ -49,9 +53,9 @@ func main() {
 		Name:        "M.I.E.R.",
 		Description: fmt.Sprintf("A native Git and pull request workspace\n\nVersion %s", appVersion),
 		Services: []application.Service{
-			application.NewService(NewAIService(github, credentials)),
-			application.NewService(NewIntegrationService()),
-			application.NewService(NewLinearService()),
+			application.NewService(ai),
+			application.NewService(jira),
+			application.NewService(linear),
 			application.NewService(NewEditorService(repositories)),
 			application.NewService(NewLSPService(repositories)),
 			application.NewService(desktop),

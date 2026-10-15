@@ -333,7 +333,7 @@ func RunCopilot(ctx context.Context, binary, directory, token, model, prompt str
 // The only permitted writes are explicit additive draft tools registered above.
 // Built-in command, file, network, and unrelated MCP permissions are rejected.
 func rejectReviewPermission(copilot.PermissionRequest, copilot.PermissionInvocation) (rpc.PermissionDecision, error) {
-	feedback := "This review only allows M.I.E.R.'s four scoped review tools"
+	feedback := "This review only allows M.I.E.R.'s scoped review tools"
 	return &rpc.PermissionDecisionReject{Feedback: &feedback}, nil
 }
 

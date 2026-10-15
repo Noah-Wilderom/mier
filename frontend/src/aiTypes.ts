@@ -68,6 +68,8 @@ export interface AIToolActivity {
   state: "running" | "completed" | "failed" | "cancelled";
   path?: string;
   side?: "old" | "new";
+  ticketProvider?: "jira" | "linear";
+  ticketKey?: string;
   startLine?: number;
   endLine?: number;
   lines: number;
@@ -83,6 +85,9 @@ export interface AIActivityTotals {
   filesRead: number;
   linesRead: number;
   bytesRead: number;
+  ticketReads?: number;
+  ticketsRead?: number;
+  ticketBytesRead?: number;
   omitted: number;
 }
 export interface AIUsage {

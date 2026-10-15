@@ -563,11 +563,13 @@ function LiveAssistant({
                         </p>
                       )}
                       <p className="ai-review-disclosure">
-                        Starting sends this PR’s changes and requested source
-                        files to {aiProviderName(preferences.provider)} using
-                        your account. Findings stay in this assistant until you
-                        choose to add them to your pending review. Each message
-                        starts a new review of this PR.
+                        Starting sends this PR’s changes, requested source
+                        files, and linked ticket content from connected Jira or
+                        Linear accounts to {aiProviderName(preferences.provider)}
+                        {" "}using your account. Ticket access is read only.
+                        Findings stay in this assistant until you choose to add
+                        them to your pending review. Each message starts a new
+                        review of this PR.
                       </p>
                       {connection && active && (
                         <div className="ai-mcp-connection">

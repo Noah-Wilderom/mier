@@ -11,7 +11,11 @@ import (
 // Exercise the same real MCP transport that SDK tool handlers use, without
 // requiring credentials, inference, or a provider process in CI.
 func TestCopilotToolsForwardBoundedReviewCapabilities(t *testing.T) {
-	run := NewRun("copilot", "", reviewFixture(), nil)
+	scope := reviewFixture()
+	scope.Tickets = []TicketReference{{Provider: "linear", Key: "ENG-7"}}
+	run := NewRun("copilot", "", scope, nil, func(ctx context.Context, provider, key string) (TicketContent, error) {
+		return TicketContent{Provider: provider, Key: key, Description: "Linked ticket requirement"}, nil
+	})
 	bridge, err := StartBridge(run)
 	if err != nil {
 		t.Fatal(err)
@@ -24,7 +28,7 @@ func TestCopilotToolsForwardBoundedReviewCapabilities(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer session.Close()
-	if len(tools) != 4 {
+	if len(tools) != 5 {
 		t.Fatal("unexpected tool count")
 	}
 	byName := map[string]copilot.Tool{}
@@ -34,6 +38,10 @@ func TestCopilotToolsForwardBoundedReviewCapabilities(t *testing.T) {
 	result, err := byName["get_review_context"].Handler(copilot.ToolInvocation{Arguments: map[string]any{}})
 	if err != nil || result.ResultType != "success" || !run.HasContext() {
 		t.Fatal("context was not delivered", result, err)
+	}
+	result, err = byName["read_review_ticket"].Handler(copilot.ToolInvocation{Arguments: map[string]any{"provider": "linear", "key": "ENG-7"}})
+	if err != nil || result.ResultType != "success" || run.Snapshot().ActivityTotals.TicketReads != 1 {
+		t.Fatal("Copilot did not receive linked ticket context", result, err)
 	}
 	add := byName["add_review_comment"]
 	if add.Parameters == nil || !add.SkipPermission || add.Defer != copilot.ToolDeferNever {

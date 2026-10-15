@@ -11,6 +11,7 @@ const duration = (value: number) =>
 const toolLabels: Record<string, string> = {
   get_review_context: "Read PR context",
   read_review_file: "Read file",
+  read_review_ticket: "Read linked ticket",
   add_review_comment: "Propose finding",
   finish_review: "Write summary",
 };
@@ -61,6 +62,8 @@ export function AIReviewActivity({ run }: { run: AIReview }) {
           <span>
             {totals.toolCalls} tools · {totals.fileReads} file{" "}
             {totals.fileReads === 1 ? "read" : "reads"}
+            {!!totals.ticketReads &&
+              ` · ${totals.ticketReads} ticket ${totals.ticketReads === 1 ? "read" : "reads"}`}
           </span>
         )}
       </summary>
@@ -87,6 +90,8 @@ export function AIReviewActivity({ run }: { run: AIReview }) {
           · {totals.linesRead} source lines · {number(totals.bytesRead)} source
           bytes · {totals.failedCalls} failed or cancelled{" "}
           {totals.failedCalls === 1 ? "call" : "calls"}
+          {!!totals.ticketsRead &&
+            ` · ${totals.ticketsRead} unique ${totals.ticketsRead === 1 ? "ticket" : "tickets"} · ${number(totals.ticketBytesRead)} ticket bytes`}
         </p>
       ) : (
         <p className="muted">Tool activity is unavailable for this session.</p>
@@ -122,10 +127,22 @@ export function AIReviewActivity({ run }: { run: AIReview }) {
                     : ""}
                 </code>
               )}
+              {call.ticketKey && (
+                <code>
+                  {call.ticketProvider === "jira" ? "Jira" : "Linear"} ·{" "}
+                  {call.ticketKey}
+                </code>
+              )}
               {call.tool === "read_review_file" &&
                 call.state === "completed" && (
                   <span className="muted">
                     {call.lines} lines returned · {number(call.bytes)} bytes
+                  </span>
+                )}
+              {call.tool === "read_review_ticket" &&
+                call.state === "completed" && (
+                  <span className="muted">
+                    {number(call.bytes)} ticket bytes returned · read only
                   </span>
                 )}
             </li>

@@ -58,6 +58,8 @@ type aiTask struct {
 type AIService struct {
 	github                *GitHubService
 	credentials           *CredentialService
+	jira                  *IntegrationService
+	linear                *LinearService
 	mu                    sync.Mutex
 	tasks                 map[string]*aiTask
 	active                map[string]string
@@ -453,7 +455,13 @@ func (s *AIService) start(ctx context.Context, request AIReviewRequest, external
 		end := min(len(lines), start-1+count)
 		return reviewagent.Source{Path: path, Revision: revision, StartLine: start, Lines: lines[start-1 : end], TotalLines: len(lines)}, nil
 	}
-	run := reviewagent.NewRun(provider, model, scope, reader)
+	tickets, ticketReader, warnings := s.captureReviewTickets(ctx, TicketPullRequest{Repository: TicketRepository{Host: scope.Host, Owner: scope.Owner, Repo: scope.Repository}, Number: scope.PullRequest, Branch: changes.PullRequest.Head.Ref, Title: scope.Title, Body: scope.Description})
+	if err := ctx.Err(); err != nil {
+		return AIConnection{}, err
+	}
+	scope.Tickets = tickets
+	scope.Warnings = append(scope.Warnings, warnings...)
+	run := reviewagent.NewRun(provider, model, scope, reader, ticketReader)
 	bridge, err := reviewagent.StartBridge(run)
 	if err != nil {
 		return AIConnection{}, err
@@ -526,7 +534,7 @@ func (s *AIService) execute(ctx context.Context, request AIReviewRequest, task *
 	if directory != "" {
 		defer os.RemoveAll(directory)
 	}
-	prompt := "Review the captured pull request using the mier MCP tools. Start with get_review_context. Propose actionable findings with add_review_comment for the human to accept or dismiss, and record a summary with finish_review."
+	prompt := "Review the captured pull request using the mier MCP tools. Start with get_review_context, then use read_review_ticket for linked tickets to understand requirements before assessing the code. Propose actionable findings with add_review_comment for the human to accept or dismiss, and record a summary with finish_review."
 	prompt += "\n" + reviewagent.IntensityInstructions(request.Intensity)
 	if request.Instructions != "" {
 		prompt += "\nAdditional reviewer focus: " + request.Instructions
