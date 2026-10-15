@@ -24,3 +24,11 @@ export interface LFSFile { name:string;oid:string;size:number;downloaded:boolean
 export interface LFSState { installed:boolean;version:string;initialized:boolean;patterns:LFSPattern[];files:LFSFile[];summary:string;token:string }
 export interface LFSRequest { action:'install'|'track'|'untrack'|'pull'|'fetch'|'checkout'|'lock'|'unlock';pattern:string;filename:boolean;lockable:boolean;remote:string;expectedHead:string;expectedBranch:string;token:string }
 export interface LFSLock { id:string;path:string;owner:{name:string};locked_at:string }
+export interface BisectRequest { action:'start'|'good'|'bad'|'skip'|'checkout'|'reset';good:string;bad:string;expectedHead:string;expectedBranch:string;token:string }
+export interface FlowConfig { main:string;develop:string;featurePrefix:string;releasePrefix:string;hotfixPrefix:string }
+export interface FlowSession { kind:'feature'|'release'|'hotfix';source:string;sourceSha:string;config:FlowConfig;mainSha:string;developSha:string;tag:string;message:string;deleteBranch:boolean;stage:number;mergeTarget:string;mergeBefore:string;mergeSource:string }
+export interface FlowState { config:FlowConfig;configured:boolean;kind:string;session?:FlowSession;token:string }
+export interface FlowRequest { action:'configure'|'start'|'prepare'|'advance'|'cancel';config:FlowConfig;kind:string;name:string;tag:string;message:string;deleteBranch:boolean;expectedHead:string;expectedBranch:string;token:string }
+export interface CustomCommand { id:string;name:string;executable:string;arguments:string[];timeoutSeconds:number }
+export interface CommandRun { id:string;root:string;name:string;status:'running'|'completed'|'failed'|'canceled';stdout:string;stderr:string;truncated:boolean;exitCode:number;error:string;startedAt:string;finishedAt:string }
+export interface Terminal { id:string;name:string;available:boolean }

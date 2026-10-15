@@ -78,6 +78,28 @@ export type CodeHover = lspclient$0.Hover;
 
 export type CodePositionRequest = lspclient$0.CodePositionRequest;
 
+export interface CommandRun {
+    "id": string;
+    "root": string;
+    "name": string;
+    "status": string;
+    "stdout": string;
+    "stderr": string;
+    "truncated": boolean;
+    "exitCode": number;
+    "error": string;
+    "startedAt": string;
+    "finishedAt": string;
+}
+
+export interface CustomCommand {
+    "id": string;
+    "name": string;
+    "executable": string;
+    "arguments": string[] | null;
+    "timeoutSeconds": number;
+}
+
 export type DefinitionDocument = lspclient$0.DefinitionDocument;
 
 export interface JiraAppConfiguration {
@@ -207,6 +229,12 @@ export interface PRNotificationEvent {
 export type ReadDefinitionRequest = lspclient$0.ReadDefinitionRequest;
 
 export type RepositorySnapshot = gitclient$0.RepositorySnapshot;
+
+export interface Terminal {
+    "id": string;
+    "name": string;
+    "available": boolean;
+}
 
 export interface Ticket {
     "key": string;

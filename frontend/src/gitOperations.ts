@@ -1,5 +1,5 @@
 export interface GitOperation {
-  kind: 'merge' | 'cherry-pick' | 'rebase' | 'revert' | 'am'
+  kind: 'merge' | 'cherry-pick' | 'rebase' | 'revert' | 'am' | 'bisect'
   token: string
   sourceSha: string
   sourceLabel: string
@@ -41,8 +41,11 @@ export type GitMutation =
   | { kind:'apply-patch';request:import('./repositoryToolTypes').ApplyPatchRequest }
   | { kind:'submodule';request:import('./repositoryToolTypes').SubmoduleRequest }
   | { kind:'lfs';request:import('./repositoryToolTypes').LFSRequest }
+  | { kind:'gitflow';request:import('./repositoryToolTypes').FlowRequest }
+  | { kind:'bisect';request:import('./repositoryToolTypes').BisectRequest }
+  | { kind:'custom-command';id:string }
   | { kind: 'continue' | 'abort' | 'skip'; token: string }
-export const operationLabel = (kind: GitOperation['kind']) => ({ merge: 'Merge', 'cherry-pick': 'Cherry-pick', rebase: 'Rebase', revert: 'Revert', am: 'Apply patches' })[kind]
+export const operationLabel = (kind: GitOperation['kind']) => ({ merge: 'Merge', 'cherry-pick': 'Cherry-pick', rebase: 'Rebase', revert: 'Revert', am: 'Apply patches',bisect:'Bisect' })[kind]
 
 export interface ConflictChunk { before: string; current: string; incoming: string; base?: string; start: number; end: number }
 // Offsets retain CRLF and the last line's newline. Both regular and diff3/zdiff3

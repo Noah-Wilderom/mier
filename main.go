@@ -67,6 +67,7 @@ func main() {
 			application.NewService(jira),
 			application.NewService(linear),
 			application.NewService(NewEditorService(repositories)),
+			application.NewService(NewCommandService(repositories)),
 			application.NewService(NewLSPService(repositories)),
 			application.NewService(desktop),
 			application.NewService(prNotifications),

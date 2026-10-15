@@ -76,6 +76,20 @@ Worktrees can be locked and unlocked. Removal previews its directory and keeps t
 
 **Git LFS** uses the installed Git LFS CLI. Enable repository filters, track patterns or exact filenames, mark patterns lockable, and stop tracking with confirmation. Stage .gitattributes with the affected files. Existing history is kept. Fetch/download objects, check out cached objects, and explicitly load remote locks. File unlocks verify ownership and never force another person's lock. Older CLI versions fall back to textual listings when JSON catalogs are unavailable.
 
+## Gitflow and bisect
+
+**Repository tools → Advanced → Gitflow** configures conventional production/development branches and feature/release/hotfix prefixes in repository-local Git configuration. A missing development branch is created from production. New features/releases start at development; hotfixes start at production. Starting a branch requires clean files.
+
+Finishing first saves a reviewable plan. Features merge into development. Releases/hotfixes merge into production, create an annotated tag, then merge production into development. Each step is explicit and checks source/destination revisions. Conflicts use the normal merge editor; after continuing or aborting that merge, reopen Gitflow to resume. Progress survives app restarts. Source branches stay by default; optional deletion is a final guarded step. Canceling a plan keeps completed merges/tags and recovery checkpoints. No step pushes or rewrites remote history.
+
+**Bisect** searches between full good/bad commit IDs, where good must be an ancestor of bad. Git records the bisection and M.I.E.R. explicitly checks out candidates without overwriting ignored files. Test each commit, then mark good, bad, or skip. The operation bar displays the log and final result. Ending requires confirmation and clean files, then returns to the original branch. Sessions begun in another client are also detected; marking a result adopts the same guarded checkout behavior.
+
+## Terminal and custom commands
+
+**Repository tools → Advanced → Terminal & custom commands** opens an installed terminal in the current repository. Terminal paths and working directories are passed as literal arguments.
+
+Custom commands are stored privately on this device, outside the repository. Save an executable, a JSON array of arguments, and a timeout (1–900 seconds); saving never runs it. **Run** executes the selected definition against the displayed checkout, with live stdout/stderr and **Cancel command**. App Git mutations are serialized while it runs, and repository status refreshes when it finishes or fails. Each output stream displays up to 512 KiB without stopping the process when the display limit is reached. Commands inherit the user's environment and permissions; shell syntax requires explicitly choosing a shell executable. They are never loaded or run automatically from repository configuration.
+
 ## Resolve conflicts
 
 An operation bar appears for merges, cherry-picks, rebases, reverts and patch application, including operations started in another client. Choose **Resolve conflicts** to open Changes.

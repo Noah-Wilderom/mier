@@ -583,6 +583,21 @@ export const services = {
     recentRepositories: async () => (await invoke<string[] | null>("main.WorkspaceService.RecentRepositories")) ?? [],
     rememberRepository: (path: string) => invoke<void>("main.WorkspaceService.RememberRepository", path),
   },
+  commands:{
+    list:()=>invoke<import('./repositoryToolTypes').CustomCommand[]>('main.CommandService.Commands'),
+    save:(command:import('./repositoryToolTypes').CustomCommand)=>invoke<import('./repositoryToolTypes').CustomCommand>('main.CommandService.SaveCommand',command),
+    delete:(id:string)=>invoke<void>('main.CommandService.DeleteCommand',id),
+    terminals:()=>invoke<import('./repositoryToolTypes').Terminal[]>('main.CommandService.Terminals'),
+    openTerminal:(root:string,id:string)=>invoke<void>('main.CommandService.OpenTerminal',root,id),
+    latest:(root:string)=>invoke<import('./repositoryToolTypes').CommandRun|null>('main.CommandService.Latest',root),
+    cancel:(id:string)=>invoke<void>('main.CommandService.Cancel',id),
+    execute:async(root:string,id:string,head:string,branch:string)=>{
+      let job=await invoke<import('./repositoryToolTypes').CommandRun>('main.CommandService.Start',root,id,head,branch)
+      while(job.status==='running'){await new Promise(resolve=>setTimeout(resolve,500));job=await invoke<import('./repositoryToolTypes').CommandRun>('main.CommandService.Run',job.id)}
+      if(job.status!=='completed')throw new Error(job.status==='canceled'?'Command canceled.':job.error||`Command exited with status ${job.exitCode}`)
+      return job
+    },
+  },
   sync: {
     startWatch: (request: WorkspaceWatchRequest) => invoke<void>("main.WorkspaceSyncService.StartWatch", request),
     stopWatch: (path: string) => invoke<void>("main.WorkspaceSyncService.StopWatch", path),
@@ -615,6 +630,9 @@ export const services = {
     setLabels: async (host: string, owner: string, repo: string, number: number, labels: string[]) => (await invoke<string[] | null>("main.GitHubService.SetLabels", host, owner, repo, number, labels)) ?? [],
   },
   repository: {
+    flow:(root:string)=>invoke<import('./repositoryToolTypes').FlowState>('main.RepositoryService.Flow',root),
+    mutateFlow:(root:string,request:import('./repositoryToolTypes').FlowRequest)=>invoke<import('./gitOperations').GitOperationResult>('main.RepositoryService.MutateFlow',root,request),
+    bisect:(root:string,request:import('./repositoryToolTypes').BisectRequest)=>invoke<import('./gitOperations').GitOperationResult>('main.RepositoryService.Bisect',root,request),
     exportPatch:(root:string,request:import('./repositoryToolTypes').ExportPatchRequest)=>invoke<string>('main.RepositoryService.ExportPatch',root,request),
     previewPatch:(root:string,request:import('./repositoryToolTypes').ApplyPatchRequest)=>invoke<import('./repositoryToolTypes').PatchPreview>('main.RepositoryService.PreviewPatch',root,request),
     applyPatch:(root:string,request:import('./repositoryToolTypes').ApplyPatchRequest)=>invoke<import('./gitOperations').GitOperationResult>('main.RepositoryService.ApplyPatch',root,request),

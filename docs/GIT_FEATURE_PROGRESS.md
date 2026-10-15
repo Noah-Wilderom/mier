@@ -19,8 +19,8 @@ An unchecked item is planned, not a supported capability. AI additions come last
 - [x] Worktree management
 - [x] Submodules and Git LFS
 - [x] Patch import and export
-- [ ] Gitflow and bisect
-- [ ] Terminal and custom commands
+- [x] Gitflow and bisect
+- [x] Terminal and custom commands
 - [ ] Stacked pull requests
 - [ ] GitLab, Bitbucket, and Azure DevOps review providers
 - [ ] AI commit / PR writing and branch explanations (last)

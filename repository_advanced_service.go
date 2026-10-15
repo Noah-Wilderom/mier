@@ -53,3 +53,21 @@ func (s *RepositoryService) LFSLocks(ctx context.Context, path, remote string) (
 	}
 	return s.client.LFSLocks(ctx, path, remote)
 }
+func (s *RepositoryService) Bisect(ctx context.Context, path string, request gitclient.BisectRequest) (gitclient.OperationResult, error) {
+	if s.initErr != nil {
+		return gitclient.OperationResult{}, s.initErr
+	}
+	return s.client.Bisect(ctx, path, request)
+}
+func (s *RepositoryService) Flow(ctx context.Context, path string) (gitclient.FlowState, error) {
+	if s.initErr != nil {
+		return gitclient.FlowState{}, s.initErr
+	}
+	return s.client.Flow(ctx, path)
+}
+func (s *RepositoryService) MutateFlow(ctx context.Context, path string, request gitclient.FlowRequest) (gitclient.OperationResult, error) {
+	if s.initErr != nil {
+		return gitclient.OperationResult{}, s.initErr
+	}
+	return s.client.MutateFlow(ctx, path, request)
+}

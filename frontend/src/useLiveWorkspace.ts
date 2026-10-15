@@ -330,6 +330,9 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
           case 'apply-patch':result=await services.repository.applyPatch(repo.root,mutation.request);break
           case 'submodule':await services.repository.mutateSubmodule(repo.root,mutation.request);break
           case 'lfs':await services.repository.mutateLFS(repo.root,mutation.request);break
+          case 'gitflow':result=await services.repository.mutateFlow(repo.root,mutation.request);break
+          case 'bisect':result=await services.repository.bisect(repo.root,mutation.request);break
+          case 'custom-command':await services.commands.execute(repo.root,mutation.id,repo.headSha??'',repo.currentBranch);break
           default:result=await services.repository.controlOperation(repo.root,mutation.token,mutation.kind)
         }
       } catch(issue){failure=issue}

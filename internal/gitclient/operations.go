@@ -117,6 +117,16 @@ func (c *Client) operation(ctx context.Context, root string, status RepositorySn
 		if fields := strings.Fields(identity); len(fields) > 0 {
 			op.SourceSHA = fields[0]
 		}
+	case exists("BISECT_START"):
+		op.Kind = "bisect"
+		op.SourceSHA = read("BISECT_HEAD")
+		if !objectID.MatchString(op.SourceSHA) {
+			op.SourceSHA = status.HeadSHA
+		}
+		op.SourceLabel = "Test commit " + shortSHA(op.SourceSHA)
+		op.Message = read("BISECT_LOG")
+		op.CurrentLabel = read("BISECT_START")
+		identity = op.Message + "\x00" + op.CurrentLabel
 	default:
 		return nil, nil
 	}
@@ -274,6 +284,17 @@ func (c *Client) ControlOperation(ctx context.Context, path, token, action strin
 		op := result.Operation
 		if op == nil || token == "" || token != op.Token {
 			return errors.New("The Git operation changed. Refresh before continuing or aborting")
+		}
+		if op.Kind == "bisect" {
+			if action != "abort" {
+				return errors.New("Mark the bisect commit as good, bad, or skipped")
+			}
+			state, err := c.status(ctx, root)
+			if err != nil {
+				return err
+			}
+			result, err = c.resetBisect(ctx, root, state)
+			return err
 		}
 		if action != "continue" && action != "abort" && action != "skip" {
 			return errors.New("Choose continue, abort, or skip")

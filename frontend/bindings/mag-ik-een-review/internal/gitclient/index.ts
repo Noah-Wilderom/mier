@@ -4,6 +4,7 @@
 export type {
     AmendRequest,
     ApplyPatchRequest,
+    BisectRequest,
     BlameLine,
     Branch,
     ChangedFile,
@@ -20,6 +21,10 @@ export type {
     DiscardRequest,
     ExportPatchRequest,
     FileStatus,
+    FlowConfig,
+    FlowRequest,
+    FlowSession,
+    FlowState,
     HistoryPage,
     HistoryQuery,
     LFSFile,

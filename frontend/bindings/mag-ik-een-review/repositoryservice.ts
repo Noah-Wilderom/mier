@@ -26,6 +26,10 @@ export function ApplyPatch(path: string, request: gitclient$0.ApplyPatchRequest)
     return $Call.ByID(2348057567, path, request);
 }
 
+export function Bisect(path: string, request: gitclient$0.BisectRequest): $CancellablePromise<gitclient$0.OperationResult> {
+    return $Call.ByID(2309197399, path, request);
+}
+
 export function Blame(path: string, revision: string, file: string): $CancellablePromise<gitclient$0.BlameLine[] | null> {
     return $Call.ByID(457949556, path, revision, file);
 }
@@ -118,6 +122,10 @@ export function Fetch(path: string, remote: string): $CancellablePromise<void> {
     return $Call.ByID(1738008659, path, remote);
 }
 
+export function Flow(path: string): $CancellablePromise<gitclient$0.FlowState> {
+    return $Call.ByID(3461403173, path);
+}
+
 export function HistoryPage(path: string, query: gitclient$0.HistoryQuery): $CancellablePromise<gitclient$0.HistoryPage> {
     return $Call.ByID(455601620, path, query);
 }
@@ -136,6 +144,10 @@ export function LFSLocks(path: string, remote: string): $CancellablePromise<gitc
 
 export function MergeBranch(path: string, request: gitclient$0.MergeBranchRequest): $CancellablePromise<gitclient$0.OperationResult> {
     return $Call.ByID(3469450919, path, request);
+}
+
+export function MutateFlow(path: string, request: gitclient$0.FlowRequest): $CancellablePromise<gitclient$0.OperationResult> {
+    return $Call.ByID(2223533743, path, request);
 }
 
 export function MutateLFS(path: string, request: gitclient$0.LFSRequest): $CancellablePromise<string> {

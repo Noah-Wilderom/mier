@@ -16,6 +16,15 @@ export interface ApplyPatchRequest {
     "token": string;
 }
 
+export interface BisectRequest {
+    "action": string;
+    "good": string;
+    "bad": string;
+    "expectedHead": string;
+    "expectedBranch": string;
+    "token": string;
+}
+
 export interface BlameLine {
     "sha": string;
     "originalLine": number;
@@ -153,6 +162,51 @@ export interface FileStatus {
     "conflict": boolean;
     "untracked": boolean;
     "submodule"?: string;
+}
+
+export interface FlowConfig {
+    "main": string;
+    "develop": string;
+    "featurePrefix": string;
+    "releasePrefix": string;
+    "hotfixPrefix": string;
+}
+
+export interface FlowRequest {
+    "action": string;
+    "config": FlowConfig;
+    "kind": string;
+    "name": string;
+    "tag": string;
+    "message": string;
+    "deleteBranch": boolean;
+    "expectedHead": string;
+    "expectedBranch": string;
+    "token": string;
+}
+
+export interface FlowSession {
+    "kind": string;
+    "source": string;
+    "sourceSha": string;
+    "config": FlowConfig;
+    "mainSha": string;
+    "developSha": string;
+    "tag": string;
+    "message": string;
+    "deleteBranch": boolean;
+    "stage": number;
+    "mergeTarget": string;
+    "mergeBefore": string;
+    "mergeSource": string;
+}
+
+export interface FlowState {
+    "config": FlowConfig;
+    "configured": boolean;
+    "kind": string;
+    "session"?: FlowSession | null;
+    "token": string;
 }
 
 export interface HistoryPage {
