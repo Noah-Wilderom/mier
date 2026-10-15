@@ -163,7 +163,8 @@ test('the full catalog searches file types, categories, installed SDKs, and pend
   withServers(desktop, servers)
   await openFixture(desktop)
   const section = await settings(page)
-  await expect(section.locator('article:visible')).toHaveCount(servers.length)
+  await expect(section.locator('article:visible')).toHaveCount(12)
+  await expect(section.locator('.language-server-result-count')).toHaveText(`1–12 of ${servers.length} servers`)
   expect(servers.length).toBeGreaterThanOrEqual(40)
   await expect(section.locator('.language-server-mark img')).toHaveCount(servers.length)
   const search = section.getByRole('searchbox', { name: 'Search language servers' })
@@ -176,7 +177,7 @@ test('the full catalog searches file types, categories, installed SDKs, and pend
   await expect(section.getByRole('heading', { name: 'GitHub Actions', exact: true })).toBeVisible()
   await section.getByRole('button', { name: 'Clear language server search' }).click()
   await section.getByRole('combobox', { name: 'Language server category' }).selectOption('Configuration')
-  await expect(section.locator('article:visible')).toHaveCount(servers.filter(server => server.category === 'Configuration').length)
+  await expect(section.locator('article:visible')).toHaveCount(Math.min(12, servers.filter(server => server.category === 'Configuration').length))
   await section.getByRole('combobox', { name: 'Language server category' }).selectOption('')
   await section.getByRole('button', { name: /^Installed/ }).click()
   await expect(section.locator('article:visible')).toHaveCount(2)
@@ -189,10 +190,10 @@ test('the full catalog searches file types, categories, installed SDKs, and pend
   await search.fill('not-a-language-server')
   await expect(section.getByText('No matching language servers', { exact: true })).toBeVisible()
   await section.getByRole('button', { name: 'Show all servers', exact: true }).click()
-  await expect(section.locator('article:visible')).toHaveCount(servers.length)
+  await expect(section.locator('article:visible')).toHaveCount(12)
 })
 
-test('custom configuration survives filtering and does not require a TypeScript SDK for other servers', async ({ desktop, page }) => {
+test('custom configuration survives filtering and pagination without requiring a TypeScript SDK for other servers', async ({ desktop, page }) => {
   const servers = catalogServers()
   withServers(desktop, servers)
   desktop.handlers.set('main.LSPService.ConfigureServer', args => {
@@ -211,11 +212,16 @@ test('custom configuration survives filtering and does not require a TypeScript 
   await expect(section.getByRole('textbox', { name: 'Dockerfile executable', exact: true })).not.toBeVisible()
   await section.getByRole('searchbox').fill('dockerfile')
   await expect(section.getByRole('textbox', { name: 'Dockerfile executable', exact: true })).toHaveValue('/custom/docker-langserver')
+  await section.getByRole('button', { name: 'Clear language server search' }).click()
+  await section.getByRole('button', { name: 'Next language server page' }).click()
+  await expect(section.getByRole('textbox', { name: 'Dockerfile executable', exact: true })).not.toBeVisible()
+  await section.getByRole('button', { name: 'Previous language server page' }).click()
+  await expect(section.getByRole('textbox', { name: 'Dockerfile executable', exact: true })).toHaveValue('/custom/docker-langserver')
   await section.getByRole('button', { name: 'Save configuration', exact: true }).click()
   await expect(section).toContainText('Language server configuration saved.')
 })
 
-test('filtering cannot hide cancellation of a running catalog installation', async ({ desktop, page }) => {
+test('filtering and pagination cannot hide cancellation of a running catalog installation', async ({ desktop, page }) => {
   const servers = catalogServers(), item = servers.find(server => server.language === 'dockerfile')!
   withServers(desktop, servers)
   desktop.handlers.set('main.LSPService.InstallServer', () => { item.managed.state = 'installing'; item.managed.progress = 'Installing Dockerfile…'; return null })
@@ -227,8 +233,80 @@ test('filtering cannot hide cancellation of a running catalog installation', asy
   await expect(section.getByText('Installing Dockerfile…', { exact: true })).toBeVisible()
   await section.getByRole('searchbox').fill('nginx')
   await expect(section.locator('.language-server-active-install')).toContainText('Installing Dockerfile…')
+  await section.getByRole('button', { name: 'Clear language server search' }).click()
+  await expect(section.locator('.language-server-active-install')).toHaveCount(0)
+  await section.getByRole('button', { name: 'Next language server page' }).click()
+  await expect(section.locator('.language-server-active-install')).toContainText('Installing Dockerfile…')
   await section.getByRole('button', { name: 'Cancel Dockerfile installation', exact: true }).click()
   await expect(section.locator('.language-server-active-install')).toHaveCount(0)
   await section.getByRole('searchbox').fill('dockerfile')
   await expect(section.getByText('Installation cancelled.', { exact: true })).toBeVisible()
+})
+
+test('catalog pagination visits every server once with equal card heights and aligned actions', async ({ desktop, page }) => {
+  const servers = catalogServers()
+  // Include cards with additional status text, version rows, and update badges.
+  for (const item of servers.slice(0, 3)) {
+    item.available = true
+    item.source = 'managed'
+    Object.assign(item.managed, { installedVersion: '1.0.0', latestVersion: '1.1.0', ready: true, updateAvailable: true })
+  }
+  withServers(desktop, servers)
+  await openFixture(desktop)
+  const section = await settings(page)
+  const navigation = section.getByRole('navigation', { name: 'Language server pages' })
+  const next = navigation.getByRole('button', { name: 'Next language server page' })
+  await expect(navigation.getByRole('button', { name: 'Previous language server page' })).toBeDisabled()
+  const pages = Math.ceil(servers.length / 12), visited: string[] = []
+  for (let current = 1; current <= pages; current++) {
+    const start = (current - 1) * 12, end = Math.min(start + 12, servers.length)
+    await expect(navigation.getByText(`Page ${current} of ${pages}`, { exact: true })).toBeVisible()
+    await expect(section.locator('.language-server-result-count')).toHaveText(`${start + 1}–${end} of ${servers.length} servers`)
+    const cards = section.locator('article:visible')
+    await expect(cards).toHaveCount(end - start)
+    const dimensions = await cards.evaluateAll(cards => cards.map(card => {
+      const rect = card.getBoundingClientRect(), actions = card.querySelector('.language-server-actions')!.getBoundingClientRect()
+      return { language: card.getAttribute('data-language')!, height: rect.height, inset: rect.bottom - actions.bottom, overflow: card.scrollHeight - card.clientHeight }
+    }))
+    expect(Math.max(...dimensions.map(card => card.height)) - Math.min(...dimensions.map(card => card.height))).toBeLessThanOrEqual(1)
+    expect(Math.max(...dimensions.map(card => card.inset)) - Math.min(...dimensions.map(card => card.inset))).toBeLessThanOrEqual(1)
+    expect(dimensions.every(card => card.overflow <= 1), 'status and requirement text must remain readable').toBe(true)
+    visited.push(...dimensions.map(card => card.language))
+    if (current < pages) {
+      await next.click()
+      await expect(section.locator(`article[data-language="${servers[end].language}"]`)).toBeFocused()
+    }
+  }
+  await expect(next).toBeDisabled()
+  expect(visited).toEqual(servers.map(server => server.language))
+  await section.getByRole('searchbox').fill('.github/workflows')
+  await expect(section.getByRole('heading', { name: 'GitHub Actions', exact: true })).toBeVisible()
+  await expect(navigation).toHaveCount(0)
+  await section.getByRole('button', { name: 'Clear language server search' }).click()
+  await expect(navigation.getByText(`Page 1 of ${pages}`, { exact: true })).toBeVisible()
+  await next.click()
+  await section.getByRole('combobox', { name: 'Language server category' }).selectOption('Configuration')
+  await expect(navigation.getByText(`Page 1 of ${Math.ceil(servers.filter(server => server.category === 'Configuration').length / 12)}`, { exact: true })).toBeVisible()
+  await section.getByRole('combobox', { name: 'Language server category' }).selectOption('')
+  await next.click()
+  await section.getByRole('button', { name: /^Installed/ }).click()
+  await expect(section.locator('article:visible')).toHaveCount(3)
+  await expect(navigation).toHaveCount(0)
+})
+
+test('update refresh clamps the page when pending results shrink', async ({ desktop, page }) => {
+  const servers = catalogServers()
+  for (const item of servers.slice(0, 13)) Object.assign(item.managed, { installedVersion: '1.0.0', latestVersion: '1.1.0', ready: true, updateAvailable: true })
+  withServers(desktop, servers)
+  await openFixture(desktop)
+  const section = await settings(page)
+  await section.getByRole('button', { name: /^Updates/ }).click()
+  await section.getByRole('button', { name: 'Next language server page' }).click()
+  await expect(section.locator('.language-server-result-count')).toHaveText('13–13 of 13 servers')
+  for (const item of servers.slice(1, 13)) item.managed.updateAvailable = false
+  await section.getByRole('button', { name: 'Check for language server updates' }).click()
+  await expect(section.locator('article:visible')).toHaveCount(1)
+  await expect(section.getByRole('heading', { name: servers[0].name, exact: true })).toBeVisible()
+  await expect(section.locator('.language-server-result-count')).toHaveText('1 server')
+  await expect(section.getByRole('navigation', { name: 'Language server pages' })).toHaveCount(0)
 })

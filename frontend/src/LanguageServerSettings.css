@@ -16,10 +16,12 @@
 .language-server-catalog-filters > button:hover, .language-server-catalog-filters > button.is-selected { color: var(--text); background: var(--panel); border-color: var(--border); }
 .language-server-catalog-filters > button > span { padding: 1px 5px; border-radius: 3px; color: var(--muted); background: var(--bg); font-size: 10px; font-variant-numeric: tabular-nums; }
 .language-server-result-count { margin-left: auto; color: var(--muted); font-size: 11px; }
-.language-server-list, .language-server-skeleton { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 12px; align-items: start; }
-.language-server-entry { padding: 15px; border: 1px solid var(--border); border-radius: 6px; min-width: 0; background: var(--panel); }
+.language-server-list, .language-server-skeleton { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); grid-auto-rows: 1fr; gap: 12px; align-items: stretch; scroll-margin-top: 16px; }
+.language-server-entry { display: flex; flex-direction: column; padding: 15px; border: 1px solid var(--border); border-radius: 6px; min-width: 0; min-height: 270px; background: var(--panel); }
 .language-server-entry[hidden] { display: none; }
 .language-server-entry.is-editing { grid-column: 1 / -1; }
+.language-server-list:has(> .is-editing:not([hidden])) { grid-auto-rows: auto; }
+.language-server-entry:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .language-server-summary { display: flex; align-items: center; gap: 10px; }
 .language-server-mark { display: grid; place-items: center; flex: 0 0 37px; width: 37px; height: 37px; border: 1px solid var(--border); border-radius: 5px; color: #344054; background: #f8fafc; }
 .language-server-mark img { display: block; width: 27px; height: 27px; object-fit: contain; color-scheme: light; }
@@ -35,7 +37,7 @@
 .language-server-files { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-top: 11px; min-height: 20px; }
 .language-server-files code, .language-server-files > span { max-width: 100%; overflow-wrap: anywhere; padding: 3px 5px; border-radius: 3px; border: 1px solid var(--border); color: var(--muted); background: var(--bg); font: 10px var(--mono); }
 .language-server-requirements { margin: 9px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
-.language-server-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
+.language-server-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; padding-top: 13px; margin-top: auto; }
 .language-server-actions .btn { min-height: 28px; padding: 4px 9px; font-size: 12px; gap: 5px; }
 .language-server-installation { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 7px 10px; font-size: 11px; }
 .language-server-installation:empty { display: none; }
@@ -72,5 +74,8 @@
 .language-server-active-install { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; padding: 11px; border: 1px solid var(--border); border-radius: 5px; color: var(--muted); font-size: 12px; }
 .language-server-active-install > span { flex: 1; line-height: 1.6; }
 .language-server-active-install strong { color: var(--text); font-weight: 500; }
+.language-server-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+.language-server-pagination > span { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.language-server-pagination .btn { min-height: 30px; padding: 5px 9px; font-size: 12px; gap: 5px; }
 @media (max-width: 600px) { .language-server-form { padding: 12px; } .language-server-form-actions { flex-wrap: wrap; } .language-server-form-actions > span { flex-basis: 100%; } .language-server-settings-heading { flex-wrap: wrap; gap: 12px; } .language-server-catalog-toolbar { flex-direction: column; } .language-server-catalog-toolbar > select { width: 100%; } }
 @media (prefers-reduced-motion: reduce) { .language-server-skeleton .skeleton, .language-server-settings .is-spinning { animation: none; } }

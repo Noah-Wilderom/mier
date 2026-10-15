@@ -8,6 +8,8 @@ import './LanguageServerSettings.css'
 
 export interface LanguageServerSettingsProps { root?: string; available?: boolean }
 
+const CATALOG_PAGE_SIZE = 12
+
 function ServerConfiguration({ server, busy, onSave, onCancel }: {
   server: LSPServerStatus
   busy: boolean
@@ -50,6 +52,8 @@ export default function LanguageServerSettings({ root, available }: LanguageServ
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<ServerFilter>('all')
   const [category, setCategory] = useState('')
+  const [page, setPage] = useState(1)
+  const catalog = useRef<HTMLDivElement>(null)
   const mounted = useRef(true)
   const pending = useRef(false)
   const selectedRoot = useRef(root ?? '')
@@ -59,11 +63,28 @@ export default function LanguageServerSettings({ root, available }: LanguageServ
   const enabled = available ?? nativeAvailable
   const busy = !!starting || servers.some(server => isInstalling(server.managed?.state))
   const visible = filterServers(servers, query, filter, category)
-  const visibleIDs = new Set(visible.map(server => server.language))
+  const pageCount = Math.max(1, Math.ceil(visible.length / CATALOG_PAGE_SIZE))
+  const currentPage = Math.min(page, pageCount)
+  const pageStart = (currentPage - 1) * CATALOG_PAGE_SIZE
+  const pageServers = visible.slice(pageStart, pageStart + CATALOG_PAGE_SIZE)
+  const visibleIDs = new Set(pageServers.map(server => server.language))
   const installed = servers.filter(installedServer).length
   const updates = servers.filter(server => server.managed?.updateAvailable).length
   const categories = [...new Set(servers.map(server => server.category || 'Languages'))].sort()
-  const hiddenInstall = servers.find(server => isInstalling(server.managed?.state) && !visible.some(item => item.language === server.language))
+  const hiddenInstall = servers.find(server => isInstalling(server.managed?.state) && !visibleIDs.has(server.language))
+
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount)
+  }, [page, pageCount])
+
+  const changePage = (next: number) => {
+    setPage(next)
+    requestAnimationFrame(() => {
+      const first = catalog.current?.querySelector<HTMLElement>('article:not([hidden])')
+      first?.focus({ preventScroll: true })
+      catalog.current?.scrollIntoView({ block: 'start' })
+    })
+  }
 
   const applyServers = (value: LSPServerStatus[]) => {
     const changed = value.some(server => {
@@ -95,6 +116,7 @@ export default function LanguageServerSettings({ root, available }: LanguageServ
     setError('')
     setStatus('')
     setEditing(undefined)
+    setPage(1)
     previousServers.current = []
     setServers([])
     setChecking(false)
@@ -225,21 +247,21 @@ export default function LanguageServerSettings({ root, available }: LanguageServ
     {!enabled ? <p className="language-server-intro">Language servers run in the desktop app.</p> : <>
       <p className="language-server-intro">Install servers for M.I.E.R. without changing your project dependencies. You can also use an existing SDK or executable.{!root && ' You can set up servers before opening a repository.'}</p>
       <div className="language-server-catalog-toolbar">
-        <label className="language-server-search"><Icon name="search" size={15} /><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search languages, servers, or file names…" aria-label="Search language servers" />{query && <button type="button" className="icon-button" aria-label="Clear language server search" onClick={() => setQuery('')}><Icon name="close" size={13} /></button>}</label>
-        <select className="input" aria-label="Language server category" value={category} onChange={event => setCategory(event.target.value)}><option value="">All categories</option>{categories.map(value => <option key={value}>{value}</option>)}</select>
+        <label className="language-server-search"><Icon name="search" size={15} /><input type="search" value={query} onChange={event => {setQuery(event.target.value);setPage(1)}} placeholder="Search languages, servers, or file names…" aria-label="Search language servers" />{query && <button type="button" className="icon-button" aria-label="Clear language server search" onClick={() => {setQuery('');setPage(1)}}><Icon name="close" size={13} /></button>}</label>
+        <select className="input" aria-label="Language server category" value={category} onChange={event => {setCategory(event.target.value);setPage(1)}}><option value="">All categories</option>{categories.map(value => <option key={value}>{value}</option>)}</select>
       </div>
       <div className="language-server-catalog-filters" aria-label="Language server filters">
-        {([{key:'all',label:'All servers',count:servers.length},{key:'installed',label:'Installed',count:installed},{key:'updates',label:'Updates',count:updates}] as const).map(item => <button className={filter === item.key ? 'is-selected' : ''} key={item.key} type="button" aria-pressed={filter === item.key} onClick={() => setFilter(item.key)}>{item.label}<span>{item.count}</span></button>)}
-        <span className="language-server-result-count" aria-live="polite">{loading ? 'Loading catalog…' : `${visible.length} ${visible.length === 1 ? 'server' : 'servers'}`}</span>
+        {([{key:'all',label:'All servers',count:servers.length},{key:'installed',label:'Installed',count:installed},{key:'updates',label:'Updates',count:updates}] as const).map(item => <button className={filter === item.key ? 'is-selected' : ''} key={item.key} type="button" aria-pressed={filter === item.key} onClick={() => {setFilter(item.key);setPage(1)}}>{item.label}<span>{item.count}</span></button>)}
+        <span className="language-server-result-count" aria-live="polite">{loading ? 'Loading catalog…' : visible.length > CATALOG_PAGE_SIZE ? `${pageStart + 1}–${pageStart + pageServers.length} of ${visible.length} servers` : `${visible.length} ${visible.length === 1 ? 'server' : 'servers'}`}</span>
       </div>
       {hiddenInstall && <div className="language-server-active-install" role="status"><Icon name="refresh" size={14} className="is-spinning" /><span><strong>{hiddenInstall.name}</strong> · {hiddenInstall.managed.progress || 'Installing…'}</span><button type="button" className="btn" disabled={cancelling || hiddenInstall.managed.state === 'cancelling'} aria-label={`Cancel ${hiddenInstall.name} installation`} onClick={() => {void cancelInstall(hiddenInstall.language)}}>Cancel</button></div>}
-      {loading ? <div className="language-server-skeleton" role="status" aria-label="Checking language servers"><span className="sr-only">Checking language servers…</span>{[0, 1, 2, 3].map(index => <div key={index} aria-hidden="true"><span className="skeleton" /><span className="skeleton" /></div>)}</div> : <div className="language-server-list" aria-busy={saving || busy}>{servers.map(server => {
+      {loading ? <div className="language-server-skeleton" role="status" aria-label="Checking language servers"><span className="sr-only">Checking language servers…</span>{[0, 1, 2, 3].map(index => <div key={index} aria-hidden="true"><span className="skeleton" /><span className="skeleton" /></div>)}</div> : <div className="language-server-list" id="language-server-catalog" ref={catalog} aria-busy={saving || busy}>{servers.map(server => {
         const tool = server.managed
         const installing = starting === server.language || isInstalling(tool?.state)
         const action = !tool?.installedVersion ? (tool?.installError ? 'Retry install' : 'Install') : !tool.ready ? 'Reinstall' : tool.updateAvailable ? (tool.installError ? 'Retry update' : 'Update') : 'Installed'
         const blocked = !!tool?.prerequisiteError
         const external = server.installMethod === 'external'
-        return <article className={`language-server-entry${editing === server.language ? ' is-editing' : ''}`} key={server.language} aria-labelledby={`language-server-title-${server.language}`} data-language={server.language} data-category={server.category || 'Languages'} hidden={!visibleIDs.has(server.language)}>
+        return <article className={`language-server-entry${editing === server.language ? ' is-editing' : ''}`} key={server.language} aria-labelledby={`language-server-title-${server.language}`} data-language={server.language} data-category={server.category || 'Languages'} hidden={!visibleIDs.has(server.language)} tabIndex={-1}>
           <div className="language-server-summary">
             <span className="language-server-mark" aria-hidden="true">{languageServerLogo(server.language) ? <img src={languageServerLogo(server.language)} width={27} height={27} alt="" loading="lazy" draggable={false} /> : <Icon name="code" size={23} />}</span>
             <div><h4 id={`language-server-title-${server.language}`}>{server.name}</h4><span className={server.available ? 'text-green' : 'muted'}><Icon name={server.available ? 'check-circle' : 'code'} size={12} />{server.available ? `Available · ${server.source === 'managed' ? 'M.I.E.R. installation' : server.source === 'project' ? 'Project dependency' : server.source === 'configured' ? 'Configured executable' : 'PATH'}` : external ? 'Use your SDK or executable' : tool?.installedVersion ? 'Needs repair' : server.configuration.command ? 'Needs setup' : 'Not installed'}</span></div>
@@ -270,7 +292,12 @@ export default function LanguageServerSettings({ root, available }: LanguageServ
           </div>}
         </article>
       })}</div>}
-      {!loading && !visible.length && <div className="language-server-empty" role="status"><Icon name="search" size={22} /><strong>{filter === 'updates' && !query && !category ? 'No pending updates' : 'No matching language servers'}</strong><p>{filter === 'installed' && !query && !category ? 'Install a server from the catalog or configure an existing executable.' : 'Try another search or choose a different category.'}</p><button className="btn" type="button" onClick={() => {setQuery('');setCategory('');setFilter('all')}}>Show all servers</button></div>}
+      {!loading && pageCount > 1 && <nav className="language-server-pagination" aria-label="Language server pages">
+        <button className="btn" type="button" aria-label="Previous language server page" aria-controls="language-server-catalog" disabled={currentPage === 1} onClick={() => changePage(currentPage - 1)}><Icon name="chevron-left" size={14} />Previous</button>
+        <span aria-live="polite">Page {currentPage} of {pageCount}</span>
+        <button className="btn" type="button" aria-label="Next language server page" aria-controls="language-server-catalog" disabled={currentPage === pageCount} onClick={() => changePage(currentPage + 1)}>Next<Icon name="chevron-right" size={14} /></button>
+      </nav>}
+      {!loading && !visible.length && <div className="language-server-empty" role="status"><Icon name="search" size={22} /><strong>{filter === 'updates' && !query && !category ? 'No pending updates' : 'No matching language servers'}</strong><p>{filter === 'installed' && !query && !category ? 'Install a server from the catalog or configure an existing executable.' : 'Try another search or choose a different category.'}</p><button className="btn" type="button" onClick={() => {setQuery('');setCategory('');setFilter('all');setPage(1)}}>Show all servers</button></div>}
       <p className="language-server-status" role="status">{status}</p>
       {error && <p className="language-server-error" role="alert">{error}</p>}
     </>}
