@@ -9,6 +9,10 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 // @ts-ignore: Unused imports
 import * as githubclient$0 from "./internal/githubclient/models.js";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as $models from "./models.js";
+
 export function AddIssueComment(host: string, owner: string, repo: string, $number: number, body: string): $CancellablePromise<githubclient$0.Comment> {
     return $Call.ByID(2942416265, host, owner, repo, $number, body);
 }
@@ -39,6 +43,10 @@ export function GetPullRequest(host: string, owner: string, repo: string, $numbe
 
 export function GetPullRequestStack(host: string, owner: string, repo: string, $number: number): $CancellablePromise<githubclient$0.PullRequestStack> {
     return $Call.ByID(443589082, host, owner, repo, $number);
+}
+
+export function GetReviewFile(request: $models.ReviewFileRequest): $CancellablePromise<$models.ReviewFileContent> {
+    return $Call.ByID(1860123312, request);
 }
 
 export function GetWorkflowDispatch(host: string, owner: string, repo: string, id: number, reference: string): $CancellablePromise<githubclient$0.WorkflowDispatch> {

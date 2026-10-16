@@ -530,6 +530,16 @@ async function invokeTickets<T>(provider: 'jira' | 'linear', method: string, req
 }
 
 export const services = {
+  predictions:{
+    status:(scope:import('./predictionTypes').PredictionScope={})=>invoke<import('./predictionTypes').PredictionStatus>('main.PredictionService.GetStatus',scope),
+    connect:(key:string)=>invoke<import('./predictionTypes').PredictionModel[]>('main.PredictionService.Connect',key),
+    models:()=>invoke<import('./predictionTypes').PredictionModel[]>('main.PredictionService.Models'),
+    save:(scope:import('./predictionTypes').PredictionScope,model:string,enabled:boolean)=>invoke<void>('main.PredictionService.SaveSettings',scope,model,enabled),
+    disconnect:()=>invoke<void>('main.PredictionService.Disconnect'),
+    evaluate:(request:import('./predictionTypes').PredictionRequest,signal?:AbortSignal)=>invokeLSP<import('./predictionTypes').PredictionResult>('main.PredictionService.Evaluate',request,signal),
+    feedback:(scope:import('./predictionTypes').PredictionScope,id:string,useful:boolean)=>invoke<void>('main.PredictionService.Feedback',scope,id,useful),
+    evaluation:()=>invoke<import('./predictionTypes').PredictionFeedback[]>('main.PredictionService.Evaluation'),
+  },
   reviewProviders: {
     connections:()=>invoke<ReviewConnection[]>('main.ReviewProviderService.Connections'),
     connect:(request:ReviewConnectRequest)=>invoke<AccountStatus>('main.ReviewProviderService.Connect',request),
@@ -638,6 +648,7 @@ export const services = {
     listAccounts: async () => (await invoke<Account[] | null>("main.CredentialService.ListAccounts")) ?? [],
   },
   github: {
+    reviewFile:(request:import('./diffContext').ReviewFileRequest,signal?:AbortSignal)=>invokeLSP<import('./diffContext').ReviewFileContent>('main.GitHubService.GetReviewFile',request,signal),
     stack:(host:string,owner:string,repo:string,number:number)=>invoke<import('./repositoryToolTypes').PullRequestStack>('main.GitHubService.GetPullRequestStack',host,owner,repo,number),
     retarget:(host:string,owner:string,repo:string,number:number,request:{base:string;expectedBase:string;expectedHead:string})=>invoke<PullRequestSummary>('main.GitHubService.RetargetPullRequest',host,owner,repo,number,request),
     getCommitDiff: (host: string, owner: string, repo: string, sha: string) => invoke<{sha:string; files:GitHubChangedFile[]; warnings:string[]}>("main.GitHubService.GetCommitDiff", host, owner, repo, sha),

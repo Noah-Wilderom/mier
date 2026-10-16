@@ -85,3 +85,9 @@
   .app-shell .staging-group { min-height: 60px; }
   .app-shell .commit-form textarea { min-height: 50px; height: 60px; }
 }
+
+/* The focus header occupies the titlebar that the normal sidebar reserves.
+   Keep the safe area even in native fullscreen: macOS reveals its controls
+   when the pointer reaches the top edge. */
+:root[data-platform="darwin"] .app-shell.review-focused {grid-template-rows:50px minmax(0,1fr) 27px;}
+:root[data-platform="darwin"] .app-shell.review-focused .app-topbar {padding-left:calc(14px + var(--native-titlebar-inset,80px));min-height:50px;}

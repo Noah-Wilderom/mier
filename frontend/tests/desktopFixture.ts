@@ -62,6 +62,7 @@ export async function desktopFixture(page: Page) {
       const handler = fixture.handlers.get(name)
       if (handler) result = await handler(args)
       else switch (name) {
+        case 'main.PredictionService.GetStatus': result={configured:false,enabled:false,model:'jev-1.13.0',error:''};break;
         case 'main.ReviewProviderService.Connections': result=[]; break;
         case 'main.WorkspaceService.ChooseRepository': result = fixture.selected; break
         case 'main.WorkspaceService.RecentRepositories': result = fixture.recent; break

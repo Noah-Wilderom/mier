@@ -43,6 +43,20 @@ function TicketReview({ pr, children }: ReviewProps) {
   const [selection, setSelection] = useState<{ context: string; key: string }>(), [issue, setIssue] = useState<TicketIssue>(), [issueError, setIssueError] = useState(''), [issueLoading, setIssueLoading] = useState(false), [issueAttempt, setIssueAttempt] = useState(0)
   const selected = status?.connected && selection?.context === context ? selection.key : undefined
   const setSelected = (key: string | undefined) => setSelection(key ? { context, key } : undefined)
+  useEffect(()=>{
+    const inspect=(event:Event)=>{
+      const detail=(event as CustomEvent).detail
+      if(!request||!detail||detail.host!==request.repository.host||detail.owner!==request.repository.owner||detail.repo!==request.repository.repo||detail.number!==request.number||!['jira','linear'].includes(detail.provider)||typeof detail.key!=='string')return
+      const target=detail.provider as TicketProvider
+      const targetStatus=target==='jira'?jira.status:linear.status
+      if(!targetStatus?.connected)return
+      const targetWorkspace=target==='jira'?jira.status?.defaultSiteId:linear.status?.workspace?.id
+      setProviderChoice(target)
+      setSelection({context:`${target}:${targetWorkspace||''}:${request.repository.host}/${request.repository.owner}/${request.repository.repo}#${request.number}`,key:detail.key})
+    }
+    window.addEventListener('mier:inspect-review-ticket',inspect)
+    return()=>window.removeEventListener('mier:inspect-review-ticket',inspect)
+  },[request,jira.status,linear.status])
   const [searchOpen, setSearchOpen] = useState(false), [query, setQuery] = useState(''), [matches, setMatches] = useState<TicketIssue[]>([]), [searchError, setSearchError] = useState(''), [searching, setSearching] = useState(false)
   const [mappingOpen, setMappingOpen] = useState(false), [site, setSite] = useState(''), [projects, setProjects] = useState(''), [field, setField] = useState(''), [saving, setSaving] = useState(false)
   const panel = useRef<HTMLElement>(null), restoreFocus = useRef<HTMLElement>(), focusFirst = useRef(false)

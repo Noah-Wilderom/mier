@@ -193,3 +193,12 @@
   background: var(--blue-soft);
   box-shadow: inset 3px 0 var(--blue);
 }
+
+.review-context-controls { display:flex;align-items:center;gap:12px;padding:4px 12px;background:var(--panel);border-block:1px solid var(--border);font-size:12px; }
+.review-context-controls .btn {min-height:27px;font-size:12px;}
+.review-full-file {display:flex;flex-direction:column;min-height:280px;height:min(72vh,800px);overflow:hidden;}
+.repository-modal:has(.review-full-file) {width:min(1200px,94vw);max-width:94vw;}
+.review-full-file-tools {padding:12px 18px;display:flex;gap:20px;flex-wrap:wrap;border-bottom:1px solid var(--border);font-size:12px;}
+.review-full-file-tools label {display:flex;gap:8px;align-items:center;}
+.review-full-file-tools select {padding:5px;color:var(--text);background:var(--panel);border:1px solid var(--border);border-radius:4px;}
+.review-entire-file {font-size:12px;white-space:nowrap;}

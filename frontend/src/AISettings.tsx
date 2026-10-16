@@ -3,6 +3,7 @@ import { hasNativeBackend, services } from "./services";
 import { openWebURL } from "./native";
 import type { AILogin, AIPreferences, AIProviderStatus } from "./aiTypes";
 import "./AIReview.css";
+import PredictionSettings from "./PredictionSettings";
 import { AIModelLogo } from "./AIModelPicker";
 
 const defaults: AIPreferences = {
@@ -286,6 +287,7 @@ export default function AISettings() {
           AI providers are available in the desktop app.
         </p>
       )}
+      <PredictionSettings/>
       <h3>MCP tools</h3>
       <p>
         Open a pull request’s AI review pane and choose{" "}

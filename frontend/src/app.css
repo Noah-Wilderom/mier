@@ -1769,6 +1769,7 @@ kbd {
   width: 230px;
 }
 .toast {
+  pointer-events: none;
   position: fixed;
   bottom: 42px;
   right: 20px;
@@ -1789,6 +1790,7 @@ kbd {
   color: var(--accent);
 }
 .toast .icon-button {
+  pointer-events: auto;
   margin-left: 7px;
   width: 23px;
   height: 23px;

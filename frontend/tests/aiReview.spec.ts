@@ -59,6 +59,15 @@ async function openReview(desktop: Awaited<ReturnType<typeof desktopFixture>>) {
   ).toBeEnabled();
 }
 
+test('Jev triage annotates completed findings without accepting or hiding them',async({desktop,page})=>{
+ desktop.handlers.set('main.AIService.SavePreferences',()=>null);
+ desktop.handlers.set('main.AIService.GetReview',()=>review({state:'completed',findings:[finding],summary:'Review complete.'}));
+ desktop.handlers.set('main.AIService.StartReview',()=>review({state:'completed',findings:[finding],summary:'Review complete.'}));
+ desktop.handlers.set('main.PredictionService.GetStatus',()=>({configured:true,enabled:true,model:'jev-1.13.0',error:''}));
+ desktop.handlers.set('main.PredictionService.Evaluate',args=>{expect(args[0]).toMatchObject({kind:'findings',runId:'review-a',headSha:headSHA,baseSha:baseSHA});return{id:'triage-a',kind:'findings',model:'jev-1.13.0',headSha:headSHA,questionVersion:'mier-jev-1',createdAt:new Date().toISOString(),cached:false,durationMs:250,usage:{input_tokens:300,output_tokens:0},warnings:[],rows:[{id:'finding_0_evidence',findingId:finding.id,path:finding.path,line:finding.line,side:finding.side,label:'Source support',answer:{type:'choice',choice:'needs_evidence',confidence:.5,probabilities:{needs_evidence:.75,supported:.25}},options:{needs_evidence:'More source or contract evidence is needed',supported:'Source supports the claim'}}]}});
+ await openReview(desktop);await page.getByRole('button',{name:'Start AI review',exact:true}).click();await page.getByRole('button',{name:'Assess finding evidence with Jev'}).click();const panel=page.getByRole('region',{name:'Assess finding evidence with Jev'});await panel.getByRole('button',{name:'Start assessment',exact:true}).click();await expect(page.getByRole('article',{name:'AI finding at src/feature.ts:1'})).toContainText('Jev · Source support: More source or contract evidence is needed');await expect(page.getByRole('button',{name:'Add to review',exact:true})).toBeEnabled();expect(desktop.calls.filter(call=>/SubmitReview|AddReviewComment/.test(call.name))).toHaveLength(0)
+});
+
 test("model logos and all three intensities reach native reviews through the chat composer", async ({
   desktop,
   page,
@@ -707,6 +716,8 @@ test("late review starts survive navigation and older findings become outdated a
   desktop.handlers.set("main.AIService.GetReview", () => current);
   desktop.handlers.set("main.AIService.SavePreferences", () => null);
   await openReview(desktop);
+  // Opening the repository can leave a toast over this action. Its status
+  // text must not block the review button; the dismiss control stays usable.
   await page
     .getByRole("button", { name: "Start AI review", exact: true })
     .click();

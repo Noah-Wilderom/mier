@@ -13,6 +13,9 @@ import * as lspclient$0 from "./internal/lspclient/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as reviewagent$0 from "./internal/reviewagent/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as typesafe$0 from "./internal/typesafe/models.js";
 
 export interface AIActionRequest {
     "root": string;
@@ -264,6 +267,73 @@ export interface PRNotificationEvent {
     "createdAt": string;
 }
 
+/**
+ * Feedback deliberately contains no source, ticket bodies, prompts or findings.
+ */
+export interface PredictionFeedback {
+    "id": string;
+    "kind": string;
+    "model": string;
+    "useful": boolean;
+    "durationMs": number;
+    "createdAt": string;
+}
+
+export interface PredictionRequest {
+    "scope": PredictionScope;
+    "kind": string;
+    "pullRequest": number;
+    "headSha": string;
+    "baseSha": string;
+    "runId"?: string;
+    "path"?: string;
+    "conflictToken"?: string;
+    "jobId"?: number;
+}
+
+export interface PredictionResult {
+    "id": string;
+    "kind": string;
+    "model": string;
+    "questionVersion": string;
+    "headSha"?: string;
+    "baseSha"?: string;
+    "rows": PredictionRow[] | null;
+    "warnings": string[] | null;
+    "usage": typesafe$0.Usage;
+    "durationMs": number;
+    "createdAt": string;
+    "cached": boolean;
+}
+
+export interface PredictionRow {
+    "id": string;
+    "label": string;
+    "path"?: string;
+    "line"?: number;
+    "side"?: string;
+    "findingId"?: string;
+    "ticketProvider"?: string;
+    "ticketKey"?: string;
+    "excerpt"?: string;
+    "answer": typesafe$0.Answer;
+    "options"?: { [_ in string]?: string } | null;
+}
+
+export interface PredictionScope {
+    "host": string;
+    "owner": string;
+    "repo": string;
+    "root"?: string;
+}
+
+export interface PredictionStatus {
+    "configured": boolean;
+    "enabled": boolean;
+    "model": string;
+    "error": string;
+}
+
 export type ReadDefinitionRequest = lspclient$0.ReadDefinitionRequest;
 
 export type RepositorySnapshot = gitclient$0.RepositorySnapshot;
@@ -287,6 +357,32 @@ export interface ReviewConnection {
     "name": string;
     "avatarUrl": string;
     "disabled": boolean;
+}
+
+export interface ReviewFileContent {
+    "path": string;
+    "previousPath": string;
+    "headSha": string;
+    "baseSha": string;
+    "mergeBaseSha": string;
+    "old": string;
+    "new": string;
+    "oldExists": boolean;
+    "newExists": boolean;
+}
+
+/**
+ * Both sides are captured from the PR's immutable comparison, including fork
+ * heads and renamed paths. This deliberately bypasses LSP workspace preparation.
+ */
+export interface ReviewFileRequest {
+    "host": string;
+    "owner": string;
+    "repository": string;
+    "pullRequest": number;
+    "headSha": string;
+    "baseSha": string;
+    "path": string;
 }
 
 export interface Terminal {

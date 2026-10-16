@@ -110,7 +110,7 @@ test("switching PRs retains the selected file, diff layout and unfinished inline
   await page
     .locator(".review-unified-row.diff-add")
     .getByRole("button", {
-      name: "Comment on line 1 in src/second.ts",
+      name: "Comment on changed line 1 in src/second.ts",
       exact: true,
     })
     .click();

@@ -3,6 +3,7 @@ import { services } from './services'
 import { conflictChunks, containsConflictMarkers, resolveChunk, type ConflictFile, type GitMutation, type ResolveConflictRequest } from './gitOperations'
 import { Icon } from './Icon'
 import './GitOperations.css'
+import PredictionPanel from './PredictionPanel'
 import { DEFAULT_CODE_REVIEW_PREFERENCES, effectiveCodeTheme, getCodeAppearance, getCodeReviewPreferences, subscribeCodeAppearance, subscribeCodeReviewPreferences } from './codeReviewPreferences'
 import { highlightCodeLines, syntaxTokenStyle, type HighlightedCode } from './syntaxHighlighter'
 
@@ -88,6 +89,7 @@ export default function ConflictEditor({ root, path, headSha, operationToken, bu
     {reloadConfirm&&<div className="git-confirm" role="alert"><span>Reload this file and discard your unsaved result?</span><button className="btn" onClick={()=>setReloadConfirm(false)}>Keep editing</button><button className="btn" onClick={reloadFile}>Discard result and reload</button></div>}
     {error&&<div className="git-operation-error" role="alert">{error}{!file&&<button className="btn" disabled={loading} onClick={()=>setReload(n=>n+1)}>Retry conflict</button>}</div>}
     {loading?<p className="conflict-loading" role="status">Loading conflict versions…</p>:file&&<>
+      {file.editable&&<PredictionPanel label="Conflict investigation with Jev" request={{kind:'conflict',scope:{root},path,conflictToken:file.token,headSha:headSha??''}}/>}
       {file.reason&&<p className="conflict-notice">{file.reason}</p>}
       {file.editable?<>
         <nav className="conflict-navigation" aria-label="Conflict sections"><strong>{active?`Section ${Math.min(index,chunks.length-1)+1} of ${chunks.length}`:'All sections resolved'}</strong><span className="conflict-shortcuts" title="Alt+Up/Down: previous/next; Alt+1/2: accept side; Alt+3/4: accept both in each order">Alt+↑/↓ · Alt+1–4</span><button className="icon-button" aria-label="Previous conflict" disabled={locked||!active||index===0} onClick={()=>setIndex(n=>Math.max(0,n-1))}><Icon name="chevron-up"/></button><button className="icon-button" aria-label="Next conflict" disabled={locked||!active||index>=chunks.length-1} onClick={()=>setIndex(n=>n+1)}><Icon name="chevron-down"/></button><label className="checkbox-label"><input type="checkbox" checked={showBase} onChange={e=>setShowBase(e.target.checked)}/>Show base</label></nav>

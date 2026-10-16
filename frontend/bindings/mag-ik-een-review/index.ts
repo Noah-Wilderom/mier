@@ -10,6 +10,7 @@ import * as IntegrationService from "./integrationservice.js";
 import * as LSPService from "./lspservice.js";
 import * as LinearService from "./linearservice.js";
 import * as PRNotificationService from "./prnotificationservice.js";
+import * as PredictionService from "./predictionservice.js";
 import * as RepositoryService from "./repositoryservice.js";
 import * as ReviewProviderService from "./reviewproviderservice.js";
 import * as WorkspaceService from "./workspaceservice.js";
@@ -24,6 +25,7 @@ export {
     LSPService,
     LinearService,
     PRNotificationService,
+    PredictionService,
     RepositoryService,
     ReviewProviderService,
     WorkspaceService,
@@ -70,10 +72,18 @@ export type {
     LinearWorkspace,
     NotificationPreferences,
     PRNotificationEvent,
+    PredictionFeedback,
+    PredictionRequest,
+    PredictionResult,
+    PredictionRow,
+    PredictionScope,
+    PredictionStatus,
     ReadDefinitionRequest,
     RepositorySnapshot,
     ReviewConnectRequest,
     ReviewConnection,
+    ReviewFileContent,
+    ReviewFileRequest,
     Terminal,
     Ticket,
     TicketComment,

@@ -73,7 +73,7 @@ test('GitLab inline review carries stable draft IDs and the displayed head',asyn
   desktop.handlers.set('main.GitHubService.SubmitReview',args=>{const input=args[4];expect(input.commitId).toBe(headSHA);expect(input.event).toBe('COMMENT');expect(input.comments).toHaveLength(1);expect(input.comments[0]).toMatchObject({body:'Check this value',path:'src/feature.ts',line:1,side:'RIGHT'});expect(input.comments[0].clientId).toBeTruthy();return {id:99,user:{login:'reviewer'},body:'Summary',state:'COMMENTED',commitId:headSHA,submittedAt:new Date().toISOString()}})
   await page.locator('.pr-list-item').filter({hasText:'Review 12'}).click()
   await page.getByRole('button',{name:'Unified',exact:true}).click()
-  await page.locator('.review-unified-row.diff-add').getByRole('button',{name:'Comment on line 1 in src/feature.ts',exact:true}).click()
+  await page.locator('.review-unified-row.diff-add').getByRole('button',{name:'Comment on changed line 1 in src/feature.ts',exact:true}).click()
   await page.locator('#new-review-comment').fill('Check this value')
   await page.locator('.review-inline-composer').getByRole('button',{name:'Add to review',exact:true}).click()
   await page.getByRole('button',{name:/^Finish review/}).click()

@@ -1,5 +1,7 @@
 # AI assistance
 
+For optional Jev review prioritization, finding triage, ticket coverage, CI triage and conflict guidance, see [Jev assessments](PREDICTIONS.md).
+
 M.I.E.R. can review a PR from a [connected review provider](REVIEW_PROVIDERS.md) with your ChatGPT subscription through Codex, or your GitHub Copilot account through the official Copilot SDK. Copilot still uses your separate GitHub account. Open a PR, choose **Review with AI**, select a provider/model and intensity, and start. Use **Expand code area** for more code space. The assistant docks beside the editor when there is room and below it in smaller review areas.
 
 The same connections also support commit and PR drafting, branch explanations, conflict proposals, and coding worktrees. These actions use assistant-ui, provider/model logos, three intensity choices, and the same activity and usage display. Starting a task shares the captured changes and requested source with the selected provider. Nothing starts automatically.

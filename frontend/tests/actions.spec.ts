@@ -134,6 +134,12 @@ test("Actions loads real job logs, step groups and safe searchable output", asyn
   expect(request.args).toEqual(["github.com", "fork", "app", 99]);
 });
 
+test("Jev classifies a job failure without rerunning or cancelling it",async({desktop,page})=>{
+ desktop.handlers.set('main.PredictionService.GetStatus',()=>({configured:true,enabled:true,model:'jev-1.13.0',error:''}));
+ desktop.handlers.set('main.PredictionService.Evaluate',args=>{expect(args[0]).toEqual({kind:'ci',scope:{host:'github.com',owner:'fork',repo:'app'},jobId:99});return{id:'ci-a',kind:'ci',model:'jev-1.13.0',questionVersion:'mier-jev-1',createdAt:new Date().toISOString(),cached:false,durationMs:200,usage:{input_tokens:250,output_tokens:0},warnings:[],rows:[{id:'ci_category',label:'Likely failure category',answer:{type:'choice',choice:'build',confidence:.8,probabilities:{build:.9,unknown:.1}},options:{build:'Compiler, type checker, linter or packaging error',unknown:'Insufficient evidence'}}]}});
+ await openActions(desktop);await page.getByRole('button',{name:/Review workflow 12/}).click();await page.getByRole('button',{name:'Assess job failure with Jev'}).click();const panel=page.getByRole('region',{name:'Assess job failure with Jev'});await panel.getByRole('button',{name:'Start assessment',exact:true}).click();await expect(panel).toContainText('Compiler, type checker, linter or packaging error');await expect(page.locator('.actions-log-output')).toContainText('Failure in attempt 2');expect(desktop.calls.filter(call=>call.name.endsWith('.MutateWorkflowRun'))).toHaveLength(0)
+});
+
 test("run filters, pagination and retries preserve useful results", async ({
   desktop,
   page,

@@ -13,6 +13,7 @@ import { Icon } from "./Icon";
 import Modal from "./Modal";
 import { openWebURL } from "./native";
 import "./Actions.css";
+import PredictionPanel from "./PredictionPanel";
 
 export function ActionsStatus({
   status,
@@ -139,6 +140,7 @@ export function JobLogs({
         </button>
         <ActionsLink url={job.url} label="View job on GitHub" />
       </div>
+      {log.data?.state==="available"&&job.conclusion!=="success"&&<PredictionPanel label="Assess job failure with Jev" request={{kind:"ci",scope:repository,jobId:job.id}}/>}
       <ActionsError
         error={log.error}
         retry={log.refresh}

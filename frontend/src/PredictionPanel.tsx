@@ -1,0 +1,31 @@
+import {useEffect,useRef,useState,type ReactNode} from 'react'
+import {services} from './services'
+import {PREDICTIONS_CHANGED,predictionValue,type PredictionRequest,type PredictionResult,type PredictionRow} from './predictionTypes'
+import PredictionSettings,{usePredictionStatus} from './PredictionSettings'
+import {Icon} from './Icon'
+import './Predictions.css'
+export default function PredictionPanel({request,label='Jev insights',onResult,onInspect,controls,children,available=true}:{request:PredictionRequest;label?:string;onResult?:(result:PredictionResult|undefined)=>void;onInspect?:(row:PredictionRow)=>void;controls?:ReactNode;children?:ReactNode;available?:boolean}){
+ const [open,setOpen]=useState(false),[settings,setSettings]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('')
+ const [saved,setSaved]=useState<{key:string;result:PredictionResult}>(),[rated,setRated]=useState<boolean>(),[ratingBusy,setRatingBusy]=useState(false)
+ const status=usePredictionStatus(request.scope,open),key=JSON.stringify(request)
+ const current=useRef(key);current.current=key
+ const abort=useRef<AbortController>(),guard=useRef(false),notify=useRef(onResult);notify.current=onResult
+ const result=saved?.key===key?saved.result:undefined
+ useEffect(()=>{setBusy(false);guard.current=false;setError('');setRated(undefined);notify.current?.(undefined);return()=>abort.current?.abort()},[key])
+ useEffect(()=>{const changed=()=>{abort.current?.abort();setSaved(undefined);setBusy(false);guard.current=false;setRated(undefined);notify.current?.(undefined)};window.addEventListener(PREDICTIONS_CHANGED,changed);return()=>window.removeEventListener(PREDICTIONS_CHANGED,changed)},[])
+ const start=async()=>{if(guard.current||!status.status?.enabled)return;guard.current=true;const controller=new AbortController();abort.current=controller;setBusy(true);setError('');setSaved(undefined);setRated(undefined);notify.current?.(undefined)
+  try{const value=await services.predictions.evaluate(request,controller.signal);if(!controller.signal.aborted&&current.current===key){setSaved({key,result:value});notify.current?.(value)}}catch(issue){if(!controller.signal.aborted&&current.current===key)setError(issue instanceof Error?issue.message:String(issue))}finally{if(abort.current===controller){guard.current=false;setBusy(false)}}}
+ const rate=async(value:boolean)=>{if(!result||ratingBusy)return;setRatingBusy(true);try{await services.predictions.feedback(request.scope,result.id,value);if(current.current===key)setRated(value)}catch(issue){if(current.current===key)setError(String(issue))}finally{setRatingBusy(false)}}
+ const toggle=<button type="button" className="btn btn-ghost prediction-toggle" aria-expanded={open} onClick={()=>setOpen(value=>!value)}><span className="jev-mark" aria-hidden="true">Jev</span>{label}<Icon name={open?'chevron-up':'chevron-down'} size={12}/></button>
+ const panel=open?<div className="prediction-panel"><div className="prediction-panel-controls">{controls}<span className="muted">{status.status?.model??'TypeSafe'} · optional assessment</span><button className="btn btn-ghost" onClick={()=>setSettings(value=>!value)}>{settings?'Hide settings':'Configure Jev'}</button>{busy?<button className="btn" onClick={()=>{abort.current?.abort();guard.current=false;setBusy(false)}}>Cancel assessment</button>:<button className="btn" disabled={!status.status?.configured||!status.status.enabled} onClick={()=>void start()}>{result?'Assess again':'Start assessment'}</button>}</div>
+ {(settings||status.status&&!status.status.enabled)&&<PredictionSettings scope={request.scope}/>}
+ {(status.error||status.status?.error)&&<p className="prediction-error" role="alert">{status.error||status.status?.error}</p>}
+ {busy&&<p role="status">Capturing context and asking Jev…</p>}{error&&<p className="prediction-error" role="alert">{error}</p>}
+ {result&&<><p className="prediction-metadata">{result.model} · {(result.durationMs/1000).toFixed(2)}s{result.cached?' · cached result (no new model call)':''} · {result.usage.input_tokens??'Unreported'} input / {result.usage.output_tokens??'unreported'} output tokens · Charge not reported</p><div className="prediction-rows">{result.rows.map(row=><article key={row.id} className="prediction-row"><header><strong>{row.ticketKey?`${row.ticketProvider} · ${row.ticketKey} · `:''}{row.path?`${row.path} · `:''}{row.label}</strong>{(row.path||row.ticketKey)&&onInspect&&<button className="btn btn-ghost" onClick={()=>onInspect(row)}>{row.path?'View code':'View ticket'}</button>}</header><p>{predictionValue(row)}</p>{row.excerpt&&<pre>{row.excerpt}</pre>}{row.answer.confidence!==undefined&&<small>Model certainty: {Math.round(row.answer.confidence*100)}% · uncalibrated for this repository</small>}{row.answer.probabilities&&<details><summary>Option probabilities</summary><dl>{Object.entries(row.answer.probabilities).map(([option,p])=><div key={option}><dt>{row.options?.[option]??option}</dt><dd>{Math.round(p*100)}%</dd></div>)}</dl></details>}</article>)}</div><details className="prediction-warnings"><summary>Scope and limitations ({result.warnings.length})</summary><ul>{result.warnings.map((note,i)=><li key={i}>{note}</li>)}</ul></details><div className="prediction-feedback"><span>Was this useful?</span><button className="btn btn-ghost" aria-pressed={rated===true} disabled={ratingBusy} onClick={()=>void rate(true)}>Useful</button><button className="btn btn-ghost" aria-pressed={rated===false} disabled={ratingBusy} onClick={()=>void rate(false)}>Not useful</button>{rated!==undefined&&<span role="status">Saved for this app session</span>}</div></>}
+ </div>:null
+ if(children){
+  if(!available)return <>{children}</>
+  return <section className={`prediction-container prediction-workspace ${open?'has-insights':''}`} aria-label={label}><div className="prediction-dock-toggle">{toggle}</div><div className="prediction-workspace-layout"><div className="prediction-workspace-main">{children}</div>{panel&&<aside className="prediction-workspace-aside" aria-label="Jev assessment results">{panel}</aside>}</div></section>
+ }
+ return <section className="prediction-container" aria-label={label}>{toggle}{panel}</section>
+}

@@ -15,6 +15,11 @@ function setupConflict(desktop:Awaited<ReturnType<typeof desktopFixture>>) {
   return repo
 }
 
+test('Jev conflict guidance preserves manual result edits and staged state',async({desktop,page})=>{
+ setupConflict(desktop);desktop.handlers.set('main.PredictionService.GetStatus',()=>({configured:true,enabled:true,model:'jev-1.13.0',error:''}));desktop.handlers.set('main.PredictionService.Evaluate',args=>{expect(args[0]).toMatchObject({kind:'conflict',scope:{root},path:'src/feature.ts',conflictToken:'conflict-1'});return{id:'conflict-a',kind:'conflict',model:'jev-1.13.0',questionVersion:'mier-jev-1',createdAt:new Date().toISOString(),cached:false,durationMs:200,usage:{input_tokens:400,output_tokens:0},warnings:[],rows:[{id:'conflict_route',label:'Suggested next step',path:'src/feature.ts',answer:{type:'choice',choice:'manual',confidence:.7,probabilities:{manual:.85,agent:.15}},options:{manual:'Inspect the disagreement manually',agent:'Ask the coding assistant'}}]}})
+ await openFixture(desktop);await page.getByRole('button',{name:'Resolve conflicts',exact:true}).click();const editor=page.getByRole('region',{name:'Resolve conflict in src/feature.ts'});await editor.getByLabel('Merged result').fill('My carefully merged result\n');await editor.getByRole('button',{name:'Conflict investigation with Jev'}).click();const panel=editor.getByRole('region',{name:'Conflict investigation with Jev'});await panel.getByRole('button',{name:'Start assessment',exact:true}).click();await expect(panel).toContainText('Inspect the disagreement manually');await expect(editor.getByLabel('Merged result')).toContainText('My carefully merged result');expect(desktop.calls.filter(c=>/ResolveConflict|ControlOperation/.test(c.name))).toHaveLength(0)
+})
+
 test('a conflict presents both sources, keeps the result editable, and continues only after saving',async({desktop,page})=>{
   const repo=setupConflict(desktop)
   desktop.handlers.set('main.RepositoryService.ResolveConflict',args=>{expect(args[1]).toEqual({path:'src/feature.ts',token:'conflict-1',choice:'result',content:'before\nconst value = 2\nconst value = 3\nafter\n'});repo.changes=repo.changes!.map(file=>({...file,conflict:false,unstaged:false,indexStatus:'M',worktreeStatus:'.'}));repo.operation={...op,conflicts:0}})

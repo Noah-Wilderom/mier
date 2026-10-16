@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
 import type { PullRequest } from "./data";
 import { aiReviewActive, type AIFinding, type AIReview } from "./aiTypes";
+import PredictionPanel from "./PredictionPanel";
+import {predictionValue,type PredictionResult} from "./predictionTypes";
 import { Markdown } from "./Markdown";
 
 export function AIReviewFindings({
@@ -20,6 +22,7 @@ export function AIReviewFindings({
   onInspect: (finding: AIFinding) => void;
   onOpenComment: (id: string, path: string) => void;
 }) {
+  const [triage,setTriage]=useState<{runId:string;result:PredictionResult}>();
   const [selected, setSelected] = useState<string[]>([]);
   const [editing, setEditing] = useState<string>();
   const [body, setBody] = useState("");
@@ -59,6 +62,7 @@ export function AIReviewFindings({
   if (!run.findings.length) return null;
   return (
     <section className="ai-findings" aria-label="AI findings">
+      {!active&&pr.provider&&<PredictionPanel label="Assess finding evidence with Jev" request={{kind:"findings",scope:{host:pr.provider.host,owner:pr.provider.owner,repo:pr.provider.repo},pullRequest:pr.number,headSha:pr.headSha,baseSha:pr.baseSha,runId:run.id}} onResult={result=>setTriage(result?{runId:run.id,result}:undefined)} onInspect={row=>{const finding=run.findings.find(f=>f.id===row.findingId);if(finding)onInspect(finding)}}/>}
       <h3>Findings · {run.findings.length}</h3>
       <p className="muted">
         {active
@@ -131,6 +135,7 @@ export function AIReviewFindings({
                 {finding.side === "old" ? "Original" : "Changed"}
               </span>
             </header>
+            {triage?.runId===run.id&&triage.result.rows.filter(row=>row.findingId===finding.id).map(row=><p className="ai-finding-state" key={row.id}>Jev · {row.label}: {predictionValue(row)}</p>)}
             <Markdown>{finding.body}</Markdown>
             {isAdded ? (
               <p className="ai-finding-state" role="status">
