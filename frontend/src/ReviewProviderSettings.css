@@ -1,0 +1,14 @@
+.review-provider-settings{margin-top:28px;border-top:1px solid var(--border);padding-top:22px}
+.review-provider-card{border:1px solid var(--border);border-radius:6px;margin-top:12px;padding:16px;min-width:0}
+.review-provider-heading{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.review-provider-heading>div{flex:1;min-width:180px}
+.review-provider-heading h3{margin:0;font-size:14px}
+.review-provider-heading p{margin:4px 0 0;font-size:12px;color:var(--muted)}
+.review-provider-account{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:12px;margin-top:12px}
+.review-provider-account>div{flex:1;min-width:180px;display:grid;gap:4px}
+.review-provider-account span{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.review-provider-form{display:grid;gap:12px;border-top:1px solid var(--border);margin-top:16px;padding-top:16px}
+.review-provider-form label:not(.checkbox-label){display:grid;gap:6px}
+.review-provider-form input:not([type=checkbox]){width:100%;min-width:0}
+.review-provider-buttons{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.review-provider-buttons>span{flex:1}

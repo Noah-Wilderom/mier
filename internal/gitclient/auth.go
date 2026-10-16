@@ -43,13 +43,18 @@ func (c *Client) authenticatedRun(ctx context.Context, root string, timeout time
 	if parsed.User != nil {
 		username := parsed.User.Username()
 		password, exists := parsed.User.Password()
-		if !exists || password == "" {
-			credential = "x-access-token:" + username
-		} else {
+		if exists && password != "" {
 			credential = username + ":" + password
 		}
-	} else if c.options.CredentialProvider != nil {
-		token, providerErr := c.options.CredentialProvider(ctx, strings.ToLower(parsed.Host))
+	}
+	if credential == "" && (c.options.CredentialResolver != nil || c.options.CredentialProvider != nil) {
+		username, token := "x-access-token", ""
+		var providerErr error
+		if c.options.CredentialResolver != nil {
+			username, token, providerErr = c.options.CredentialResolver(ctx, strings.ToLower(parsed.Host))
+		} else {
+			token, providerErr = c.options.CredentialProvider(ctx, strings.ToLower(parsed.Host))
+		}
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
@@ -60,7 +65,10 @@ func (c *Client) authenticatedRun(ctx context.Context, root string, timeout time
 			if strings.ContainsAny(token, "\r\n\x00") || len(token) > 16*1024 {
 				return nil, errors.New("The stored Git token is invalid; reconnect the account")
 			}
-			credential = "x-access-token:" + token
+			if strings.ContainsAny(username, "\r\n\x00:") {
+				return nil, errors.New("The stored Git username is invalid; reconnect the account")
+			}
+			credential = username + ":" + token
 			secrets = append(secrets, token)
 		}
 	}

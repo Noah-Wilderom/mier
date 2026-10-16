@@ -265,7 +265,27 @@ func (c *Client) remotes(ctx context.Context, root string) ([]Remote, error) {
 		if result[i].PushURL == "" {
 			result[i].PushURL = result[i].FetchURL
 		}
-		result[i].Host, result[i].Owner, result[i].Repository, result[i].Provider = remoteMetadata(result[i].FetchURL)
+		identityURL := result[i].FetchURL
+		if expanded, err := c.run(ctx, root, c.options.LocalTimeout, "remote", "get-url", "--", result[i].Name); err == nil {
+			candidate := redactCredentials(strings.TrimSpace(string(expanded)))
+			// Local mirrors keep the configured hosting identity for PR APIs.
+			// Network rewrites identify the real host (including SSH aliases).
+			if host, _, _, _ := remoteMetadata(candidate); host != "" {
+				identityURL = candidate
+			}
+		}
+		result[i].Host, result[i].Owner, result[i].Repository, result[i].Provider = remoteMetadata(identityURL)
+		if result[i].Provider == "unknown" && sshRemote(identityURL) {
+			if host, err := c.sshHost(ctx, result[i].Host); err == nil && host != "" {
+				result[i].Host = host
+				_, _, _, result[i].Provider = remoteMetadata("ssh://git@" + host + "/identity/repo.git")
+			}
+		}
+		if c.options.ProviderResolver != nil {
+			if provider := c.options.ProviderResolver(result[i].Host); provider != "" {
+				result[i].Provider = provider
+			}
+		}
 	}
 	return result, nil
 }
@@ -284,16 +304,31 @@ func remoteMetadata(raw string) (host, owner, repository, provider string) {
 			return
 		}
 		host, path = strings.ToLower(parsed.Host), parsed.Path
+		if strings.EqualFold(parsed.Scheme, "ssh") || strings.EqualFold(parsed.Scheme, "git") {
+			host = strings.ToLower(parsed.Hostname())
+		}
 	} else if match := scpRemote.FindStringSubmatch(raw); len(match) == 3 && !filepath.IsAbs(raw) {
 		host, path = strings.ToLower(match[1]), match[2]
 	} else {
 		return
 	}
 	segments := strings.Split(strings.TrimSuffix(strings.Trim(path, "/"), ".git"), "/")
+	if (host == "ssh.dev.azure.com" || strings.HasSuffix(host, ".visualstudio.com")) && len(segments) == 4 && segments[0] == "v3" {
+		return "dev.azure.com", segments[1] + "/" + segments[2], segments[3], "azure"
+	}
+	if host == "dev.azure.com" && len(segments) == 4 && segments[2] == "_git" {
+		return host, segments[0] + "/" + segments[1], segments[3], "azure"
+	}
+	if strings.HasSuffix(host, ".visualstudio.com") && len(segments) == 3 && segments[1] == "_git" {
+		return "dev.azure.com", strings.TrimSuffix(host, ".visualstudio.com") + "/" + segments[0], segments[2], "azure"
+	}
 	if len(segments) >= 2 {
 		owner, repository = strings.Join(segments[:len(segments)-1], "/"), segments[len(segments)-1]
 	}
 	switch host {
+	case "ssh.github.com":
+		host = "github.com"
+		provider = "github"
 	case "github.com":
 		provider = "github"
 	case "gitlab.com":

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"regexp"
-	"strconv"
 	"strings"
 )
 
@@ -40,7 +39,7 @@ func (c *Client) ArchiveCommit(ctx context.Context, path string, request CommitA
 		if request.ComparisonHead != "" {
 			revisions = append(revisions, strings.ToLower(request.ComparisonHead))
 		}
-		fetched := false
+		fetched := map[string]bool{}
 		for _, wanted := range revisions {
 			if present(wanted) {
 				continue
@@ -72,15 +71,28 @@ func (c *Client) ArchiveCommit(ctx context.Context, path string, request CommitA
 			if err := validateRemoteURL(remote.fetchSource); err != nil {
 				return err
 			}
-			ref := "refs/pull/" + strconv.Itoa(request.PullRequest) + "/head"
-			if !fetched {
-				if _, err := c.authenticatedRun(ctx, root, c.options.RemoteTimeout, remote.fetchSource, "fetch", "--no-tags", "--no-write-fetch-head", "--recurse-submodules=no", "--refmap=", "--", remote.Name, ref); err != nil {
-					return err
+			source, err := c.pullRequestSource(ctx, root, remote, request.PullRequest)
+			if err != nil {
+				return err
+			}
+			endpoint, ref := source.HeadURL, source.HeadRef
+			if request.ComparisonHead != "" && wanted == revision {
+				endpoint, ref = source.BaseURL, source.BaseRef
+			}
+			key := endpoint + "\x00" + ref
+			if ref != "" && !fetched[key] {
+				if _, err := c.authenticatedRun(ctx, root, c.options.RemoteTimeout, endpoint, "fetch", "--no-tags", "--no-write-fetch-head", "--recurse-submodules=no", "--refmap=", "--", endpoint, ref); err != nil {
+					if ctx.Err() != nil {
+						return ctx.Err()
+					}
+					// Reviewed branches can be deleted after merge. The immutable
+					// commit below may still be available from the same repository.
+				} else {
+					fetched[key] = true
 				}
-				fetched = true
 			}
 			if !present(wanted) {
-				if _, err := c.authenticatedRun(ctx, root, c.options.RemoteTimeout, remote.fetchSource, "fetch", "--no-tags", "--no-write-fetch-head", "--recurse-submodules=no", "--refmap=", "--", remote.Name, wanted); err != nil {
+				if _, err := c.authenticatedRun(ctx, root, c.options.RemoteTimeout, endpoint, "fetch", "--no-tags", "--no-write-fetch-head", "--recurse-submodules=no", "--refmap=", "--", endpoint, wanted); err != nil {
 					return err
 				}
 			}

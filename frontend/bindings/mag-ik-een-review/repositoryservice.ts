@@ -50,6 +50,10 @@ export function CheckoutPullRequest(path: string, $number: number, remote: strin
     return $Call.ByID(4036037655, path, $number, remote);
 }
 
+export function CheckoutReviewedPullRequest(path: string, $number: number, remote: string, expectedHead: string): $CancellablePromise<void> {
+    return $Call.ByID(2743525788, path, $number, remote, expectedHead);
+}
+
 export function Checkpoints(path: string): $CancellablePromise<gitclient$0.Checkpoint[] | null> {
     return $Call.ByID(869117268, path);
 }

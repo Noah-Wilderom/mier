@@ -5,7 +5,7 @@ import { repositoryName, type RepositoryCard } from './RepositorySelector'
 import { readReviewDrafts, restoreReviewDraft, reviewDraftStorageKey, type SavedReviewDraft } from './reviewDrafts'
 import { hasNativeBackend, services, subscribeWorkspaceUpdates, type AccountStatus, type PullRequestPageQuery, type PullRequestSummary, type RepositorySnapshot, type WorkspaceUpdate } from './services'
 import type { GitAction } from './gitWorkspace'
-import { preferredRemote, gitHubIdentity as identityFor } from './gitWorkspace'
+import { preferredRemote, knownCount, reviewIdentity as identityFor } from './gitWorkspace'
 import type { GitMutation, GitOperationResult } from './gitOperations'
 import { aiPendingComment, mergePendingComments, type AIFinding, type AIReview } from './aiTypes'
 
@@ -100,8 +100,8 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
       for(const retained of prsRef.current.filter(pr=>pr.provider?.detailLoaded||pr.number===selectedRef.current||openedPullRequests.current.has(pr.number)))if(!items.some(pr=>pr.number===retained.number))items.push(retained)
       pageNumbersRef.current=numbers;setPullRequestNumbers(numbers);setItems(items)
       pageCursor.current=page.nextCursor;setHasMorePullRequests(page.hasNextPage)
-      setPullRequestTotal(page.totalCount);setOpenPullRequestCount(page.openCount);setPullRequestResultLimit(page.resultLimit??0)
-      setRepositoryCards(cards=>({...cards,[repo.root]:{...cards[repo.root],path:repo.root,name:repo.name,openPullRequests:page.openCount,loadingPullRequests:false}}))
+      setPullRequestTotal(knownCount(page.totalCount));setOpenPullRequestCount(knownCount(page.openCount));setPullRequestResultLimit(page.resultLimit??0)
+      setRepositoryCards(cards=>({...cards,[repo.root]:{...cards[repo.root],path:repo.root,name:repo.name,openPullRequests:knownCount(page.openCount)??undefined,loadingPullRequests:false}}))
       setError(authenticationError.current)
       setUpdatedAt(new Date().toISOString())
     }).catch(issue=>{
@@ -135,19 +135,19 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
   },[enabled,repository?.root,account?.host,account?.authenticated,pullRequestQuery,resetPullRequestPage,loadPullRequestPage])
   useEffect(()=>()=>clearTimeout(pendingSearch.current),[])
   const applyUpdate=useCallback((update:WorkspaceUpdate)=>{
-    if(update.repository||update.pullRequests||update.error||update.openPullRequestCount!==undefined)setRepositoryCards(cards=>({...cards,[update.path]:{...cards[update.path],path:update.path,name:update.repository?.name??cards[update.path]?.name??repositoryName(update.path),branch:update.repository?.currentBranch??cards[update.path]?.branch,host:update.host||cards[update.path]?.host,owner:update.owner||cards[update.path]?.owner,repo:update.repo||cards[update.path]?.repo,...(update.pullRequests||update.error?{loadingPullRequests:false}:{}),...(update.openPullRequestCount!==undefined?{openPullRequests:update.openPullRequestCount}:{})}}))
+    if(update.repository||update.pullRequests||update.error||update.openPullRequestCount!==undefined)setRepositoryCards(cards=>({...cards,[update.path]:{...cards[update.path],path:update.path,name:update.repository?.name??cards[update.path]?.name??repositoryName(update.path),branch:update.repository?.currentBranch??cards[update.path]?.branch,host:update.host||cards[update.path]?.host,owner:update.owner||cards[update.path]?.owner,repo:update.repo||cards[update.path]?.repo,...(update.pullRequests||update.error?{loadingPullRequests:false}:{}),...(update.openPullRequestCount!==undefined?{openPullRequests:knownCount(update.openPullRequestCount)??undefined}:{})}}))
     if(!enabledRef.current)return
     if(update.path!==repoRef.current?.root)return
     if(update.repository && Date.parse((update as WorkspaceUpdate & {repositoryUpdatedAt?:string}).repositoryUpdatedAt??update.updatedAt)>localMutationAt.current){repoRef.current=update.repository;setRepository(update.repository)}
     const identity=repoRef.current&&identityFor(repoRef.current)
     const eventIdentity=update.host&&update.owner&&update.repo?{host:update.host,owner:update.owner,repo:update.repo}:undefined
-    if(JSON.stringify(identity)!==JSON.stringify(eventIdentity)){
+    if(identity?.host!==eventIdentity?.host||identity?.owner!==eventIdentity?.owner||identity?.repo!==eventIdentity?.repo){
       const epoch=++activeEpoch.current;authenticationError.current='';selectedRef.current=0;openedPullRequests.current.clear();resetPullRequestPage();setItems([]);setSelected(0);setOpenPullRequestCount(null);setLoadingPullRequests(!!identity);setAccount(null);detailRequests.current.clear();latestRevisions.current.clear()
       void services.sync.startWatch({path:update.path,host:identity?.host??'',owner:identity?.owner??'',repo:identity?.repo??''}).catch(issue=>{if(epoch===activeEpoch.current){setLoadingPullRequests(false);setError(String(issue))}})
       if(identity)void services.credentials.accountStatus(identity.host).then(status=>{if(epoch!==activeEpoch.current)return;setAccount(status);authenticationError.current=status.authenticated?'':status.error||`Connect your account for ${identity.host} to load pull requests.`;if(status.authenticated)configureGitHubAccount(status);else{setLoadingPullRequests(false);setError(authenticationError.current)}}).catch(issue=>{if(epoch===activeEpoch.current){authenticationError.current=issue instanceof Error?issue.message:String(issue);setLoadingPullRequests(false);setError(authenticationError.current)}})
       return
     }
-    if(update.openPullRequestCount!==undefined)setOpenPullRequestCount(update.openPullRequestCount)
+    if(update.openPullRequestCount!==undefined)setOpenPullRequestCount(knownCount(update.openPullRequestCount))
     if(update.pullRequests&&identity){const updated=new Map(update.pullRequests.map(raw=>[raw.number,raw]));setItems(prsRef.current.map(previous=>{const raw=updated.get(previous.number);return raw?mergeSummary(raw,identity):previous}))}
     if(update.pullRequest&&identity)applyDetail(mapPullRequest(update.pullRequest,identity))
     setError(update.error||authenticationError.current)
@@ -208,6 +208,17 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
     if(!status.authenticated)throw new Error(status.error||`No account connected for ${host}. Run gh auth login --hostname ${host} or save a token.`)
     if(isActiveAccount)configureGitHubAccount(status);setError('');if(repoRef.current&&isActiveAccount){setEnabled(true);if(account?.authenticated)await refresh();else await services.sync.refresh(repoRef.current.root)}notify(`Connected as ${status.login} on ${status.host}.`)
   },epoch)},[account?.authenticated,perform,refresh,notify])
+  const providerChanged=useCallback(async(host:string)=>{
+    const repo=repoRef.current,epoch=activeEpoch.current
+    if(!repo||identityFor(repo)?.host.toLowerCase()!==host.toLowerCase())return
+    const [snapshot,status]=await Promise.all([services.repository.snapshot(repo.root),services.credentials.accountStatus(host)])
+    if(epoch!==activeEpoch.current)return
+    repoRef.current=snapshot;setRepository(snapshot);setAccount(status)
+    authenticationError.current=status.authenticated?'':status.error||`Connect your account for ${host} in Settings.`
+    setError(authenticationError.current)
+    if(status.authenticated){configureGitHubAccount(status);await loadPullRequestPage();await services.sync.refresh(repo.root)}
+    else{resetPullRequestPage();setItems([]);setSelected(0);selectedRef.current=0;setOpenPullRequestCount(null)}
+  },[loadPullRequestPage,resetPullRequestPage,setItems])
   const selectPullRequest=useCallback((number:number)=>{
     selectedRef.current=number;setSelected(number)
     const repo=repoRef.current;if(!repo)return
@@ -278,8 +289,10 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
         case 'checkout':await services.repository.checkout(repo.root,String(argument));break
         case 'checkoutPullRequest':{
           const identity=identityFor(repo),source=repo.remotes?.find(item=>item.host===identity?.host&&item.owner===identity?.owner&&item.repository===identity?.repo)?.name
-          if(!source)throw new Error('This repository needs a matching GitHub remote to check out a pull request.')
-          await services.repository.checkoutPullRequest(repo.root,Number(argument),source);break
+          if(!source)throw new Error('This repository needs a matching remote to check out a pull request.')
+          const pr=prsRef.current.find(pr=>pr.number===Number(argument))
+          if(!pr?.headSha)throw new Error('Load the pull request before checking out its source branch.')
+          await services.repository.checkoutPullRequest(repo.root,Number(argument),source,pr.headSha);break
         }
         case 'createBranch':await services.repository.createBranch(repo.root,String(argument));break
         case 'createAndCheckoutBranch':await services.repository.createAndCheckoutBranch(repo.root,String(argument));break
@@ -380,5 +393,5 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
   const inboxPullRequests=useMemo(()=>{const byNumber=new Map(prs.map(pr=>[pr.number,pr]));return pullRequestNumbers.flatMap(number=>{const pr=byNumber.get(number);return pr?[pr]:[]})},[prs,pullRequestNumbers])
   const loadMorePullRequests=useCallback(()=>loadPullRequestPage(true),[loadPullRequestPage])
   const retryPullRequests=useCallback(()=>loadPullRequestPage(pageNumbersRef.current.length>0),[loadPullRequestPage])
-  return {available,enabled,repository,identity:repository?identityFor(repository):undefined,prs,inboxPullRequests,account,recent,repositoryCards,busy,openingRepository,loadingPullRequests,loadingMorePullRequests,hasMorePullRequests,pullRequestTotal,openPullRequestCount,pullRequestResultLimit,pullRequestPageError,setPullRequestQuery,loadMorePullRequests,retryPullRequests,retainPullRequests,error,updatedAt,selected,history:mapped?.history??emptyHistory,changes:mapped?.changes??emptyChanges,branch:mapped?.branch??'',openRepository,connect,selectPullRequest,updatePullRequest,appendAISuggestions,acceptNewCommits,retarget,merge,create,git,operate,diff,commitDiff,refresh,useDemo}
+  return {available,enabled,repository,identity:repository?identityFor(repository):undefined,prs,inboxPullRequests,account,recent,repositoryCards,busy,openingRepository,loadingPullRequests,loadingMorePullRequests,hasMorePullRequests,pullRequestTotal,openPullRequestCount,pullRequestResultLimit,pullRequestPageError,setPullRequestQuery,loadMorePullRequests,retryPullRequests,retainPullRequests,error,updatedAt,selected,history:mapped?.history??emptyHistory,changes:mapped?.changes??emptyChanges,branch:mapped?.branch??'',openRepository,connect,providerChanged,selectPullRequest,updatePullRequest,appendAISuggestions,acceptNewCommits,retarget,merge,create,git,operate,diff,commitDiff,refresh,useDemo}
 }

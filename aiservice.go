@@ -398,7 +398,7 @@ func (s *AIService) start(ctx context.Context, request AIReviewRequest, external
 			s.mu.Unlock()
 		}
 	}()
-	client, err := s.github.client(ctx, request.Host)
+	client, err := s.github.reviewClient(ctx, request.Host)
 	if err != nil {
 		return AIConnection{}, err
 	}
@@ -441,8 +441,9 @@ func (s *AIService) start(ctx context.Context, request AIReviewRequest, external
 					break
 				}
 			}
-		} else if parts := strings.Split(changes.PullRequest.Head.Repository, "/"); len(parts) == 2 && parts[0] != "" && parts[1] != "" {
-			owner, repository = parts[0], parts[1]
+		} else if full := changes.PullRequest.Head.Repository; strings.LastIndex(full, "/") > 0 {
+			last := strings.LastIndex(full, "/")
+			owner, repository = full[:last], full[last+1:]
 		}
 		text, err := client.ReadFileAtCommit(ctx, owner, repository, path, revision)
 		if err != nil {

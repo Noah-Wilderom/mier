@@ -10,6 +10,22 @@ export interface RepositoryIdentity {
   host: string;
   owner: string;
   repo: string;
+  kind?: ReviewProviderKind;
+}
+export type ReviewProviderKind = 'github' | 'gitlab' | 'bitbucket' | 'azure';
+export interface ReviewCapabilities {
+  comments:boolean; inlineComments:boolean; approve:boolean; requestChanges:boolean;
+  resolveThreads:boolean; draft:boolean; merge:boolean; reviewers:boolean;
+  assignees:boolean; labels:boolean; retarget:boolean; actions:boolean;
+  reopen?:boolean;
+}
+export interface ReviewConnection {
+  kind:Exclude<ReviewProviderKind,'github'>; host:string; username:string; organization:string;
+  readOnly:boolean; login:string; name:string; avatarUrl:string; disabled:boolean;
+}
+export interface ReviewConnectRequest {
+  kind:Exclude<ReviewProviderKind,'github'>; host:string; username:string; organization:string;
+  readOnly:boolean; token:string;
 }
 
 export interface NotificationPreferences {
@@ -124,6 +140,8 @@ export interface AccountStatus {
   source: "saved" | "gh" | "";
   cliInstalled: boolean;
   error?: string;
+  provider?: ReviewProviderKind;
+  readOnly?: boolean;
 }
 
 export interface Account {
@@ -169,6 +187,7 @@ export interface GitHubBranch {
 }
 
 export interface PullRequestSummary {
+  provider?: ReviewProviderKind;
   number: number;
   nodeId: string;
   title: string;
@@ -305,6 +324,7 @@ export interface GitHubCommitStatus {
 }
 
 export interface PullRequestDetail {
+  capabilities?: ReviewCapabilities;
   pullRequest: PullRequestSummary;
   files: GitHubChangedFile[] | null;
   commits: GitHubCommit[] | null;
@@ -324,6 +344,7 @@ export interface PullRequestDetail {
 }
 
 export interface ReviewCommentRequest {
+  clientId?: string;
   body: string;
   path: string;
   line: number;
@@ -509,6 +530,12 @@ async function invokeTickets<T>(provider: 'jira' | 'linear', method: string, req
 }
 
 export const services = {
+  reviewProviders: {
+    connections:()=>invoke<ReviewConnection[]>('main.ReviewProviderService.Connections'),
+    connect:(request:ReviewConnectRequest)=>invoke<AccountStatus>('main.ReviewProviderService.Connect',request),
+    status:(host:string)=>invoke<AccountStatus>('main.ReviewProviderService.Status',host),
+    disconnect:(host:string)=>invoke<void>('main.ReviewProviderService.Disconnect',host),
+  },
   actions: {
     dispatchConfig: (repository: RepositoryIdentity, id: number, ref: string, signal?: AbortSignal) => invokeActions<import('./actionsTypes').WorkflowDispatch>('GetWorkflowDispatch', repository, [id, ref], signal),
     dispatch: (repository: RepositoryIdentity, input: import('./actionsTypes').WorkflowDispatchRequest) => invokeActions<void>('DispatchWorkflow', repository, [input]),
@@ -695,7 +722,7 @@ export const services = {
     unstage: (path: string, files: string[]) => invoke<void>("main.RepositoryService.Unstage", path, files),
     commit: (path: string, message: string) => invoke<string>("main.RepositoryService.Commit", path, message),
     checkout: (path: string, branch: string) => invoke<void>("main.RepositoryService.Checkout", path, branch),
-    checkoutPullRequest: (path: string, number: number, remote: string) => invoke<void>("main.RepositoryService.CheckoutPullRequest", path, number, remote),
+    checkoutPullRequest: (path: string, number: number, remote: string, expectedHead:string) => invoke<void>("main.RepositoryService.CheckoutReviewedPullRequest", path, number, remote, expectedHead),
     createBranch: (path: string, branch: string) => invoke<void>("main.RepositoryService.CreateBranch", path, branch),
     createAndCheckoutBranch: (path: string, branch: string) => invoke<void>("main.RepositoryService.CreateAndCheckoutBranch", path, branch),
     deleteBranch: (path: string, branch: string) => invoke<void>("main.RepositoryService.DeleteBranch", path, branch),

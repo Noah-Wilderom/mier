@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { Icon } from './Icon'
+import { allowsReview } from './reviewCapabilities'
 import { currentUser, latestReview, submitReview } from './data'
 import type { ChangedFile, DiffLine, PendingComment, PullRequest, ReviewDecision, Thread } from './data'
 import './review.css'
@@ -93,8 +94,8 @@ function ReviewThread({ thread, pr, onUpdate, onNotify, busy = false }: ReviewPr
   const [expanded, setExpanded] = useReviewSessionState(`thread.${thread.id}.expanded`, !thread.resolved)
   const [saving, setSaving] = useReviewSessionState(`thread.${thread.id}.saving`, false)
   const [error, setError] = useReviewSessionState(`thread.${thread.id}.error`, '')
-  const editable = ['open', 'draft'].includes(pr.status) && pr.provider?.detailLoaded !== false
-  const canResolve = editable && (thread.resolved ? thread.canUnresolve !== false : thread.canResolve !== false)
+  const editable = ['open', 'draft'].includes(pr.status) && pr.provider?.detailLoaded !== false && allowsReview(pr,'comments')
+  const canResolve = editable && allowsReview(pr,'resolveThreads') && (thread.resolved ? thread.canUnresolve !== false : thread.canResolve !== false)
 
   const toggleResolved = async () => {
     if (!canResolve || busy || saving) return
@@ -242,7 +243,7 @@ export default function ReviewWorkspace({ pr, onUpdate, onNotify, focusMode, onT
       return line.kind === 'remove' ? [] : [{ ...line, kind: 'context' as const, oldLine: paired.old.oldLine }]
     })
   }, [file, splitRows, ignoreWhitespace])
-  const editable = ['open', 'draft'].includes(pr.status) && pr.provider?.detailLoaded !== false
+  const editable = ['open', 'draft'].includes(pr.status) && pr.provider?.detailLoaded !== false && allowsReview(pr,'inlineComments')
   const composerOutdated = composerHeadSha !== null && composerHeadSha !== pr.headSha
   const composerDetached = commentAt !== null && (composerPath !== file?.path || !file?.lines.some(line => commentAt.side === 'old' ? line.oldLine === commentAt.line : line.newLine === commentAt.line))
 
@@ -446,9 +447,9 @@ export default function ReviewWorkspace({ pr, onUpdate, onNotify, focusMode, onT
                 })}
               </>}
               <div className="review-diff-end"><Icon name="check" size={13} />End of file<button className="btn-ghost review-text-button" disabled={busy || saving} onClick={async () => { const wasViewed = pr.viewedFiles.includes(file.path); const saved = await setViewed(file.path, !wasViewed); if (saved && !wasViewed) selectAdjacent(1) }}>{pr.viewedFiles.includes(file.path) ? 'Mark as not viewed' : activeIndex < navigableFiles.length - 1 ? 'Mark viewed and next file' : 'Mark as viewed'}<Icon name="arrow-right" size={12} /></button></div>
-            </div> : <div className="review-code-empty"><Icon name="file" size={28} /><strong>{file.binary ? 'Binary file' : file.truncated ? 'Diff too large to display' : file.patchUnavailable ? 'Text diff unavailable' : 'No text changes to display'}</strong><p>{file.binary ? 'Binary contents cannot be compared as text.' : file.truncated ? 'This file exceeds the available diff limit.' : file.patchUnavailable ? 'GitHub did not provide a text patch for this file.' : 'This file has no reviewable text diff.'}</p><button className="btn" disabled={busy || saving} onClick={() => setViewed(file.path, !pr.viewedFiles.includes(file.path))}>{pr.viewedFiles.includes(file.path) ? 'Mark as not viewed' : 'Mark as viewed'}</button></div>}
+            </div> : <div className="review-code-empty"><Icon name="file" size={28} /><strong>{file.binary ? 'Binary file' : file.truncated ? 'Diff too large to display' : file.patchUnavailable ? 'Text diff unavailable' : 'No text changes to display'}</strong><p>{file.binary ? 'Binary contents cannot be compared as text.' : file.truncated ? 'This file exceeds the available diff limit.' : file.patchUnavailable ? 'The provider did not supply a text patch for this file.' : 'This file has no reviewable text diff.'}</p><button className="btn" disabled={busy || saving} onClick={() => setViewed(file.path, !pr.viewedFiles.includes(file.path))}>{pr.viewedFiles.includes(file.path) ? 'Mark as not viewed' : 'Mark as viewed'}</button></div>}
           </div>
-        </> : <div className="review-code-empty"><Icon name={pr.provider?.detailLoaded === false ? 'clock' : 'files'} size={28} /><strong>{pr.provider?.detailLoaded === false ? 'Loading changed files' : 'No changed files'}</strong><p>{pr.provider?.detailLoaded === false ? 'Retrieving the pull request diff from GitHub.' : 'This pull request has no file changes.'}</p></div>}
+        </> : <div className="review-code-empty"><Icon name={pr.provider?.detailLoaded === false ? 'clock' : 'files'} size={28} /><strong>{pr.provider?.detailLoaded === false ? 'Loading changed files' : 'No changed files'}</strong><p>{pr.provider?.detailLoaded === false ? 'Retrieving the pull request diff.' : 'This pull request has no file changes.'}</p></div>}
       </div>
     </div>
   </section>
@@ -462,7 +463,7 @@ export function ReviewFooter({ pr, onUpdate, onNotify, busy = false }: ReviewPro
   const [submitting, setSubmitting] = useReviewSessionState('footer.submitting', false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const editable = ['open', 'draft'].includes(pr.status) && pr.provider?.detailLoaded !== false
+  const editable = ['open', 'draft'].includes(pr.status) && pr.provider?.detailLoaded !== false && allowsReview(pr,'comments')
   const isDraft = pr.status === 'draft'
   const hasNewCommits = pr.provider?.hasNewCommits === true
   const selfAuthored = pr.author === currentUser
@@ -472,7 +473,8 @@ export function ReviewFooter({ pr, onUpdate, onNotify, busy = false }: ReviewPro
   const pending = pr.pendingComments.length
   const outdatedComments = pr.pendingComments.filter(comment => comment.outdated || (comment.headSha && comment.headSha !== pr.headSha) || !pr.files.some(file => file.path === comment.path && file.lines.some(line => comment.side === 'old' ? line.oldLine === comment.line : line.newLine === comment.line)))
   const locked = busy || submitting || deletingId !== null
-  const valid = editable && !locked && !hasNewCommits && !outdatedComments.length && !(selfAuthored && decision === 'approved') && !(isDraft && decision !== 'commented') && (decision !== 'changes_requested' || body.trim().length > 0) && (decision !== 'commented' || body.trim().length > 0 || pending > 0)
+  const permittedDecision = allowsReview(pr,decision === 'approved' ? 'approve' : decision === 'changes_requested' ? 'requestChanges' : 'comments')
+  const valid = permittedDecision && editable && !locked && !hasNewCommits && !outdatedComments.length && !(selfAuthored && decision === 'approved') && !(isDraft && decision !== 'commented') && (decision !== 'changes_requested' || body.trim().length > 0) && (decision !== 'commented' || body.trim().length > 0 || pending > 0)
 
   const wasExpanded = useRef(expanded)
   useEffect(() => {
@@ -481,8 +483,8 @@ export function ReviewFooter({ pr, onUpdate, onNotify, busy = false }: ReviewPro
   }, [expanded])
 
   useEffect(() => {
-    if ((isDraft && decision !== 'commented') || (selfAuthored && decision === 'approved')) setDecision('commented')
-  }, [isDraft, selfAuthored, decision])
+    if (!permittedDecision || (isDraft && decision !== 'commented') || (selfAuthored && decision === 'approved')) setDecision('commented')
+  }, [isDraft, selfAuthored, decision, permittedDecision])
 
   const removeOutdated = async (comment: PendingComment) => {
     if (locked) return
@@ -529,7 +531,7 @@ export function ReviewFooter({ pr, onUpdate, onNotify, busy = false }: ReviewPro
     <footer className="review-footer">
       <div className="review-progress">{pr.provider?.detailLoaded === false ? <span>Loading review…</span> : <><span className="review-progress-track" role="progressbar" aria-label="Files viewed" aria-valuemin={0} aria-valuemax={pr.files.length || 1} aria-valuenow={viewed}><span style={{ width: `${pr.files.length ? (viewed / pr.files.length) * 100 : 0}%` }} /></span><span><strong>{viewed}</strong> / {pr.files.length} files viewed</span></>}</div>
       <div className="review-footer-status">{pending > 0 ? <span className="review-pending-status"><Icon name="message-circle" size={13} />{pending} pending {pending === 1 ? 'comment' : 'comments'}</span> : review ? <span className={review.decision === 'approved' ? 'text-green' : 'muted'}><Icon name={review.decision === 'approved' ? 'check-circle' : 'message-circle'} size={13} />{decisionLabels[review.decision]}{review.headSha !== pr.headSha ? ' on earlier changes' : ''}</span> : <span className="muted"><Icon name="shield-check" size={13} />Review in progress</span>}</div>
-      <div className="review-footer-actions"><label className="sr-only" htmlFor="review-decision">Review decision</label><select id="review-decision" className="review-decision-select" value={decision} disabled={!editable || locked} title={selfAuthored ? 'You cannot approve your own pull request' : 'Choose a review decision'} onChange={event => { setDecision(event.target.value as ReviewDecision); setError('') }}><option value="commented">Comment</option><option value="approved" disabled={selfAuthored || isDraft}>Approve</option><option value="changes_requested" disabled={isDraft}>Request changes</option></select><button className="btn btn-primary" disabled={!editable || locked} onClick={() => setExpanded(!expanded)} aria-expanded={expanded} title={!editable ? pr.provider?.detailLoaded === false ? 'Wait for the pull request details to load' : `Reviews are unavailable for ${pr.status} pull requests` : undefined}><Icon name="check-circle" size={14} />{expanded ? 'Hide summary' : 'Finish review'}{pending > 0 && <span className="review-button-count">{pending}</span>}</button></div>
+      <div className="review-footer-actions"><label className="sr-only" htmlFor="review-decision">Review decision</label><select id="review-decision" className="review-decision-select" value={decision} disabled={!editable || locked} title={selfAuthored ? 'You cannot approve your own pull request' : 'Choose a review decision'} onChange={event => { setDecision(event.target.value as ReviewDecision); setError('') }}><option value="commented">Comment</option><option value="approved" disabled={selfAuthored || isDraft || !allowsReview(pr,'approve')}>Approve</option><option value="changes_requested" disabled={isDraft || !allowsReview(pr,'requestChanges')}>Request changes</option></select><button className="btn btn-primary" disabled={!editable || locked} onClick={() => setExpanded(!expanded)} aria-expanded={expanded} title={!editable ? pr.provider?.detailLoaded === false ? 'Wait for the pull request details to load' : `Reviews are unavailable for ${pr.status} pull requests` : undefined}><Icon name="check-circle" size={14} />{expanded ? 'Hide summary' : 'Finish review'}{pending > 0 && <span className="review-button-count">{pending}</span>}</button></div>
     </footer>
   </div>
 }

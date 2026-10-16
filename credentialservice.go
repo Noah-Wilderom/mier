@@ -26,6 +26,8 @@ type Account struct {
 	Source string `json:"source"`
 }
 type AccountStatus struct {
+	Provider      string `json:"provider,omitempty"`
+	ReadOnly      bool   `json:"readOnly,omitempty"`
 	Host          string `json:"host"`
 	Authenticated bool   `json:"authenticated"`
 	Login         string `json:"login"`
@@ -49,6 +51,7 @@ func (systemSecretStore) Set(service, user, secret string) error {
 func (systemSecretStore) Delete(service, user string) error { return keyring.Delete(service, user) }
 
 type CredentialService struct {
+	providers  *ReviewProviderService
 	mu         sync.Mutex
 	store      secretStore
 	configPath string
@@ -115,6 +118,10 @@ func (s *CredentialService) resolveToken(ctx context.Context, input string) (str
 	if err != nil {
 		return "", "", "", err
 	}
+	if s.providers != nil && s.providers.Kind(host) != "" {
+		connection, token, err := s.providers.credentials(host)
+		return connection.Host, token, "saved", err
+	}
 	if token, err := s.store.Get(credentialKeyringService, host); err == nil && strings.TrimSpace(token) != "" {
 		return host, strings.TrimSpace(token), "saved", nil
 	}
@@ -135,6 +142,9 @@ func (s *CredentialService) resolveToken(ctx context.Context, input string) (str
 }
 
 func (s *CredentialService) AccountStatus(ctx context.Context, input string) (AccountStatus, error) {
+	if s.providers != nil && s.providers.Kind(input) != "" {
+		return s.providers.Status(ctx, input)
+	}
 	host, err := githubclient.NormalizeHost(input)
 	if err != nil {
 		return AccountStatus{}, err
@@ -167,6 +177,9 @@ func (s *CredentialService) AccountStatus(ctx context.Context, input string) (Ac
 	return status, nil
 }
 func (s *CredentialService) SaveToken(ctx context.Context, input, token string) (AccountStatus, error) {
+	if s.providers != nil && s.providers.Kind(input) != "" {
+		return AccountStatus{}, errors.New("Connect this host through its provider card in Settings → Accounts")
+	}
 	host, err := githubclient.NormalizeHost(input)
 	if err != nil {
 		return AccountStatus{}, err
@@ -197,6 +210,9 @@ func (s *CredentialService) SaveToken(ctx context.Context, input, token string) 
 	return AccountStatus{Host: host, Authenticated: true, Login: user.Login, Name: user.Name, AvatarURL: user.AvatarURL, Source: "saved", CLIInstalled: cliErr == nil}, nil
 }
 func (s *CredentialService) DeleteToken(ctx context.Context, input string) error {
+	if s.providers != nil && s.providers.Kind(input) != "" {
+		return s.providers.Disconnect(ctx, input)
+	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}

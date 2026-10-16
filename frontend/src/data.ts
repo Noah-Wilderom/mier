@@ -100,6 +100,7 @@ export interface PendingComment {
 export interface PullRequest {
   checkHeadSha?: string;
   provider?: {
+    kind?:import('./services').ReviewProviderKind; capabilities?:import('./services').ReviewCapabilities;
     host: string; owner: string; repo: string; number: number;
     nodeId?: string; url?: string; mergeStateStatus?: string; reviewDecision?: string;
     hasNewCommits?: boolean; detailLoaded?:boolean; countsKnown?:boolean; viewerCanUpdate?:boolean; requiredStatusCheckContexts?:string[]; counts?:{additions:number;deletions:number;changedFiles:number;commits:number;comments:number;reviewComments:number;threads?:number}; warnings?: string[]; allowedMergeMethods?: MergeMethod[];
@@ -162,11 +163,12 @@ export function mergeBlockers(pr: PullRequest): string[] {
     return ["Reopen this pull request before merging."];
 
   const blockers: string[] = [];
+  if (pr.provider?.capabilities?.merge === false) blockers.push("Complete the merge in your provider.");
   if (pr.provider?.hasNewCommits) blockers.push("New commits are available. Refresh the review before merging.");
-  if (pr.provider?.reviewDecision === "REVIEW_REQUIRED") blockers.push("GitHub requires additional review approval.");
-  if (pr.provider?.mergeStateStatus === "BLOCKED") blockers.push("GitHub branch protection requirements are not yet satisfied.");
+  if (pr.provider?.reviewDecision === "REVIEW_REQUIRED") blockers.push("Additional review approval is required.");
+  if (pr.provider?.mergeStateStatus === "BLOCKED") blockers.push("Branch protection requirements are not yet satisfied.");
   if (pr.provider?.mergeStateStatus === "BEHIND") blockers.push("Update this branch with the latest base branch changes.");
-  if (pr.provider?.mergeStateStatus === "UNKNOWN") blockers.push("GitHub is still calculating merge readiness.");
+  if (pr.provider?.mergeStateStatus === "UNKNOWN") blockers.push("The provider is still calculating merge readiness.");
   if (pr.status === "draft")
     blockers.push("Mark this pull request ready for review.");
   if (pr.hasConflicts)

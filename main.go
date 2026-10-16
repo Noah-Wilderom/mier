@@ -38,6 +38,8 @@ func main() {
 	}
 	updater.HandleHelperMode()
 	credentials := NewCredentialService()
+	providers := NewReviewProviderService(credentials)
+	credentials.providers = providers
 	repositories := NewRepositoryService(credentials)
 	github := NewGitHubService(credentials)
 	jira := NewIntegrationService()
@@ -73,6 +75,7 @@ func main() {
 			application.NewService(prNotifications),
 			application.NewService(repositories),
 			application.NewService(credentials),
+			application.NewService(providers),
 			application.NewService(github),
 			application.NewService(workspace),
 			application.NewService(syncService),

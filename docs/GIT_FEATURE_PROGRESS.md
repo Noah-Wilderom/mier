@@ -22,10 +22,12 @@ An unchecked item is planned, not a supported capability. AI additions come last
 - [x] Gitflow and bisect
 - [x] Terminal and custom commands
 - [x] Stacked pull requests
-- [ ] GitLab, Bitbucket, and Azure DevOps review providers
+- [x] GitLab, Bitbucket Cloud, and Azure DevOps Services review providers
 - [ ] AI commit / PR writing and branch explanations (last)
 - [ ] Coding-agent worktrees (last)
 - [ ] AI conflict proposals with manual approval (last)
 
 Each group must have real Git/provider integration, appropriate automated tests,
 and usable controls before being marked complete.
+
+Provider-specific API limits and authentication are documented in [Review providers](REVIEW_PROVIDERS.md). The native provider group is covered by HTTP contract tests, real Git source/checkout tests, and Chromium/WebKit review and account flows. Subscription-backed AI additions below remain separate work.

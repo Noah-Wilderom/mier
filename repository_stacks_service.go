@@ -40,14 +40,14 @@ func (s *RepositoryService) PushStackBranch(ctx context.Context, path string, re
 func (s *GitHubService) GetPullRequestStack(ctx context.Context, host, owner, repo string, number int) (githubclient.PullRequestStack, error) {
 	ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
-	client, err := s.client(ctx, host)
+	client, err := s.reviewClient(ctx, host)
 	if err != nil {
 		return githubclient.PullRequestStack{}, err
 	}
 	return client.GetPullRequestStack(ctx, owner, repo, number)
 }
 func (s *GitHubService) RetargetPullRequest(ctx context.Context, host, owner, repo string, number int, request githubclient.RetargetRequest) (githubclient.PullRequestSummary, error) {
-	client, err := s.client(ctx, host)
+	client, err := s.reviewClient(ctx, host)
 	if err != nil {
 		return githubclient.PullRequestSummary{}, err
 	}

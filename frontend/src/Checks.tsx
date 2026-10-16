@@ -99,7 +99,7 @@ export default function Checks({
               <ActionsLink url={check.detailsUrl} label="View check details" />
               {repository &&
               check.checkRunId &&
-              check.appSlug === "github-actions" ? (
+              check.appSlug === "github-actions" && pr.provider?.capabilities?.actions !== false && (!repository.kind || repository.kind === "github") ? (
                 <CheckLogs
                   key={`${check.id}:${repository.host}:${repository.owner}:${repository.repo}:${account}`}
                   repository={repository}

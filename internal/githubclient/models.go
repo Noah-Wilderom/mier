@@ -44,6 +44,7 @@ func (b *Branch) UnmarshalJSON(data []byte) error {
 }
 
 type PullRequestSummary struct {
+	Provider            string   `json:"provider,omitempty"`
 	Number              int      `json:"number"`
 	NodeID              string   `json:"nodeId"`
 	Title               string   `json:"title"`
@@ -257,21 +258,37 @@ type Thread struct {
 }
 
 type PullRequestDetail struct {
-	PullRequest                 PullRequestSummary `json:"pullRequest"`
-	Files                       []ChangedFile      `json:"files"`
-	Commits                     []Commit           `json:"commits"`
-	Comments                    []Comment          `json:"comments"`
-	Reviews                     []Review           `json:"reviews"`
-	Checks                      []CheckRun         `json:"checks"`
-	Statuses                    []CommitStatus     `json:"statuses"`
-	Threads                     []Thread           `json:"threads"`
-	MergeStateStatus            string             `json:"mergeStateStatus"`
-	ReviewDecision              string             `json:"reviewDecision"`
-	ViewerCanUpdate             bool               `json:"viewerCanUpdate"`
-	AllowedMergeMethods         []string           `json:"allowedMergeMethods"`
-	RequiredApprovals           *int               `json:"requiredApprovals"`
-	RequiredStatusCheckContexts []string           `json:"requiredStatusCheckContexts"`
-	Warnings                    []string           `json:"warnings"`
+	Capabilities                *ReviewCapabilities `json:"capabilities,omitempty"`
+	PullRequest                 PullRequestSummary  `json:"pullRequest"`
+	Files                       []ChangedFile       `json:"files"`
+	Commits                     []Commit            `json:"commits"`
+	Comments                    []Comment           `json:"comments"`
+	Reviews                     []Review            `json:"reviews"`
+	Checks                      []CheckRun          `json:"checks"`
+	Statuses                    []CommitStatus      `json:"statuses"`
+	Threads                     []Thread            `json:"threads"`
+	MergeStateStatus            string              `json:"mergeStateStatus"`
+	ReviewDecision              string              `json:"reviewDecision"`
+	ViewerCanUpdate             bool                `json:"viewerCanUpdate"`
+	AllowedMergeMethods         []string            `json:"allowedMergeMethods"`
+	RequiredApprovals           *int                `json:"requiredApprovals"`
+	RequiredStatusCheckContexts []string            `json:"requiredStatusCheckContexts"`
+	Warnings                    []string            `json:"warnings"`
+}
+type ReviewCapabilities struct {
+	Comments       bool `json:"comments"`
+	InlineComments bool `json:"inlineComments"`
+	Approve        bool `json:"approve"`
+	RequestChanges bool `json:"requestChanges"`
+	ResolveThreads bool `json:"resolveThreads"`
+	Draft          bool `json:"draft"`
+	Merge          bool `json:"merge"`
+	Reviewers      bool `json:"reviewers"`
+	Assignees      bool `json:"assignees"`
+	Labels         bool `json:"labels"`
+	Retarget       bool `json:"retarget"`
+	Actions        bool `json:"actions"`
+	Reopen         bool `json:"reopen"`
 }
 
 type CreateRequest struct {
@@ -287,6 +304,7 @@ type UpdateRequest struct {
 	State *string `json:"state,omitempty"`
 }
 type ReviewCommentRequest struct {
+	ClientID string `json:"clientId,omitempty"`
 	Body     string `json:"body"`
 	Path     string `json:"path"`
 	Line     int    `json:"line"`

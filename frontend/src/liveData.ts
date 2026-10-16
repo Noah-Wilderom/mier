@@ -1,6 +1,7 @@
 import { configureCurrentUser, registerPerson, people } from "./data";
 import type { ChangedFile, Check, Comment, Commit, DiffLine, MergeMethod, PullRequest, Review, ReviewDecision, Thread } from "./data";
 import { services } from "./services";
+import {allowsReview} from './reviewCapabilities';
 import type { AccountStatus, GitHubChangedFile, GitHubComment, GitHubThread, GitHubUser, PullRequestDetail, PullRequestSummary, RepositoryDiff, RepositoryIdentity, RepositorySnapshot, UpdatePullRequestRequest } from "./services";
 
 export interface ProviderCounts {
@@ -60,7 +61,7 @@ export function registerGitHubUser(user: GitHubUser): string {
 }
 
 export function configureGitHubAccount(account: AccountStatus): void {
-  if (!account.authenticated || !account.login) throw new Error("This GitHub account is not authenticated.");
+  if (!account.authenticated || !account.login) throw new Error("This account is not authenticated.");
   const name = account.name || account.login;
   configureCurrentUser(account.login, { name, initials: initialsFor(name), color: colorFor(account.login), ...(account.avatarUrl?{avatarUrl:account.avatarUrl}:{}) });
 }
@@ -76,14 +77,25 @@ function providerFor(summary: PullRequestSummary, identity?: RepositoryIdentity)
   let origin = identity;
   if (!origin) {
     const url = new URL(summary.url);
-    const segments = url.pathname.split("/").filter(Boolean);
-    const pullSegment = segments.lastIndexOf("pull");
-    if (pullSegment < 2) throw new Error("The pull request URL does not identify a GitHub repository.");
-    origin = { host: url.host, owner: segments[pullSegment - 2], repo: segments[pullSegment - 1] };
+    const segments = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
+    if(summary.provider==='gitlab') {
+      const separator=segments.lastIndexOf('-');
+      if(separator<2||segments[separator+1]!=='merge_requests')throw new Error('The merge request URL does not identify a repository.');
+      origin={host:url.host,owner:segments.slice(0,separator-1).join('/'),repo:segments[separator-1],kind:'gitlab'};
+    } else if(summary.provider==='azure') {
+      const separator=segments.indexOf('_git');
+      if(separator!==2||!segments[separator+1])throw new Error('The Azure pull request URL does not identify a repository.');
+      origin={host:url.host,owner:segments.slice(0,separator).join('/'),repo:segments[separator+1],kind:'azure'};
+    } else {
+      const pullSegment = segments.lastIndexOf(summary.provider==='bitbucket'?'pull-requests':'pull');
+      if (pullSegment < 2) throw new Error("The pull request URL does not identify a repository.");
+      origin = { host: url.host, owner: segments[pullSegment - 2], repo: segments[pullSegment - 1] };
+    }
   }
   if (!origin.host || !origin.owner || !origin.repo) throw new Error("The pull request repository is incomplete.");
   return {
     ...origin,
+    ...(summary.provider?{kind:summary.provider}:{}),
     number: summary.number,
     nodeId: summary.nodeId,
     url: summary.url,
@@ -282,6 +294,7 @@ export function mapPullRequest(raw: PullRequestDetail, identity?: RepositoryIden
       ...mapped.provider,
       detailLoaded: true,
       viewerCanUpdate: raw.viewerCanUpdate,
+      capabilities: raw.capabilities,
       requiredStatusCheckContexts: raw.requiredStatusCheckContexts ?? [],
       mergeStateStatus: raw.mergeStateStatus || undefined,
       reviewDecision: raw.reviewDecision || undefined,
@@ -342,13 +355,13 @@ export function mapRepositoryDiff(raw: RepositoryDiff): ChangedFile {
 function replyCommentId(thread: Thread): number {
   const id = thread.comments[0]?.id;
   const number = id && /^\d+$/.test(id) ? Number(id) : NaN;
-  if (!Number.isSafeInteger(number) || number <= 0) throw new Error("This conversation does not have a replyable GitHub comment identifier.");
+  if (!Number.isSafeInteger(number) || number <= 0) throw new Error("This conversation does not have a replyable comment identifier.");
   return number;
 }
 
 function samePullRequest(previous: PullRequest, next: PullRequest): RepositoryIdentity & { number: number } {
   const provider = previous.provider;
-  if (!provider) throw new Error("This pull request is not connected to GitHub.");
+  if (!provider) throw new Error("This pull request is not connected to a review provider.");
   if (next.number !== previous.number || next.provider?.host !== provider.host || next.provider?.owner !== provider.owner || next.provider?.repo !== provider.repo) throw new Error("The pull request changed before this action could be sent.");
   return { host: provider.host, owner: provider.owner, repo: provider.repo, number: provider.number };
 }
@@ -361,7 +374,7 @@ function sameMembers(first: string[], second: string[]): boolean {
 export class RemoteActionAppliedError extends Error {
   readonly remoteApplied = true;
   constructor(readonly originalError: unknown) {
-    super("GitHub accepted the action, but the updated pull request could not be loaded. Refresh before trying the action again.");
+    super("The provider accepted the action, but the updated pull request could not be loaded. Refresh before trying the action again.");
     this.name = "RemoteActionAppliedError";
   }
 }
@@ -372,6 +385,16 @@ export async function syncPullRequest(previous: PullRequest, next: PullRequest):
   if (next.status === "merged" && previous.status !== "merged") throw new Error("Use the merge action to merge this pull request with its expected head commit.");
   let wrote = false;
   const newReviews = next.reviews.filter(review => !previous.reviews.some(item => item.id === review.id));
+  const requireCapability=(capability:Parameters<typeof allowsReview>[1])=>{if(!allowsReview(previous,capability))throw new Error('This action is unavailable for this provider or read-only connection.');};
+  if(newReviews.length){for(const review of newReviews)requireCapability(review.decision==='approved'?'approve':review.decision==='changes_requested'?'requestChanges':'comments');if(previous.pendingComments.length)requireCapability('inlineComments');}
+  if(next.comments.some(comment=>!previous.comments.some(item=>item.id===comment.id)))requireCapability('comments');
+  for(const thread of next.threads){const original=previous.threads.find(item=>item.id===thread.id);if(!original)continue;if(thread.resolved!==original.resolved)requireCapability('resolveThreads');if(thread.comments.some(comment=>!original.comments.some(item=>item.id===comment.id)))requireCapability('comments');}
+  if(!sameMembers(previous.reviewers,next.reviewers))requireCapability('reviewers');
+  if(!sameMembers(previous.assignees,next.assignees))requireCapability('assignees');
+  if(!sameMembers(previous.labels,next.labels))requireCapability('labels');
+  if(previous.status!==next.status&&(previous.status==='draft'||next.status==='draft'))requireCapability('draft');
+  if(previous.status==='closed'&&next.status!=='closed')requireCapability('reopen');
+  if((previous.title!==next.title||previous.body!==next.body||previous.status!==next.status)&&previous.provider?.viewerCanUpdate===false)throw new Error('This account cannot edit the pull request.');
   if (newReviews.length > 1) throw new Error("Submit one review at a time.");
   if (!newReviews.length && next.threads.some(thread => !previous.threads.some(item => item.id === thread.id))) throw new Error("New inline comments must be submitted as part of a review.");
   for (const thread of next.threads) {
@@ -385,7 +408,7 @@ export async function syncPullRequest(previous: PullRequest, next: PullRequest):
       event: review.decision === "approved" ? "APPROVE" : review.decision === "changes_requested" ? "REQUEST_CHANGES" : "COMMENT",
       body: review.body,
       commitId: previous.headSha,
-      comments: previous.pendingComments.map(comment => ({ body: comment.body, path: comment.path, line: comment.line, side: comment.side === "old" ? "LEFT" : "RIGHT" })),
+      comments: previous.pendingComments.map(comment => ({ clientId:comment.id, body: comment.body, path: comment.path, line: comment.line, side: comment.side === "old" ? "LEFT" : "RIGHT" })),
     });
     wrote = true;
   }

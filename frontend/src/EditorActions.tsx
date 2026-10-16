@@ -3,10 +3,12 @@ import { Icon } from './Icon'
 import { hasNativeBackend, services } from './services'
 import { openWebURL } from './native'
 import './EditorActions.css'
+import {reviewProviderName} from './reviewCapabilities'
+import type {ReviewProviderKind} from './services'
 
 const editors = [{id:'vscode',name:'VS Code'},{id:'phpstorm',name:'PhpStorm'},{id:'zed',name:'Zed'}] as const
 
-export default function EditorActions({root,githubURL,notify}: {root?:string;githubURL?:string;notify:(message:string)=>void}) {
+export default function EditorActions({root,githubURL,providerKind,notify}: {root?:string;githubURL?:string;providerKind?:ReviewProviderKind;notify:(message:string)=>void}) {
   const [editor,setEditor] = useState('vscode')
   const [menu,setMenu] = useState(false)
   const [launching,setLaunching] = useState(false)
@@ -43,6 +45,6 @@ export default function EditorActions({root,githubURL,notify}: {root?:string;git
         if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)){event.preventDefault();const options=Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'));const current=options.indexOf(document.activeElement as HTMLButtonElement);options[event.key==='Home'?0:event.key==='End'?options.length-1:(current+(event.key==='ArrowDown'?1:-1)+options.length)%options.length]?.focus()}
       }}><span className="editor-open-menu-label">Open repository in</span>{editors.map(item=><button key={item.id} role="menuitemradio" aria-checked={editor===item.id} onClick={()=>{userChoseEditor.current=true;setEditor(item.id);setMenu(false);chooser.current?.focus()}}><img className="editor-logo" src={`/editors/${item.id}.${item.id==='zed'?'png':'svg'}`} alt="" aria-hidden="true" width={19} height={19}/>{item.name}{editor===item.id&&<Icon name="check" size={14} className="text-green"/>}</button>)}</div>}
     </div>
-    <button className="btn repository-open-github" aria-label="Open in GitHub" title="Open in GitHub" disabled={!githubURL} onClick={()=>{if(githubURL)void openWebURL(githubURL).catch(issue=>notify(issue instanceof Error?issue.message:String(issue)))}}><Icon name="github" size={16}/><span>Open in GitHub</span></button>
+    <button className="btn repository-open-github" aria-label={`Open in ${reviewProviderName(providerKind)}`} title={`Open in ${reviewProviderName(providerKind)}`} disabled={!githubURL} onClick={()=>{if(githubURL)void openWebURL(githubURL).catch(issue=>notify(issue instanceof Error?issue.message:String(issue)))}}>{providerKind&&providerKind!=='github'?<img src={`/providers/${providerKind}.svg`} alt="" width={16} height={16}/>:<Icon name="github" size={16}/>}<span>Open in {reviewProviderName(providerKind)}</span></button>
   </div>
 }

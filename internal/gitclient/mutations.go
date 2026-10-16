@@ -288,6 +288,12 @@ func (c *Client) selectRemote(ctx context.Context, root, name string) (selectedR
 		if result.pushSource == "" {
 			result.pushSource = result.fetchSource
 		}
+		if expanded, expandErr := c.run(ctx, root, c.options.LocalTimeout, "remote", "get-url", "--", name); expandErr == nil {
+			result.fetchSource = strings.TrimSpace(string(expanded))
+		}
+		if expanded, expandErr := c.run(ctx, root, c.options.LocalTimeout, "remote", "get-url", "--push", "--", name); expandErr == nil {
+			result.pushSource = strings.TrimSpace(string(expanded))
+		}
 		return result, nil
 	}
 	return selectedRemote{}, fmt.Errorf("remote %q is not configured in this repository", name)

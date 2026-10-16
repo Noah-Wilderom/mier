@@ -20,3 +20,7 @@ The bundled logos in `frontend/public/language-servers` identify the correspondi
 - The unchanged jq icon comes from [jq's documentation](https://github.com/jqlang/jq/blob/6b53f8031161db96387b64b5f412845cd23491f6/docs/public/icon.svg), copyright Stephen Dolan and contributors, under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/); see [upstream licensing](frontend/public/language-servers/JQ-COPYING.txt).
 
 Brand marks remain the property of their respective owners and do not imply endorsement. These third-party asset licenses do not license M.I.E.R.'s source code.
+
+## Review providers
+
+The bundled GitLab and Bitbucket marks in `frontend/public/providers` come from [Simple Icons](https://github.com/simple-icons/simple-icons), under [CC0](frontend/public/language-servers/SIMPLE-ICONS-LICENSE.txt). The Azure DevOps mark comes from [Devicon](https://github.com/devicons/devicon), under its [MIT license](frontend/public/providers/DEVICON-LICENSE.txt). Exact revisions are recorded in [sources.json](frontend/public/providers/sources.json). The GitLab and Bitbucket SVGs use their brand colors. These marks identify supported providers and remain the property of their owners.

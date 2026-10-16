@@ -24,28 +24,60 @@ func (c *Client) CheckoutPullRequest(ctx context.Context, path string, number in
 		if err := validateRemoteURL(remote.fetchSource); err != nil {
 			return err
 		}
-		ref := "refs/pull/" + strconv.Itoa(number) + "/head"
-		if _, err := c.authenticatedRun(ctx, root, c.options.RemoteTimeout, remote.fetchSource, "fetch", "--no-tags", "--", remote.Name, ref); err != nil {
+		source, err := c.pullRequestSource(ctx, root, remote, number)
+		if err != nil {
 			return err
+		}
+		ref := source.HeadRef
+		if ref == "" {
+			ref = source.HeadSHA
+		}
+		if ref == "" {
+			return errors.New("This provider did not return a source branch or commit")
+		}
+		expected := ""
+		if len(remoteName) > 1 {
+			expected = remoteName[1]
+		}
+		if expected != "" && (!objectID.MatchString(expected) || source.HeadSHA != "" && source.HeadSHA != expected) {
+			return errors.New("The pull request changed. Refresh before checking it out")
+		}
+		if _, fetchErr := c.authenticatedRun(ctx, root, c.options.RemoteTimeout, source.HeadURL, "fetch", "--no-tags", "--", source.HeadURL, ref); fetchErr != nil {
+			fallback := source.HeadSHA
+			if fallback == "" {
+				fallback = expected
+			}
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			if fallback == "" || fallback == ref {
+				return fetchErr
+			}
+			if _, err := c.authenticatedRun(ctx, root, c.options.RemoteTimeout, source.HeadURL, "fetch", "--no-tags", "--", source.HeadURL, fallback); err != nil {
+				return err
+			}
 		}
 		output, err := c.run(ctx, root, c.options.LocalTimeout, "rev-parse", "--verify", "FETCH_HEAD^{commit}")
 		if err != nil {
 			return err
 		}
 		fetched := strings.TrimSpace(string(output))
+		if expected != "" && fetched != expected {
+			return errors.New("The source branch changed while fetching. Refresh the pull request before checking it out")
+		}
 		branch := "pr-" + strconv.Itoa(number)
 		existing, err := c.run(ctx, root, c.options.LocalTimeout, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch)
 		if err == nil {
 			if strings.TrimSpace(string(existing)) != fetched {
 				return fmt.Errorf("branch %s already exists at a different commit; its work has been preserved", branch)
 			}
-			_, err = c.run(ctx, root, c.options.LocalTimeout, "switch", "--no-guess", "--", branch)
+			_, err = c.run(ctx, root, c.options.LocalTimeout, "switch", "--no-guess", "--no-overwrite-ignore", "--", branch)
 			return err
 		}
 		if !isExitCode(err, 1) {
 			return err
 		}
-		_, err = c.run(ctx, root, c.options.LocalTimeout, "switch", "--no-guess", "--create", branch, "--", fetched)
+		_, err = c.run(ctx, root, c.options.LocalTimeout, "switch", "--no-guess", "--no-overwrite-ignore", "--create", branch, "--", fetched)
 		return err
 	})
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"sync"
 	"time"
 
@@ -20,6 +21,12 @@ func NewGitHubService(credentials *CredentialService) *GitHubService {
 	return &GitHubService{credentials: credentials, clients: map[string]*githubclient.Client{}}
 }
 func (s *GitHubService) client(ctx context.Context, input string) (*githubclient.Client, error) {
+	if s.credentials == nil {
+		return nil, errors.New("Connect a GitHub account first")
+	}
+	if s.credentials.providers != nil && s.credentials.providers.Kind(input) != "" {
+		return nil, errors.New("GitHub Actions is only available for GitHub repositories")
+	}
 	host, token, _, err := s.credentials.resolveToken(ctx, input)
 	if err != nil {
 		return nil, err
@@ -45,7 +52,7 @@ func (s *GitHubService) client(ctx context.Context, input string) (*githubclient
 	return client, nil
 }
 func (s *GitHubService) ListPullRequests(ctx context.Context, host, owner, repo, state string) ([]githubclient.PullRequestSummary, error) {
-	client, err := s.client(ctx, host)
+	client, err := s.reviewClient(ctx, host)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +61,7 @@ func (s *GitHubService) ListPullRequests(ctx context.Context, host, owner, repo,
 func (s *GitHubService) ListPullRequestsPage(ctx context.Context, host, owner, repo string, request githubclient.PullRequestListRequest) (githubclient.PullRequestPage, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	client, err := s.client(ctx, host)
+	client, err := s.reviewClient(ctx, host)
 	if err != nil {
 		return githubclient.PullRequestPage{}, err
 	}
@@ -63,7 +70,7 @@ func (s *GitHubService) ListPullRequestsPage(ctx context.Context, host, owner, r
 func (s *GitHubService) GetPullRequest(ctx context.Context, host, owner, repo string, number int) (*githubclient.PullRequestDetail, error) {
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
-	client, err := s.client(ctx, host)
+	client, err := s.reviewClient(ctx, host)
 	if err != nil {
 		return nil, err
 	}
@@ -73,70 +80,70 @@ func (s *GitHubService) GetPullRequest(ctx context.Context, host, owner, repo st
 func (s *GitHubService) GetCommitDiff(ctx context.Context, host, owner, repo, sha string) (*githubclient.CommitDiff, error) {
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
-	client, err := s.client(ctx, host)
+	client, err := s.reviewClient(ctx, host)
 	if err != nil {
 		return nil, err
 	}
 	return client.GetCommitDiff(ctx, owner, repo, sha)
 }
 func (s *GitHubService) CreatePullRequest(ctx context.Context, host, owner, repo string, input githubclient.CreateRequest) (githubclient.PullRequestSummary, error) {
-	client, err := s.client(ctx, host)
+	client, err := s.reviewClient(ctx, host)
 	if err != nil {
 		return githubclient.PullRequestSummary{}, err
 	}
 	return client.CreatePullRequest(ctx, owner, repo, input)
 }
 func (s *GitHubService) UpdatePullRequest(ctx context.Context, host, owner, repo string, number int, input githubclient.UpdateRequest) (githubclient.PullRequestSummary, error) {
-	client, err := s.client(ctx, host)
+	client, err := s.reviewClient(ctx, host)
 	if err != nil {
 		return githubclient.PullRequestSummary{}, err
 	}
 	return client.UpdatePullRequest(ctx, owner, repo, number, input)
 }
 func (s *GitHubService) SetDraft(ctx context.Context, host, owner, repo string, number int, draft bool) error {
-	client, err := s.client(ctx, host)
+	client, err := s.reviewClient(ctx, host)
 	if err != nil {
 		return err
 	}
 	return client.SetDraft(ctx, owner, repo, number, draft)
 }
 func (s *GitHubService) AddIssueComment(ctx context.Context, host, owner, repo string, number int, body string) (githubclient.Comment, error) {
-	client, err := s.client(ctx, host)
+	client, err := s.reviewClient(ctx, host)
 	if err != nil {
 		return githubclient.Comment{}, err
 	}
 	return client.AddIssueComment(ctx, owner, repo, number, body)
 }
 func (s *GitHubService) AddReviewComment(ctx context.Context, host, owner, repo string, number int, input githubclient.ReviewCommentRequest) (githubclient.Comment, error) {
-	client, err := s.client(ctx, host)
+	client, err := s.reviewClient(ctx, host)
 	if err != nil {
 		return githubclient.Comment{}, err
 	}
 	return client.AddReviewComment(ctx, owner, repo, number, input)
 }
 func (s *GitHubService) SubmitReview(ctx context.Context, host, owner, repo string, number int, input githubclient.ReviewRequest) (githubclient.Review, error) {
-	client, err := s.client(ctx, host)
+	client, err := s.reviewClient(ctx, host)
 	if err != nil {
 		return githubclient.Review{}, err
 	}
 	return client.SubmitReview(ctx, owner, repo, number, input)
 }
 func (s *GitHubService) ReplyReviewComment(ctx context.Context, host, owner, repo string, number int, commentID int64, body string) (githubclient.Comment, error) {
-	client, err := s.client(ctx, host)
+	client, err := s.reviewClient(ctx, host)
 	if err != nil {
 		return githubclient.Comment{}, err
 	}
 	return client.ReplyReviewComment(ctx, owner, repo, number, commentID, body)
 }
 func (s *GitHubService) ResolveThread(ctx context.Context, host, threadID string, resolved bool) error {
-	client, err := s.client(ctx, host)
+	client, err := s.reviewClient(ctx, host)
 	if err != nil {
 		return err
 	}
 	return client.ResolveThread(ctx, threadID, resolved)
 }
 func (s *GitHubService) MergePullRequest(ctx context.Context, host, owner, repo string, number int, method, expectedHeadSHA string) (githubclient.MergeResult, error) {
-	client, err := s.client(ctx, host)
+	client, err := s.reviewClient(ctx, host)
 	if err != nil {
 		return githubclient.MergeResult{}, err
 	}
@@ -144,7 +151,7 @@ func (s *GitHubService) MergePullRequest(ctx context.Context, host, owner, repo 
 }
 
 func (s *GitHubService) RequestReviewers(ctx context.Context, host, owner, repo string, number int, reviewers []string) (githubclient.PullRequestSummary, error) {
-	client, err := s.client(ctx, host)
+	client, err := s.reviewClient(ctx, host)
 	if err != nil {
 		return githubclient.PullRequestSummary{}, err
 	}
@@ -152,21 +159,21 @@ func (s *GitHubService) RequestReviewers(ctx context.Context, host, owner, repo 
 }
 
 func (s *GitHubService) RemoveReviewers(ctx context.Context, host, owner, repo string, number int, reviewers []string) error {
-	client, err := s.client(ctx, host)
+	client, err := s.reviewClient(ctx, host)
 	if err != nil {
 		return err
 	}
 	return client.RemoveReviewers(ctx, owner, repo, number, reviewers)
 }
 func (s *GitHubService) SetAssignees(ctx context.Context, host, owner, repo string, number int, assignees []string) error {
-	client, err := s.client(ctx, host)
+	client, err := s.reviewClient(ctx, host)
 	if err != nil {
 		return err
 	}
 	return client.SetAssignees(ctx, owner, repo, number, assignees)
 }
 func (s *GitHubService) SetLabels(ctx context.Context, host, owner, repo string, number int, labels []string) ([]string, error) {
-	client, err := s.client(ctx, host)
+	client, err := s.reviewClient(ctx, host)
 	if err != nil {
 		return nil, err
 	}

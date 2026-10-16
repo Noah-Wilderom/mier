@@ -17,6 +17,18 @@ type RepositoryService struct {
 func NewRepositoryService(credentials ...*CredentialService) *RepositoryService {
 	options := gitclient.Options{}
 	if len(credentials) > 0 && credentials[0] != nil {
+		options.CredentialResolver = func(ctx context.Context, host string) (string, string, error) {
+			service := credentials[0]
+			if service.providers != nil && service.providers.Kind(host) != "" {
+				return service.providers.gitCredential(ctx, host)
+			}
+			_, token, _, err := service.resolveToken(ctx, host)
+			return "x-access-token", token, err
+		}
+		if credentials[0].providers != nil {
+			options.ProviderResolver = credentials[0].providers.Kind
+			options.ReviewSourceResolver = credentials[0].providers.reviewSource
+		}
 		options.CredentialProvider = func(ctx context.Context, host string) (string, error) {
 			_, token, _, err := credentials[0].resolveToken(ctx, host)
 			return token, err
@@ -133,6 +145,12 @@ func (s *RepositoryService) CheckoutPullRequest(ctx context.Context, path string
 		return s.initErr
 	}
 	return s.client.CheckoutPullRequest(ctx, path, number, remote)
+}
+func (s *RepositoryService) CheckoutReviewedPullRequest(ctx context.Context, path string, number int, remote, expectedHead string) error {
+	if s.initErr != nil {
+		return s.initErr
+	}
+	return s.client.CheckoutPullRequest(ctx, path, number, remote, expectedHead)
 }
 
 func (s *RepositoryService) Compare(ctx context.Context, path, base, head string) ([]ChangedFile, error) {

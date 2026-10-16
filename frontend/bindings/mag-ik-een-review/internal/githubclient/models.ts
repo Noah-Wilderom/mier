@@ -86,6 +86,7 @@ export interface MergeResult {
 }
 
 export interface PullRequestDetail {
+    "capabilities"?: ReviewCapabilities | null;
     "pullRequest": PullRequestSummary;
     "files": ChangedFile[] | null;
     "commits": Commit[] | null;
@@ -135,6 +136,7 @@ export interface PullRequestStack {
 }
 
 export interface PullRequestSummary {
+    "provider"?: string;
     "number": number;
     "nodeId": string;
     "title": string;
@@ -181,7 +183,24 @@ export interface Review {
     "url": string;
 }
 
+export interface ReviewCapabilities {
+    "comments": boolean;
+    "inlineComments": boolean;
+    "approve": boolean;
+    "requestChanges": boolean;
+    "resolveThreads": boolean;
+    "draft": boolean;
+    "merge": boolean;
+    "reviewers": boolean;
+    "assignees": boolean;
+    "labels": boolean;
+    "retarget": boolean;
+    "actions": boolean;
+    "reopen": boolean;
+}
+
 export interface ReviewCommentRequest {
+    "clientId"?: string;
     "body": string;
     "path": string;
     "line": number;

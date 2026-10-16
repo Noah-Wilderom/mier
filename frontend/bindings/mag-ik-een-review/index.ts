@@ -11,6 +11,7 @@ import * as LSPService from "./lspservice.js";
 import * as LinearService from "./linearservice.js";
 import * as PRNotificationService from "./prnotificationservice.js";
 import * as RepositoryService from "./repositoryservice.js";
+import * as ReviewProviderService from "./reviewproviderservice.js";
 import * as WorkspaceService from "./workspaceservice.js";
 import * as WorkspaceSyncService from "./workspacesyncservice.js";
 export {
@@ -24,6 +25,7 @@ export {
     LinearService,
     PRNotificationService,
     RepositoryService,
+    ReviewProviderService,
     WorkspaceService,
     WorkspaceSyncService
 };
@@ -67,6 +69,8 @@ export type {
     PRNotificationEvent,
     ReadDefinitionRequest,
     RepositorySnapshot,
+    ReviewConnectRequest,
+    ReviewConnection,
     Terminal,
     Ticket,
     TicketComment,

@@ -192,6 +192,7 @@ func (c *Client) verifyHead(ctx context.Context, owner, repo string, number int,
 	return pr, nil
 }
 func (c *Client) AddReviewComment(ctx context.Context, owner, repo string, number int, input ReviewCommentRequest) (Comment, error) {
+	input.ClientID = ""
 	path, err := prPath(owner, repo, number)
 	if err != nil {
 		return Comment{}, err
@@ -207,6 +208,12 @@ func (c *Client) AddReviewComment(ctx context.Context, owner, repo string, numbe
 	return result, err
 }
 func (c *Client) SubmitReview(ctx context.Context, owner, repo string, number int, input ReviewRequest) (Review, error) {
+	// Client IDs identify drafts for providers with non-atomic review APIs;
+	// GitHub receives only its documented review fields.
+	input.Comments = append([]ReviewCommentRequest{}, input.Comments...)
+	for i := range input.Comments {
+		input.Comments[i].ClientID = ""
+	}
 	path, err := prPath(owner, repo, number)
 	if err != nil {
 		return Review{}, err

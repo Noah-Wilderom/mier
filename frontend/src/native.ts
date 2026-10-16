@@ -84,7 +84,7 @@ export async function toggleFullscreen(): Promise<void> {
 
 export async function openWebURL(value: string): Promise<void> {
   const url = new URL(value);
-  if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) throw new Error('Choose a valid GitHub web link.');
+  if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) throw new Error('Choose a valid web link.');
   if (nativePlatform()) {
     const {Browser} = await import('@wailsio/runtime');
     await Browser.OpenURL(url.href);

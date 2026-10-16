@@ -267,7 +267,7 @@ func TestCredentialBearingCloneURLIsSanitizedAndUsesEphemeralHeader(t *testing.T
 		t.Fatal(err)
 	}
 	token := "synthetic-clone-secret"
-	parsed.User = url.User(token)
+	parsed.User = url.UserPassword("x-access-token", token)
 	_, err = client.Clone(context.Background(), parsed.String(), filepath.Join(t.TempDir(), "clone"))
 	if err == nil {
 		t.Fatal("Synthetic repository unexpectedly cloned")

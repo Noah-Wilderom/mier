@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { comparisonBase, gitHubIdentity, preferredRemote, pullUnavailableReason, trackingRemote } from './gitWorkspace.ts'
+import { comparisonBase, gitHubIdentity, reviewIdentity, knownCount, preferredRemote, pullUnavailableReason, trackingRemote } from './gitWorkspace.ts'
 import type { RepositorySnapshot } from './services.ts'
 
 function repository(overrides: Partial<RepositorySnapshot> = {}): RepositorySnapshot {
@@ -36,4 +36,16 @@ test('GitHub identity skips known other providers and supports enterprise remote
   assert.equal(gitHubIdentity(repository({ remotes: [remote] })), undefined)
   assert.deepEqual(gitHubIdentity(repository({ remotes: [remote, { ...remote, name: 'upstream', host: 'github.com', provider: 'github' }] })), { host: 'github.com', owner: 'team', repo: 'app' })
   assert.deepEqual(gitHubIdentity(repository({ remotes: [{ ...remote, host: 'github.company.test', provider: 'unknown' }] })), { host: 'github.company.test', owner: 'team', repo: 'app' })
+})
+
+test('native review identities preserve namespaces and keep unknown counts out of badges',()=>{
+  for(const provider of ['gitlab','bitbucket','azure'] as const){
+    const remote={name:'origin',host:provider==='azure'?'dev.azure.com':`${provider}.com`,owner:'team/subgroup',repository:'app',provider,fetchUrl:'',pushUrl:''}
+    const repo=repository({remotes:[remote]})
+    assert.equal(gitHubIdentity(repo),undefined)
+    assert.deepEqual(reviewIdentity(repo),{host:remote.host,owner:remote.owner,repo:'app',kind:provider})
+  }
+  assert.equal(knownCount(-1),null)
+  assert.equal(knownCount(undefined),null)
+  assert.equal(knownCount(0),0)
 })

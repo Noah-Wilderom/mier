@@ -2,7 +2,7 @@
 
 ![M.I.E.R. pull request review in light and dark mode](art/mier-preview.png)
 
-**Mag ik een review?** A desktop workspace for Git repositories and GitHub pull requests, built with Wails 3, Go, React, and TypeScript.
+**Mag ik een review?** A desktop workspace for Git repositories and pull requests, built with Wails 3, Go, React, and TypeScript.
 
 Manage branches and local changes, compare commits, and review pull requests with inline comments, syntax highlighting, and light or dark appearance.
 
@@ -13,6 +13,8 @@ Browse 57 language servers in Settings, with logos, search, install/update contr
 View related [Jira Cloud](docs/JIRA.md) and [Linear](docs/LINEAR.md) tickets alongside a PR using your own OAuth app.
 
 Browse [GitHub Actions](docs/ACTIONS.md), inspect job logs, rerun or cancel runs, and start workflows with their declared inputs.
+
+Connect [GitHub, GitLab, Bitbucket Cloud, and Azure DevOps](docs/REVIEW_PROVIDERS.md) for native reviews and PR stacks.
 
 Review PRs with [ChatGPT/Codex, GitHub Copilot, or your own MCP client](docs/AI.md). AI suggestions become private native review comments for you to inspect before submitting.
 

@@ -1,6 +1,6 @@
 # AI pull request reviews
 
-M.I.E.R. can review a GitHub PR with your ChatGPT subscription through Codex, or your GitHub Copilot account through the official Copilot SDK. Open a PR, choose **Review with AI**, select a provider/model and intensity, and start. Use **Expand code area** for more code space. The assistant docks beside the editor when there is room and below it in smaller review areas.
+M.I.E.R. can review a PR from a [connected review provider](REVIEW_PROVIDERS.md) with your ChatGPT subscription through Codex, or your GitHub Copilot account through the official Copilot SDK. Copilot still uses your separate GitHub account. Open a PR, choose **Review with AI**, select a provider/model and intensity, and start. Use **Expand code area** for more code space. The assistant docks beside the editor when there is room and below it in smaller review areas.
 
 The chat uses [assistant-ui](https://www.assistant-ui.com/docs/runtimes/custom/external-store) with M.I.E.R.'s native review state. Enter starts a review with your focus; Shift+Enter adds a line. An empty focus starts a general review. Each message starts a fresh review of the captured PR, rather than resuming an unrestricted coding conversation. Only the latest run is shown. The provider, model, and intensity are remembered; unfinished focus text stays in memory while hiding the pane. Model choices include locally bundled brand marks from [Lobe Icons](https://github.com/lobehub/lobe-icons) (the asset license is in `frontend/public/ai/LICENSE`); unknown model families use a neutral icon.
 

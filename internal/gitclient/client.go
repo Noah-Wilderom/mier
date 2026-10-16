@@ -16,20 +16,26 @@ import (
 )
 
 type Options struct {
-	GitPath            string
-	LocalTimeout       time.Duration
-	RemoteTimeout      time.Duration
-	CloneTimeout       time.Duration
-	MaxOutputBytes     int
-	MaxFileBytes       int64
-	CredentialProvider func(context.Context, string) (string, error)
+	GitPath              string
+	LocalTimeout         time.Duration
+	RemoteTimeout        time.Duration
+	CloneTimeout         time.Duration
+	MaxOutputBytes       int
+	MaxFileBytes         int64
+	CredentialProvider   func(context.Context, string) (string, error)
+	CredentialResolver   func(context.Context, string) (string, string, error)
+	ProviderResolver     func(string) string
+	SSHHostResolver      func(context.Context, string) (string, error)
+	ReviewSourceResolver func(context.Context, string, string, string, int) (PullRequestFetchSource, error)
 }
 
 type Client struct {
-	gitPath string
-	options Options
-	locksMu sync.Mutex
-	locks   map[string]chan struct{}
+	gitPath  string
+	options  Options
+	locksMu  sync.Mutex
+	locks    map[string]chan struct{}
+	sshMu    sync.Mutex
+	sshHosts map[string]sshIdentity
 }
 
 type CommandError struct {
@@ -70,7 +76,7 @@ func New(options Options) (*Client, error) {
 	if options.MaxFileBytes <= 0 {
 		options.MaxFileBytes = 2 * 1024 * 1024
 	}
-	client := &Client{gitPath: resolved, options: options, locks: make(map[string]chan struct{})}
+	client := &Client{gitPath: resolved, options: options, locks: make(map[string]chan struct{}), sshHosts: map[string]sshIdentity{}}
 	if _, err := client.run(context.Background(), "", options.LocalTimeout, "--version"); err != nil {
 		return nil, err
 	}

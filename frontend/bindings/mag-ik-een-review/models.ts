@@ -60,6 +60,8 @@ export interface Account {
 }
 
 export interface AccountStatus {
+    "provider"?: string;
+    "readOnly"?: boolean;
     "host": string;
     "authenticated": boolean;
     "login": string;
@@ -229,6 +231,27 @@ export interface PRNotificationEvent {
 export type ReadDefinitionRequest = lspclient$0.ReadDefinitionRequest;
 
 export type RepositorySnapshot = gitclient$0.RepositorySnapshot;
+
+export interface ReviewConnectRequest {
+    "kind": string;
+    "host": string;
+    "username": string;
+    "organization": string;
+    "readOnly": boolean;
+    "token": string;
+}
+
+export interface ReviewConnection {
+    "kind": string;
+    "host": string;
+    "username": string;
+    "organization": string;
+    "readOnly": boolean;
+    "login": string;
+    "name": string;
+    "avatarUrl": string;
+    "disabled": boolean;
+}
 
 export interface Terminal {
     "id": string;

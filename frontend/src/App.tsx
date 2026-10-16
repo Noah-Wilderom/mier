@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Icon } from "./Icon";
+import { allowsReview, supportsActions, repositoryWebURL } from "./reviewCapabilities";
 import { Markdown } from "./Markdown";
 import ReviewWorkspace, { ReviewFooter } from "./ReviewWorkspace";
 import {
@@ -20,7 +21,7 @@ import type {
   ReviewTab,
   UserId,
 } from "./data";
-import { subscribeNativeCommands, toggleFullscreen } from "./native";
+import { subscribeNativeCommands, toggleFullscreen, openWebURL } from "./native";
 import type { ThemePreference } from "./native";
 import "./app.css";
 import { useLiveWorkspace } from "./useLiveWorkspace";
@@ -228,7 +229,7 @@ export default function App() {
   useEffect(()=>setInspectedCommit(null),[live.enabled,live.repository?.root,selected,destination]);
   const provider=pr?.provider;
   const loadPRCommit:LoadCommitDiff=useCallback(async sha=>{
-    if(!provider)throw new Error('This pull request is not connected to GitHub.');
+    if(!provider)throw new Error('This pull request is not connected to a review provider.');
     const result=await services.github.getCommitDiff(provider.host,provider.owner,provider.repo,sha);
     return {files:(result.files??[]).map(mapChangedFile),warnings:result.warnings??[]};
   },[provider?.host,provider?.owner,provider?.repo]);
@@ -536,7 +537,7 @@ export default function App() {
     settings: "Settings",
   };
   const actions = [
-    { label: "GitHub Actions", detail: "Cmd/Ctrl 4", icon: "play", run: () => navigate("actions") },
+    ...(!live.enabled||supportsActions(live.identity)?[{ label: "GitHub Actions", detail: "Cmd/Ctrl 4", icon: "play", run: () => navigate("actions") }]:[]),
     {
       label: "Review inbox",
       detail: "Cmd/Ctrl 3",
@@ -778,7 +779,7 @@ export default function App() {
           </span>
         )}
         <div className="topbar-spacer" />
-        <EditorActions root={live.enabled?live.repository?.root:undefined} githubURL={live.enabled?isPRView&&pr?.provider?.url?pr.provider.url:live.identity?`https://${live.identity.host}/${encodeURIComponent(live.identity.owner)}/${encodeURIComponent(live.identity.repo)}`:undefined:undefined} notify={notify}/>
+        <EditorActions root={live.enabled?live.repository?.root:undefined} providerKind={live.identity?.kind} githubURL={live.enabled?isPRView&&pr?.provider?.url?pr.provider.url:live.identity?repositoryWebURL(live.identity):undefined:undefined} notify={notify}/>
         <button className="global-search" onClick={openPalette}>
           <Icon name="search" size={16} />
           <span>Search or jump to…</span>
@@ -1107,7 +1108,7 @@ export default function App() {
             </section>
           )}
           </ReviewSessionProvider></div></section>}
-        {destination === "actions" && (!live.enabled || !!live.repository) && <ActionsPage repository={live.enabled ? live.identity : undefined} account={live.account?.login}/>}
+        {destination === "actions" && (!live.enabled || !!live.repository) && <ActionsPage repository={live.enabled && supportsActions(live.identity) ? live.identity : undefined} account={live.account?.login}/>}
         {destination === "history" && (!live.enabled || !!live.repository) && (
           <HistoryView
             key={live.enabled ? live.repository?.root : 'demo'}
@@ -1173,7 +1174,7 @@ export default function App() {
         </span>
         <span className="status-context">
           <Icon name="github" size={13} />
-          {live.account?.authenticated ? live.account.host : "GitHub"}
+          {live.account?.authenticated ? live.account.host : "Review account"}
           <Icon name="branch" size={13} />
           <span title={branch}>{branch}</span>
         </span>
@@ -1410,13 +1411,13 @@ function PullRequestHeader({
                   <Icon name="file" />
                   Edit title and description
                 </button>
-                {pr.status === "draft" && (
+                {pr.status === "draft" && allowsReview(pr,"draft") && (
                   <button disabled={!canEdit || locked} onClick={() => lifecycle("open")}>
                     <Icon name="check-circle" />
                     Mark ready for review
                   </button>
                 )}
-                {pr.status === "closed" && (
+                {pr.status === "closed" && allowsReview(pr,"reopen") && (
                   <button disabled={!canEdit || locked} onClick={() => lifecycle("open")}>
                     <Icon name="pull-request" />
                     Reopen pull request
@@ -1586,8 +1587,8 @@ function Conversation({
   const [reviewers, setReviewers] = useReviewSessionState("conversation.reviewers", ""), [assignees, setAssignees] = useReviewSessionState("conversation.assignees", ""), [labels, setLabels] = useReviewSessionState("conversation.labels", "");
   const loaded = pr.provider?.detailLoaded !== false;
   const locked = busy || saving;
-  const canDiscuss = loaded && (!!pr.provider || ["open", "draft"].includes(pr.status));
-  const canEditMetadata = loaded && pr.provider?.viewerCanUpdate !== false;
+  const canDiscuss = allowsReview(pr,"comments") && loaded && (!!pr.provider || ["open", "draft"].includes(pr.status));
+  const canEditMetadata = (allowsReview(pr,"reviewers")||allowsReview(pr,"assignees")||allowsReview(pr,"labels")) && loaded && pr.provider?.viewerCanUpdate !== false;
   const contextKey = `${pr.provider?.host ?? "local"}/${pr.provider?.owner ?? ""}/${pr.provider?.repo ?? pr.repository}#${pr.number}`;
   const activeContext = useRef(contextKey); activeContext.current = contextKey;
   const allowedMethods = pr.provider ? pr.provider.allowedMergeMethods ?? [] : ["squash", "merge", "rebase"];
@@ -1689,7 +1690,7 @@ function Conversation({
           if (!canEditMetadata) return;
           const users = (value: string) => [...new Set(value.split(/[,\n]/).map(item => item.trim()).filter(Boolean))];
           void apply({...pr, reviewers:users(reviewers),assignees:users(assignees),labels:[...new Set(labels.split("\n").map(item => item.trim()).filter(Boolean))]}, () => { setEditingMetadata(false); notify("Pull request metadata updated."); });
-        }}><label>Reviewers<input aria-label="Requested reviewers" placeholder="GitHub usernames, separated by commas" value={reviewers} disabled={saving} onChange={event=>setReviewers(event.target.value)}/></label><label>Assignees<input aria-label="Pull request assignees" placeholder="GitHub usernames, separated by commas" value={assignees} disabled={saving} onChange={event=>setAssignees(event.target.value)}/></label><label>Labels<textarea aria-label="Pull request labels" placeholder="One label per line" rows={2} value={labels} disabled={saving} onChange={event=>setLabels(event.target.value)}/></label><div className="metadata-editor-actions"><button type="button" className="btn" disabled={saving} onClick={()=>setEditingMetadata(false)}>Cancel</button><button className="btn btn-primary" disabled={locked || !canEditMetadata}>{saving ? "Saving…" : "Save metadata"}</button></div></form>}
+        }}><label>Reviewers<input aria-label="Requested reviewers" placeholder={pr.provider?.kind==='bitbucket'?'Bitbucket UUIDs, separated by commas':pr.provider?.kind==='azure'?'Azure identity IDs, separated by commas':'Usernames, separated by commas'} value={reviewers} disabled={saving||!allowsReview(pr,"reviewers")} onChange={event=>setReviewers(event.target.value)}/></label><label>Assignees<input aria-label="Pull request assignees" placeholder="Usernames, separated by commas" value={assignees} disabled={saving||!allowsReview(pr,"assignees")} onChange={event=>setAssignees(event.target.value)}/></label><label>Labels<textarea aria-label="Pull request labels" placeholder="One label per line" rows={2} value={labels} disabled={saving||!allowsReview(pr,"labels")} onChange={event=>setLabels(event.target.value)}/></label><div className="metadata-editor-actions"><button type="button" className="btn" disabled={saving} onClick={()=>setEditingMetadata(false)}>Cancel</button><button className="btn btn-primary" disabled={locked || !canEditMetadata}>{saving ? "Saving…" : "Save metadata"}</button></div></form>}
         {pr.reviews.map((review) => (
           <div className="timeline-event" key={review.id}>
             <span
@@ -1769,7 +1770,7 @@ function Conversation({
                 </button>
                 <button
                   className="btn btn-ghost"
-                  disabled={locked || (pr.provider ? thread.resolved ? thread.canUnresolve !== true : thread.canResolve !== true : pr.status !== "open")}
+                  disabled={!allowsReview(pr,"resolveThreads") || locked || (pr.provider ? thread.resolved ? thread.canUnresolve !== true : thread.canResolve !== true : pr.status !== "open")}
                   onClick={() =>
                     void apply({
                       ...pr,
@@ -1912,7 +1913,7 @@ function Conversation({
               <p>
                 {blockers.length
                   ? blockers.join(" · ")
-                  : pr.provider ? "GitHub reports no outstanding merge requirements." : "Required checks passed and conversations are resolved."}
+                  : pr.provider ? "No outstanding merge requirements were reported." : "Required checks passed and conversations are resolved."}
               </p>
             )}
             {confirmMerge && (
@@ -1957,7 +1958,8 @@ function Conversation({
               </div>
             )}
           </div>
-          {pr.status === "open" && !confirmMerge && (
+          {pr.status === "open" && !allowsReview(pr,"merge") && pr.provider?.url && <button className="btn" onClick={()=>void openWebURL(pr.provider!.url!).catch(issue=>notify(String(issue)))}><Icon name="external-link" size={15}/>Open pull request</button>}
+          {pr.status === "open" && !confirmMerge && allowsReview(pr,"merge") && (
             <button
               className="btn btn-primary"
               disabled={locked || blockers.length > 0 || !allowedMethods.length}

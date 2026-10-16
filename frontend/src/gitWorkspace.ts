@@ -5,9 +5,21 @@ export type GitAction = 'fetch' | 'pull' | 'push' | 'checkout' | 'createBranch' 
 export function gitHubIdentity(repository: RepositorySnapshot): RepositoryIdentity | undefined {
   // Custom hosts remain eligible for GitHub Enterprise. Known other providers
   // are local Git remotes and must not be queried using GitHub's API.
-  const remotes = (repository.remotes ?? []).filter(remote => remote.host && remote.owner && remote.repository && !['gitlab', 'bitbucket', 'local'].includes(remote.provider))
+  const remotes = (repository.remotes ?? []).filter(remote => remote.host && remote.owner && remote.repository && !['gitlab', 'bitbucket', 'azure', 'local'].includes(remote.provider))
   const remote = remotes.find(remote => remote.name === 'origin') ?? remotes[0]
   return remote ? { host: remote.host, owner: remote.owner, repo: remote.repository } : undefined
+}
+
+export function reviewIdentity(repository:RepositorySnapshot):RepositoryIdentity|undefined {
+  const remotes=(repository.remotes??[]).filter(remote=>remote.host&&remote.owner&&remote.repository&&remote.provider!=='local')
+  const remote=remotes.find(remote=>remote.name==='origin')??remotes[0]
+  if(!remote)return undefined
+  const kind=['gitlab','bitbucket','azure'].includes(remote.provider)?remote.provider as 'gitlab'|'bitbucket'|'azure':undefined
+  return {host:remote.host,owner:remote.owner,repo:remote.repository,...(kind?{kind}:{})}
+}
+
+export function knownCount(value:number|undefined):number|null {
+  return typeof value==='number'&&Number.isSafeInteger(value)&&value>=0?value:null
 }
 
 export function trackingRemote(repository: RepositorySnapshot): string {

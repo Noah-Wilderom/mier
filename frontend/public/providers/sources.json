@@ -1,0 +1,17 @@
+[
+  {
+    "asset": "gitlab.svg",
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/gitlab.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "asset": "bitbucket.svg",
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/bitbucket.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "asset": "azure.svg",
+    "url": "https://raw.githubusercontent.com/devicons/devicon/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/azuredevops/azuredevops-original.svg",
+    "license": "MIT"
+  }
+]

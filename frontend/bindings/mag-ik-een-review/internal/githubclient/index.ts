@@ -18,6 +18,7 @@ export type {
     PullRequestSummary,
     RetargetRequest,
     Review,
+    ReviewCapabilities,
     ReviewCommentRequest,
     ReviewRequest,
     StackNode,

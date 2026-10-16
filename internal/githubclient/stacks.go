@@ -31,6 +31,10 @@ type RetargetRequest struct {
 	ExpectedHead string `json:"expectedHead"`
 }
 
+func BuildPullRequestStack(current PullRequestSummary, candidates []PullRequestSummary, target string) PullRequestStack {
+	return buildPullRequestStack(current, candidates, target)
+}
+
 func buildPullRequestStack(current PullRequestSummary, candidates []PullRequestSummary, target string) PullRequestStack {
 	result := PullRequestStack{Nodes: []StackNode{}, Warnings: []string{}}
 	byID := map[int]PullRequestSummary{current.Number: current}
