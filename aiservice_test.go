@@ -4,12 +4,39 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"mag-ik-een-review/internal/desktopruntime"
 	"mag-ik-een-review/internal/reviewagent"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
+
+func TestNodeBasedAIProviderWorksWithDesktopPATH(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix npm shebang launch; Windows uses native provider executables")
+	}
+	node, err := desktopruntime.FindNode(context.Background(), "", false)
+	if err != nil {
+		t.Skip("Node is not installed for the real CLI launcher check")
+	}
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv("NVM_BIN", filepath.Dir(node.Executable))
+	binary := filepath.Join(t.TempDir(), "node based provider")
+	if err := os.WriteFile(binary, []byte("#!/usr/bin/env node\nconsole.log('[]');\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	s := &AIService{preferences: AIPreferences{CodexPath: binary}}
+	resolved, err := s.cli("codex")
+	if err != nil || resolved != binary {
+		t.Fatal("explicit provider path was not preserved", resolved, err)
+	}
+	servers, err := reviewagent.CodexDisabledServers(context.Background(), resolved, t.TempDir())
+	if err != nil || len(servers) != 0 {
+		t.Fatal("npm-installed provider failed without terminal PATH", servers, err)
+	}
+}
 
 func TestAIIntensityValidationPrecedesProviderAccess(t *testing.T) {
 	s := &AIService{}

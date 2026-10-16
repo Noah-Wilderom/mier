@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"mag-ik-een-review/internal/desktopruntime"
 	"net/http"
 	"os/exec"
 	"sync"
@@ -102,6 +103,7 @@ func CodexDisabledServers(ctx context.Context, binary, directory string) (map[st
 	defer cancel()
 	command := exec.CommandContext(ctx, binary, "-c", "features.plugins=false", "-c", "features.apps=false", "mcp", "list", "--json")
 	command.Dir = directory
+	command.Env = desktopruntime.CLIEnvironment(ctx, binary)
 	command.Stderr = nil
 	data, err := command.Output()
 	if err != nil {
@@ -232,7 +234,7 @@ func RunCodex(ctx context.Context, binary, directory, version, model, prompt str
 }
 
 func NewCopilot(binary, directory, token string) *copilot.Client {
-	return copilot.NewClient(&copilot.ClientOptions{Connection: copilot.StdioConnection{Path: binary, Args: []string{"--disable-builtin-mcps", "--no-remote", "--no-remote-export", "--log-level", "none"}}, WorkingDirectory: directory, BaseDirectory: directory, Mode: copilot.ModeEmpty, GitHubToken: token, UseLoggedInUser: copilot.Bool(false)})
+	return copilot.NewClient(&copilot.ClientOptions{Connection: copilot.StdioConnection{Path: binary, Args: []string{"--disable-builtin-mcps", "--no-remote", "--no-remote-export", "--log-level", "none"}, Env: desktopruntime.CLIEnvironment(context.Background(), binary)}, WorkingDirectory: directory, BaseDirectory: directory, Mode: copilot.ModeEmpty, GitHubToken: token, UseLoggedInUser: copilot.Bool(false)})
 }
 func CopilotStatus(ctx context.Context, client *copilot.Client) (ProviderStatus, error) {
 	result := ProviderStatus{Provider: "copilot", Installed: true, Models: []Model{}}

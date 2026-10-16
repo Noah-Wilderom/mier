@@ -1,10 +1,12 @@
 package lspclient
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"mag-ik-een-review/internal/desktopruntime"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -169,6 +171,10 @@ func existingDirectory(path string) bool {
 	return err == nil && info.IsDir()
 }
 func resolveProgram(program string) (string, error) {
+	if program == "node" || program == "node.exe" {
+		node, err := desktopruntime.FindNode(context.Background(), "", false)
+		return node.Executable, err
+	}
 	if runtime.GOOS == "windows" && (strings.EqualFold(filepath.Ext(program), ".cmd") || strings.EqualFold(filepath.Ext(program), ".bat")) {
 		return "", errors.New("Use node.exe or php.exe with the server script as an argument; command shell wrappers are not supported")
 	}
@@ -296,6 +302,14 @@ func detectServerInDirectories(directories []string, language string, configurat
 				status.Command = executable
 				status.Source = "PATH"
 			}
+			if status.Command == "" && definition.Install.Method == "npm" {
+				if node, err := desktopruntime.FindNode(context.Background(), "", false); err == nil {
+					if executable, err := resolveProgram(filepath.Join(filepath.Dir(node.Executable), definition.Program)); err == nil {
+						status.Command = executable
+						status.Source = "PATH"
+					}
+				}
+			}
 		}
 	}
 	if status.Command == "" {
@@ -311,6 +325,21 @@ func detectServerInDirectories(directories []string, language string, configurat
 		return status
 	}
 	status.Command = executable
+	if definition.Install.Method == "npm" {
+		node := status.Command
+		if basename := strings.ToLower(filepath.Base(node)); basename != "node" && basename != "node.exe" {
+			// Global npm launchers use /usr/bin/env node. The Dock's PATH
+			// must not make an otherwise detected server fail at startup.
+			if host, err := desktopruntime.FindNode(context.Background(), "", false); err == nil {
+				node = host.Executable
+			} else {
+				node = ""
+			}
+		}
+		if node != "" {
+			status.Environment = []string{"PATH=" + filepath.Dir(node) + string(os.PathListSeparator) + os.Getenv("PATH")}
+		}
+	}
 	if usesTypeScriptSDK(language) {
 		sdk := configuration.TypeScriptSDKPath
 		if sdk == "" {

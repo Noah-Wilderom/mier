@@ -64,7 +64,7 @@ npm install -g @github/copilot
 
 Connect your GitHub account to M.I.E.R. through **Accounts**, using a GitHub CLI login (`gh auth login`) or a supported OAuth token. The Copilot SDK receives that credential in Go, outside the webview, and uses the account's Copilot access. GitHub OAuth tokens and appropriately permitted fine-grained tokens are supported; classic `ghp_` PATs are rejected. A regular GitHub account alone does not guarantee Copilot model access.
 
-Both providers need their CLIs available to the desktop application. **Settings → AI review → Executable paths** accepts an absolute path if automatic detection fails, including applications launched from the macOS Dock. Update the provider CLI if its local protocol is unsupported. Provider model lists are discovered dynamically; quotas and organization policies still apply.
+Both providers need their CLIs available to the desktop application. Automatic detection also checks the selected Node installation's bin directory for npm-installed CLIs. Node launchers use the shared [mise/nvm runtime detection](LANGUAGE_INTELLIGENCE.md#install-and-configure-servers), including when the macOS Dock provides a restricted PATH. **Settings → AI review → Executable paths** accepts an absolute path if automatic detection fails. Update the provider CLI if its local protocol is unsupported. Provider model lists are discovered dynamically; quotas and organization policies still apply.
 
 ## Suggestions and review control
 

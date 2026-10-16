@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mag-ik-een-review/internal/desktopruntime"
 	"os/exec"
 	"sync"
 	"sync/atomic"
@@ -42,6 +43,7 @@ func NewCodex(parent context.Context, binary, directory, version string, notify 
 	args := []string{"-c", "features.shell_tool=false", "-c", "features.unified_exec=false", "-c", "features.multi_agent=false", "-c", "features.plugins=false", "-c", "features.apps=false", "-c", "features.browser_use=false", "-c", "features.computer_use=false", "-c", "features.image_generation=false", "-c", "features.view_image=false", "-c", "features.hooks=false", "-c", "web_search=\"disabled\"", "-c", "project_doc_max_bytes=0", "app-server"}
 	command := exec.CommandContext(ctx, binary, args...)
 	command.Dir = directory
+	command.Env = desktopruntime.CLIEnvironment(ctx, binary)
 	command.WaitDelay = 2 * time.Second
 	configureProcess(command)
 	stdout, err := command.StdoutPipe()

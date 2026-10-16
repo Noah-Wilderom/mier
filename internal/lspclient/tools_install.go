@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mag-ik-een-review/internal/desktopruntime"
 	"net/http"
 	"os"
 	"os/exec"
@@ -44,6 +45,9 @@ func runToolCommand(ctx context.Context, directory, program string, args ...stri
 		if !strings.HasPrefix(key, "NPM_CONFIG_") && !strings.HasPrefix(key, "PIP_") && key != "PYTHONPATH" && key != "PYTHONHOME" && key != "NODE_OPTIONS" && key != "NODE_PATH" && key != "NPM_TOKEN" && key != "NODE_AUTH_TOKEN" {
 			command.Env = append(command.Env, value)
 		}
+	}
+	if filepath.IsAbs(program) {
+		command.Env = desktopruntime.WithPath(command.Env, filepath.Dir(program))
 	}
 	if env, ok := ctx.Value(toolEnvironmentKey{}).(map[string]string); ok {
 		for key, value := range env {

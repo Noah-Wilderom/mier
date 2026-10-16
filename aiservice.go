@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"mag-ik-een-review/internal/desktopruntime"
 	"mag-ik-een-review/internal/gitclient"
 	"mag-ik-een-review/internal/reviewagent"
 	"os"
@@ -185,6 +186,11 @@ func (s *AIService) cli(provider string) (string, error) {
 	home, _ := os.UserHomeDir()
 	for _, directory := range []string{filepath.Join(home, ".local", "bin"), filepath.Join(home, ".bun", "bin"), "/opt/homebrew/bin", "/usr/local/bin", filepath.Join(home, ".local", "share", "mier-ai", "node_modules", ".bin")} {
 		if resolved, err := exec.LookPath(filepath.Join(directory, name)); err == nil {
+			return resolved, nil
+		}
+	}
+	if node, err := desktopruntime.FindNode(context.Background(), "", false); err == nil {
+		if resolved, err := exec.LookPath(filepath.Join(filepath.Dir(node.Executable), name)); err == nil {
 			return resolved, nil
 		}
 	}

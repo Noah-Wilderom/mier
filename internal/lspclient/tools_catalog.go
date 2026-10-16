@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mag-ik-een-review/internal/desktopruntime"
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -403,6 +403,7 @@ func (t *toolInstaller) fetchRelease(ctx context.Context, language string) (tool
 
 func (t *toolInstaller) checkUpdates(ctx context.Context, force bool) error {
 	if force {
+		desktopruntime.RefreshNode()
 		t.runtimeMu.Lock()
 		t.runtimes = map[string]runtimeResult{}
 		t.runtimeMu.Unlock()
@@ -529,51 +530,8 @@ func (t *toolInstaller) detectRuntime(ctx context.Context, language string) (too
 		}
 		return toolRuntime{}, errors.New("Install PHP 8.2 or newer with mbstring, tokenizer, and posix, then check again")
 	}
-	program := ""
-	for _, candidate := range runtimeCandidates("node") {
-		executable, err := resolveProgram(candidate)
-		if err != nil {
-			continue
-		}
-		output, err := t.run(ctx, "", executable, "-p", "JSON.stringify({version:process.versions.node,executable:process.execPath})")
-		var result struct{ Version, Executable string }
-		if err != nil || json.Unmarshal(output, &result) != nil || !npmVersion.MatchString(result.Version) || !(result.Version == "22.22.2" || newerVersion(result.Version, "22.22.2")) {
-			continue
-		}
-		if actual, err := resolveProgram(result.Executable); err == nil {
-			program = actual
-			break
-		}
-	}
-	if program == "" {
-		return toolRuntime{}, errors.New("Install Node.js 22.22.2 or newer and npm, then check again")
-	}
-	nodePath := program
-	if resolved, err := filepath.EvalSymlinks(program); err == nil {
-		nodePath = resolved
-	}
-	candidates := []string{}
-	if npm, err := exec.LookPath("npm"); err == nil {
-		if resolved, err := filepath.EvalSymlinks(npm); err == nil {
-			candidates = append(candidates, resolved)
-		}
-		candidates = append(candidates, filepath.Join(filepath.Dir(npm), "node_modules", "npm", "bin", "npm-cli.js"))
-	}
-	for _, directory := range []string{filepath.Dir(program), filepath.Dir(nodePath)} {
-		candidates = append(candidates, filepath.Join(directory, "node_modules", "npm", "bin", "npm-cli.js"), filepath.Join(directory, "..", "lib", "node_modules", "npm", "bin", "npm-cli.js"), filepath.Join(directory, "..", "share", "nodejs", "npm", "bin", "npm-cli.js"))
-	}
-	for _, candidate := range candidates {
-		if filepath.Base(candidate) == "npm-cli.js" && existingFile(candidate) {
-			absolute, err := filepath.Abs(candidate)
-			if err == nil {
-				return toolRuntime{command: program, npmCLI: absolute}, nil
-			}
-		}
-	}
-	if runtime.GOOS == "windows" {
-		return toolRuntime{}, errors.New("npm's CLI script was not found beside Node.js; install Node.js with npm and check again")
-	}
-	return toolRuntime{}, errors.New("npm's CLI script was not found; install Node.js with npm and check again")
+	node, err := desktopruntime.FindNode(ctx, "22.22.2", true)
+	return toolRuntime{command: node.Executable, npmCLI: node.NPMCLI}, err
 }
 
 func runtimeCandidates(name string) []string {
