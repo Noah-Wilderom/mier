@@ -14,6 +14,31 @@ import * as lspclient$0 from "./internal/lspclient/models.js";
 // @ts-ignore: Unused imports
 import * as reviewagent$0 from "./internal/reviewagent/models.js";
 
+export interface AIActionRequest {
+    "root": string;
+    "kind": string;
+    "base": string;
+    "head": string;
+    "expectedHead": string;
+    "path": string;
+    "worktreeId": string;
+    "clientId": string;
+    "provider": string;
+    "model": string;
+    "instructions": string;
+    "intensity": string;
+    "currentResult"?: string | null;
+}
+
+export interface AIActionSnapshot {
+    "run": reviewagent$0.RunSnapshot;
+    "kind": string;
+    "root": string;
+    "proposal": reviewagent$0.ActionProposal | null;
+    "worktree"?: AIWorktreeInfo | null;
+    "writes": number;
+}
+
 export interface AIConnection {
     "run": reviewagent$0.RunSnapshot;
     "url": string;
@@ -51,6 +76,17 @@ export interface AIReviewRequest {
     "model": string;
     "instructions": string;
     "intensity": string;
+}
+
+export interface AIWorktreeInfo {
+    "id": string;
+    "repositoryRoot": string;
+    "path": string;
+    "branch": string;
+    "headSha": string;
+    "createdAt": string;
+    "lastActionId": string;
+    "state": string;
 }
 
 export interface Account {

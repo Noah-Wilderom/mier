@@ -49,6 +49,9 @@ type Finding struct {
 	Severity string `json:"severity"`
 }
 type Source struct {
+	// Whole-file tools return text with newline bytes; line-window tools return
+	// an array of lines. Keep this accounting detail out of the model payload.
+	textBytes  *int
 	Path       string   `json:"path"`
 	Revision   string   `json:"revision"`
 	StartLine  int      `json:"startLine"`

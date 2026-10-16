@@ -1,5 +1,17 @@
 # Validation record
 
+## Scoped AI development workflows — 2026-10-16
+
+The comparison checklist was completed in dependency order: local Git/history/recovery, advanced workflows, stacks and review providers, then AI drafting/explanations, coding worktrees and manually applied conflict proposals. Provider-specific qualification remains in [Review providers](REVIEW_PROVIDERS.md); task behavior and bounds are in [AI assistance](AI.md).
+
+- All **81 frontend unit tests** and **240 Chromium/WebKit browser cases** passed. A further **30 focused AI/conflict cases** passed after checking two mounted assistant composers, panel recovery during preparation, draft preservation, explicit use, conflict Undo/separate staging and worktree removal confirmation.
+- `wails3 build`, `go test -p 1 -race ./...` and `go vet -p 1 ./...` passed. The rebuilt Linux desktop opened and closed in an isolated configuration/cache profile; this host emitted its usual software-rendering/accessibility warnings.
+- Real disposable Git tests cover immutable staged blobs (including initial commits), committed comparisons, stale conflict/index guards, current-hash file writes, metadata/path/symlink/ignored-file rejection, paginated file catalogs, cancellation ownership, follow-ups after manual commits, persistent worktree records, repository path aliases and clean-only removal. New Git-client paths also passed against locally built Git 2.56.
+- Live Codex and Copilot subscription checks each drafted a staged commit and edited a disposable worktree. Coding used the scoped read/write tools and returned a typed summary. The original staged content, checkout, index and commit IDs stayed intact; no task staged, committed or published anything. Provider usage was recorded without estimating dollar charges.
+- T3 inspected light/dark proposal layouts and the agent catalog. The conflict assistant occupies the full height beside the manual editor. Ordinary conflict layout styles load independently of the AI panel.
+
+CI exercises local MCP and fake-provider protocols without subscription access. The live checks above ran on Linux with synthetic source. They do not establish macOS/Windows provider interaction, model accuracy, or large-project performance. Existing native review capability remains read only apart from manually accepted draft findings; development tasks have their own bounded tool set.
+
 ## Deferred Apple notarization without idle runners — 2026-10-15
 
 Replaced the long synchronous waits with durable `app`, `dmg`, and `ready` checkpoints. Initial jobs submit and query once, then save Actions artifacts and exit while Apple processes. A manual Resume release workflow restores those files on fresh Mac runners, reuses submission IDs, and avoids rebuilding Linux/Windows or installing Go/frontend dependencies. Publication uses the original non-Mac artifacts and current Mac checkpoints, and is blocked until both Mac targets are ready. No schedules or wait commands run. The old release run had already ended before this change: Intel succeeded and ARM remained pending after an hour.

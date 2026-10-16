@@ -733,6 +733,12 @@ export const services = {
     clone: (url: string, directory: string) => invoke<RepositorySnapshot>("main.RepositoryService.Clone", url, directory),
   },
   ai: {
+    startAction:(request:import('./aiActionTypes').AIActionRequest)=>invoke<import('./aiActionTypes').AIActionSnapshot>('main.AIService.StartAction',request),
+    getAction:(id:string)=>invoke<import('./aiActionTypes').AIActionSnapshot>('main.AIService.GetAction',id),
+    validateAction:(id:string)=>invoke<void>('main.AIService.ValidateAction',id),
+    cancelAction:(id:string)=>invoke<void>('main.AIService.CancelAction',id),
+    worktrees:(root:string)=>invoke<import('./aiActionTypes').AIWorktreeInfo[]>('main.AIService.AgentWorktrees',root),
+    removeWorktree:(id:string)=>invoke<void>('main.AIService.RemoveAgentWorktree',id),
     preferences:()=>invoke<import('./aiTypes').AIPreferences>('main.AIService.GetPreferences'),
     savePreferences:(preferences:import('./aiTypes').AIPreferences)=>invoke<void>('main.AIService.SavePreferences',preferences),
     status:(provider:import('./aiTypes').AIProvider)=>invoke<import('./aiTypes').AIProviderStatus>('main.AIService.GetProviderStatus',provider),

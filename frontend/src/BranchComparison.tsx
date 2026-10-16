@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import type { ChangedFile } from './data'
 import { services, type RepositorySnapshot } from './services'
 import { mapRepositoryDiff } from './liveData'
@@ -8,6 +8,8 @@ import FileChangeIcon from './FileChangeIcon'
 import { codeReviewStyleVariables, DEFAULT_CODE_REVIEW_PREFERENCES, effectiveCodeTheme, getCodeAppearance, getCodeReviewPreferences, subscribeCodeAppearance, subscribeCodeReviewPreferences } from './codeReviewPreferences'
 import { highlightDiff, syntaxLineKey, syntaxTokenStyle, type HighlightedDiff } from './syntaxHighlighter'
 import './RepositoryWorkspace.css'
+
+const AIActionDialog = lazy(async () => ({default:(await import('./AIActionPanel')).AIActionDialog}))
 
 export function useBranchComparison(repository: RepositorySnapshot | null, base: string, head: string) {
   const [result, setResult] = useState<{ key: string; files: ChangedFile[] } | null>(null)
@@ -32,6 +34,7 @@ export function useBranchComparison(repository: RepositorySnapshot | null, base:
 }
 
 export default function BranchComparison({ repository }: { repository: RepositorySnapshot }) {
+  const [explain,setExplain]=useState<{base:string;head:string;sha:string}>()
   const [base, setBase] = useState(() => comparisonBase(repository))
   const [head, setHead] = useState(repository.currentBranch || 'HEAD')
   const comparison = useBranchComparison(repository, base, head)
@@ -39,6 +42,8 @@ export default function BranchComparison({ repository }: { repository: Repositor
   return <div className="branch-comparison">
     <div className="comparison-selectors"><label>Base revision<select value={base} onChange={event => setBase(event.target.value)}><option value="">Choose a base</option>{branches.map(name => <option key={name}>{name}</option>)}</select></label><Icon name="arrow-right"/><label>Compare revision<select value={head} onChange={event => setHead(event.target.value)}>{branches.map(name => <option key={name}>{name}</option>)}</select></label></div>
     <p className="comparison-note">Committed changes since the common ancestor. Your index and working files are preserved.</p>
+    <button type="button" className="btn" disabled={!base||!head||base===head||comparison.loading||!!comparison.error||!comparison.files?.length} onClick={()=>setExplain({base,head,sha:head==='HEAD'?repository.headSha??'':repository.branches?.find(item=>item.name===head)?.commitSha??''})}>Explain with AI</button>
+    {explain&&<Suspense fallback={<p role="status">Loading AI explanation…</p>}><AIActionDialog scope={{root:repository.root,kind:'explain',base:explain.base,head:explain.head,expectedHead:explain.sha}} onClose={()=>setExplain(undefined)}/></Suspense>}
     <ComparisonPreview {...comparison} valid={!!base && !!head && base !== head}/>
   </div>
 }

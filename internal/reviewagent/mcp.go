@@ -15,11 +15,35 @@ import (
 var ToolNames = []string{"get_review_context", "read_review_file", "add_review_comment", "finish_review", "read_review_ticket"}
 
 type Bridge struct {
-	URL     string
-	Token   string
-	server  *http.Server
-	handler *mcp.StreamableHTTPHandler
+	URL          string
+	Token        string
+	server       *http.Server
+	handler      *mcp.StreamableHTTPHandler
+	tools        []string
+	instructions string
+	progress     string
 }
+
+func (b *Bridge) progressMessage() string {
+	if b.progress == "" {
+		return "Reviewing captured pull request changes"
+	}
+	return b.progress
+}
+
+func (b *Bridge) toolNames() []string {
+	if len(b.tools) == 0 {
+		return ToolNames
+	}
+	return b.tools
+}
+func (b *Bridge) systemInstructions() string {
+	if b.instructions == "" {
+		return Instructions
+	}
+	return b.instructions
+}
+
 type Empty struct{}
 type ReadFileInput struct {
 	Path      string `json:"path" jsonschema:"Relative repository file path"`
@@ -36,11 +60,6 @@ type ReadTicketInput struct {
 }
 
 func StartBridge(run *Run) (*Bridge, error) {
-	listener, err := net.Listen("tcp4", "127.0.0.1:0")
-	if err != nil {
-		return nil, err
-	}
-	bridge := &Bridge{URL: "http://" + listener.Addr().String() + "/mcp", Token: ID()}
 	no := false
 	additive := &mcp.ToolAnnotations{DestructiveHint: &no, OpenWorldHint: &no, IdempotentHint: true}
 	server := mcp.NewServer(&mcp.Implementation{Name: "mier-review", Version: "1.0.0"}, &mcp.ServerOptions{Instructions: Instructions})
@@ -87,12 +106,25 @@ func StartBridge(run *Run) (*Bridge, error) {
 		run.completeTool(call, nil, &value, err)
 		return nil, value, err
 	})
-	bridge.handler = mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server }, &mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true, MaxRequestBodyBytes: 64 * 1024})
+	return startScopedBridge(server, ToolNames, Instructions, 64*1024)
+}
+
+func startScopedBridge(server *mcp.Server, tools []string, instructions string, maxBody int64) (*Bridge, error) {
+	listener, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		return nil, err
+	}
+	bridge := &Bridge{URL: "http://" + listener.Addr().String() + "/mcp", Token: ID(), tools: append([]string{}, tools...), instructions: instructions}
+	bridge.handler = mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server }, &mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true, MaxRequestBodyBytes: maxBody})
 	protected := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Loopback, Host checks, origin rejection and a fresh per-review bearer
 		// token keep browser pages and unrelated local clients out of the review.
 		if r.URL.Path != "/mcp" {
 			http.NotFound(w, r)
+			return
+		}
+		if r.Host != listener.Addr().String() {
+			http.Error(w, "Unexpected MCP host", http.StatusForbidden)
 			return
 		}
 		if r.Header.Get("Origin") != "" || r.Header.Get("Sec-Fetch-Site") == "cross-site" {

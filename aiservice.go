@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"mag-ik-een-review/internal/gitclient"
 	"mag-ik-een-review/internal/reviewagent"
 	"os"
 	"os/exec"
@@ -50,12 +51,21 @@ type AILoginStatus struct {
 	Error string `json:"error"`
 }
 type aiTask struct {
-	run    *reviewagent.Run
-	bridge *reviewagent.Bridge
-	cancel context.CancelFunc
+	run        *reviewagent.Run
+	bridge     *reviewagent.Bridge
+	cancel     context.CancelFunc
+	action     *reviewagent.Action
+	capture    gitclient.AssistantCapture
+	actionKind string
+	worktreeID string
 }
 
 type AIService struct {
+	repositories          *RepositoryService
+	worktrees             map[string]aiWorktreeRecord
+	worktreesLoaded       bool
+	worktreesErr          error
+	actionRunner          func(context.Context, AIActionRequest, *reviewagent.Bridge, *reviewagent.Action) error
 	github                *GitHubService
 	credentials           *CredentialService
 	jira                  *IntegrationService
@@ -494,17 +504,7 @@ func (s *AIService) execute(ctx context.Context, request AIReviewRequest, task *
 	defer func() {
 		s.mu.Lock()
 		delete(s.active, key)
-		if len(s.tasks) > 20 {
-			for id, old := range s.tasks {
-				state := old.run.Snapshot().State
-				if state == "completed" || state == "failed" || state == "cancelled" {
-					delete(s.tasks, id)
-					if len(s.tasks) <= 20 {
-						break
-					}
-				}
-			}
-		}
+		s.pruneAITasksLocked(run.Snapshot().ID)
 		s.mu.Unlock()
 	}()
 	if external {

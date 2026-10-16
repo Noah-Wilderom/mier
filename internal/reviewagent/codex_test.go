@@ -56,17 +56,24 @@ func fakeCodex() {
 			response = map[string]any{"data": []map[string]any{{"model": "model-from-provider", "displayName": "Provider model", "isDefault": true, "supportedReasoningEfforts": []map[string]string{{"reasoningEffort": "low"}, {"reasoningEffort": "medium"}, {"reasoningEffort": "high"}}}}}
 		case "thread/start":
 			var value struct {
-				Sandbox string
-				Config  struct {
+				Sandbox               string
+				DeveloperInstructions string
+				Config                struct {
 					Servers map[string]struct {
-						Enabled bool
-						URL     string
-						Headers map[string]string `json:"http_headers"`
+						Enabled      bool
+						URL          string
+						Headers      map[string]string `json:"http_headers"`
+						EnabledTools []string          `json:"enabled_tools"`
 					} `json:"mcp_servers"`
 				}
 			}
 			if json.Unmarshal(message.Params, &value) != nil || value.Sandbox != "read-only" || value.Config.Servers["unrelated-user-server"].Enabled {
 				os.Exit(13)
+			}
+			if os.Getenv("MIER_FAKE_CODEX_ACTION") != "" {
+				if strings.Join(value.Config.Servers["mier"].EnabledTools, ",") != "get_task_context,read_task_file,finish_task" || value.DeveloperInstructions != ActionInstructions {
+					os.Exit(19)
+				}
 			}
 			bridgeURL = value.Config.Servers["mier"].URL
 			token = strings.TrimPrefix(value.Config.Servers["mier"].Headers["Authorization"], "Bearer ")
@@ -90,7 +97,11 @@ func fakeCodex() {
 			if err != nil {
 				os.Exit(14)
 			}
-			for _, call := range []*mcp.CallToolParams{{Name: "get_review_context", Arguments: Empty{}}, {Name: "read_review_ticket", Arguments: ReadTicketInput{Provider: "jira", Key: "ENG-7"}}, {Name: "add_review_comment", Arguments: Finding{Path: "source.ts", Side: "new", Line: 3, Body: "Check the new behavior.", Severity: "bug"}}, {Name: "finish_review", Arguments: SummaryInput{Summary: "One suggestion; no tests were run."}}} {
+			calls := []*mcp.CallToolParams{{Name: "get_review_context", Arguments: Empty{}}, {Name: "read_review_ticket", Arguments: ReadTicketInput{Provider: "jira", Key: "ENG-7"}}, {Name: "add_review_comment", Arguments: Finding{Path: "source.ts", Side: "new", Line: 3, Body: "Check the new behavior.", Severity: "bug"}}, {Name: "finish_review", Arguments: SummaryInput{Summary: "One suggestion; no tests were run."}}}
+			if os.Getenv("MIER_FAKE_CODEX_ACTION") != "" {
+				calls = []*mcp.CallToolParams{{Name: "get_task_context", Arguments: Empty{}}, {Name: "finish_task", Arguments: ActionProposal{Text: "feat: describe captured change"}}}
+			}
+			for _, call := range calls {
 				result, err := session.CallTool(ctx, call)
 				if err != nil || result.IsError {
 					os.Exit(15)
@@ -114,6 +125,26 @@ func fakeCodex() {
 			os.Exit(17)
 		}
 		write(map[string]any{"id": message.ID, "result": response})
+	}
+}
+
+func TestCodexActionHarnessUsesTaskInstructionsAndScopedTools(t *testing.T) {
+	t.Setenv("MIER_FAKE_CODEX", "1")
+	t.Setenv("MIER_FAKE_CODEX_ACTION", "commit")
+	action := actionFixture(t, "commit", nil)
+	bridge, err := StartActionBridge(action)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer bridge.Close()
+	binary, _ := os.Executable()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err = RunCodex(ctx, binary, t.TempDir(), "test", "", "Draft commit", bridge, action.Run); err != nil {
+		t.Fatal(err)
+	}
+	if action.Proposal() == nil || action.Proposal().Text != "feat: describe captured change" || len(action.Run.Snapshot().Findings) != 0 || action.Run.Snapshot().ActivityTotals.ToolCalls != 2 {
+		t.Fatal("task harness did not use the dedicated tools")
 	}
 }
 func TestCodexHarnessUsesMCPAndRejectsWriteApproval(t *testing.T) {

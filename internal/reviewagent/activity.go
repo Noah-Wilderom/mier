@@ -119,6 +119,9 @@ func (r *Run) completeTool(call toolCall, source *Source, ticket *TicketContent,
 		for _, line := range source.Lines {
 			bytes += len(line)
 		}
+		if source.textBytes != nil {
+			bytes = *source.textBytes
+		}
 		r.snapshot.ActivityTotals.FileReads++
 		r.snapshot.ActivityTotals.LinesRead += lines
 		r.snapshot.ActivityTotals.BytesRead += bytes

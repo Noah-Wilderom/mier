@@ -31,11 +31,14 @@ export {
 };
 
 export type {
+    AIActionRequest,
+    AIActionSnapshot,
     AIConnection,
     AILogin,
     AILoginStatus,
     AIPreferences,
     AIReviewRequest,
+    AIWorktreeInfo,
     Account,
     AccountStatus,
     ChangedFile,

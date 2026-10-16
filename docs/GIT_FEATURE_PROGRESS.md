@@ -23,11 +23,11 @@ An unchecked item is planned, not a supported capability. AI additions come last
 - [x] Terminal and custom commands
 - [x] Stacked pull requests
 - [x] GitLab, Bitbucket Cloud, and Azure DevOps Services review providers
-- [ ] AI commit / PR writing and branch explanations (last)
-- [ ] Coding-agent worktrees (last)
-- [ ] AI conflict proposals with manual approval (last)
+- [x] AI commit / PR writing and branch explanations (last)
+- [x] Coding-agent worktrees (last)
+- [x] AI conflict proposals with manual approval (last)
 
 Each group must have real Git/provider integration, appropriate automated tests,
 and usable controls before being marked complete.
 
-Provider-specific API limits and authentication are documented in [Review providers](REVIEW_PROVIDERS.md). The native provider group is covered by HTTP contract tests, real Git source/checkout tests, and Chromium/WebKit review and account flows. Subscription-backed AI additions below remain separate work.
+Provider-specific API limits and authentication are documented in [Review providers](REVIEW_PROVIDERS.md). The native provider group is covered by HTTP contract tests, real Git source/checkout tests, and Chromium/WebKit review and account flows. [AI assistance](AI.md) documents the separate proposal and coding tools, manual use/save steps, subscription connections, and explicit limits. Live Linux Codex/Copilot checks drafted commits and edited isolated worktrees while preserving the original checkout and index.

@@ -45,6 +45,7 @@ func main() {
 	jira := NewIntegrationService()
 	linear := NewLinearService()
 	ai := NewAIService(github, credentials)
+	ai.repositories = repositories
 	ai.jira, ai.linear = jira, linear
 	workspace := NewWorkspaceService()
 	var app *application.App

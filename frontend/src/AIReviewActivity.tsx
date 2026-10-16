@@ -14,8 +14,20 @@ const toolLabels: Record<string, string> = {
   read_review_ticket: "Read linked ticket",
   add_review_comment: "Propose finding",
   finish_review: "Write summary",
+  get_task_context: "Read task context",
+  read_task_file: "Read captured file",
+  finish_task: "Propose task result",
+  list_worktree_files: "List worktree files",
+  read_worktree_file: "Read worktree file",
+  write_worktree_file: "Write worktree file",
 };
-export function AIReviewActivity({ run }: { run: AIReview }) {
+export function AIReviewActivity({
+  run,
+  task = false,
+}: {
+  run: AIReview;
+  task?: boolean;
+}) {
   const totals = run.activityTotals;
   const usage = run.usage;
   const elapsed =
@@ -53,9 +65,14 @@ export function AIReviewActivity({ run }: { run: AIReview }) {
       number(usage.nanoAiu),
     ]);
   if (Number.isFinite(elapsed))
-    metrics.push(["Review time", duration(elapsed)]);
+    metrics.push([task ? "Task time" : "Review time", duration(elapsed)]);
   return (
-    <details className="ai-activity" aria-label="Review activity and usage">
+    <details
+      className="ai-activity"
+      aria-label={
+        task ? "Task activity and usage" : "Review activity and usage"
+      }
+    >
       <summary>
         Activity and usage
         {totals && (
@@ -79,7 +96,7 @@ export function AIReviewActivity({ run }: { run: AIReview }) {
         {usage?.source
           ? `Provider-reported ${usage.partial ? "subtotals" : "usage"}. `
           : "This provider has not reported usage. "}
-        This review connection does not supply a dollar charge.
+        This connection does not supply a dollar charge.
         {usage?.premiumRequests != null || usage?.nanoAiu != null
           ? " Premium requests and nano-AI units are provider billing units, not dollars."
           : ""}
@@ -104,7 +121,10 @@ export function AIReviewActivity({ run }: { run: AIReview }) {
         </p>
       )}
       {!!run.activity?.length && (
-        <ol className="ai-tool-activity" aria-label="Executed review tools">
+        <ol
+          className="ai-tool-activity"
+          aria-label={task ? "Executed task tools" : "Executed review tools"}
+        >
           {run.activity.map((call) => (
             <li key={call.id} data-state={call.state}>
               <div>
@@ -133,7 +153,11 @@ export function AIReviewActivity({ run }: { run: AIReview }) {
                   {call.ticketKey}
                 </code>
               )}
-              {call.tool === "read_review_file" &&
+              {[
+                "read_review_file",
+                "read_task_file",
+                "read_worktree_file",
+              ].includes(call.tool) &&
                 call.state === "completed" && (
                   <span className="muted">
                     {call.lines} lines returned · {number(call.bytes)} bytes

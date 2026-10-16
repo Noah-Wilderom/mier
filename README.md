@@ -18,6 +18,8 @@ Connect [GitHub, GitLab, Bitbucket Cloud, and Azure DevOps](docs/REVIEW_PROVIDER
 
 Review PRs with [ChatGPT/Codex, GitHub Copilot, or your own MCP client](docs/AI.md). AI suggestions become private native review comments for you to inspect before submitting.
 
+Use AI to draft commits and PRs, explain branch changes, propose conflict resolutions, or edit code in an isolated worktree. You choose when to use a proposal and commit the result.
+
 [Download the latest release](https://github.com/Noah-Wilderom/mier/releases/latest) · macOS, Windows, and Linux · Intel/AMD and ARM64
 
 [Linux and Omarchy installation](docs/LINUX.md) — DEB, RPM, Arch packages, and AppImage.

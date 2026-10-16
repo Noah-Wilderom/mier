@@ -130,13 +130,13 @@ func RunCodex(ctx context.Context, binary, directory, version, model, prompt str
 	if err != nil {
 		return err
 	}
-	// Clicking Start review authorizes only these additive in-app draft tools.
-	// All command/file approvals remain disabled and unrelated MCP entries off.
+	// The originating UI action authorizes this bridge's exact tool set.
+	// Built-in approvals remain disabled and unrelated MCP entries stay off.
 	toolPolicy := map[string]any{}
-	for _, tool := range ToolNames {
+	for _, tool := range bridge.toolNames() {
 		toolPolicy[tool] = map[string]string{"approval_mode": "approve"}
 	}
-	servers["mier"] = map[string]any{"enabled": true, "required": true, "url": bridge.URL, "http_headers": map[string]string{"Authorization": "Bearer " + bridge.Token}, "enabled_tools": ToolNames, "tools": toolPolicy, "startup_timeout_sec": 15, "tool_timeout_sec": 40}
+	servers["mier"] = map[string]any{"enabled": true, "required": true, "url": bridge.URL, "http_headers": map[string]string{"Authorization": "Bearer " + bridge.Token}, "enabled_tools": bridge.toolNames(), "tools": toolPolicy, "startup_timeout_sec": 15, "tool_timeout_sec": 40}
 	completion := make(chan struct {
 		Status string
 		Error  *struct{ Message string }
@@ -184,7 +184,7 @@ func RunCodex(ctx context.Context, binary, directory, version, model, prompt str
 	if !status.Authenticated {
 		return errors.New("Sign in with ChatGPT in AI settings before starting a Codex review")
 	}
-	params := map[string]any{"cwd": directory, "approvalPolicy": "never", "sandbox": "read-only", "ephemeral": true, "developerInstructions": Instructions, "config": map[string]any{"mcp_servers": servers, "mcp_optional_startup_grace_ms": 15000}}
+	params := map[string]any{"cwd": directory, "approvalPolicy": "never", "sandbox": "read-only", "ephemeral": true, "developerInstructions": bridge.systemInstructions(), "config": map[string]any{"mcp_servers": servers, "mcp_optional_startup_grace_ms": 15000}}
 	if model != "" {
 		params["model"] = model
 	}
@@ -198,7 +198,7 @@ func RunCodex(ctx context.Context, binary, directory, version, model, prompt str
 	textMu.Lock()
 	reviewThread = thread.Thread.ID
 	textMu.Unlock()
-	run.Progress("Reviewing captured pull request changes")
+	run.Progress(bridge.progressMessage())
 	var turn struct{ Turn struct{ ID string } }
 	turnParams := map[string]any{"threadId": thread.Thread.ID, "input": []map[string]string{{"type": "text", "text": prompt}}}
 	if effort := ModelEffort(status.Models, model, run.Snapshot().Intensity); effort != "" {
@@ -288,7 +288,7 @@ func RunCopilot(ctx context.Context, binary, directory, token, model, prompt str
 		ClientName: "mier", Model: model, WorkingDirectory: directory,
 		ReasoningEffort: ModelEffort(catalog, model, run.Snapshot().Intensity),
 		AvailableTools:  allowed.ToSlice(), Tools: tools,
-		SystemMessage:          &copilot.SystemMessageConfig{Mode: "replace", Content: Instructions},
+		SystemMessage:          &copilot.SystemMessageConfig{Mode: "replace", Content: bridge.systemInstructions()},
 		SkipCustomInstructions: copilot.Bool(true), CoauthorEnabled: copilot.Bool(false), ManageScheduleEnabled: copilot.Bool(false),
 		LargeOutput:         &copilot.LargeToolOutputConfig{Enabled: copilot.Bool(false)},
 		OnPermissionRequest: rejectReviewPermission,
@@ -311,7 +311,7 @@ func RunCopilot(ctx context.Context, binary, directory, token, model, prompt str
 			run.recordCopilotMetrics(metrics)
 		}
 	}()
-	run.Progress("Reviewing captured pull request changes")
+	run.Progress(bridge.progressMessage())
 	response, err := session.SendAndWait(ctx, copilot.MessageOptions{Prompt: prompt})
 	if ctx.Err() != nil {
 		abort, stop := context.WithTimeout(context.Background(), 2*time.Second)
@@ -333,7 +333,7 @@ func RunCopilot(ctx context.Context, binary, directory, token, model, prompt str
 // The only permitted writes are explicit additive draft tools registered above.
 // Built-in command, file, network, and unrelated MCP permissions are rejected.
 func rejectReviewPermission(copilot.PermissionRequest, copilot.PermissionInvocation) (rpc.PermissionDecision, error) {
-	feedback := "This review only allows M.I.E.R.'s scoped review tools"
+	feedback := "This task only allows M.I.E.R.'s scoped tools"
 	return &rpc.PermissionDecisionReject{Feedback: &feedback}, nil
 }
 
@@ -356,7 +356,7 @@ func copilotReviewTools(ctx context.Context, bridge *Bridge) ([]copilot.Tool, *m
 		return nil, nil, err
 	}
 	tools := []copilot.Tool{}
-	for _, name := range ToolNames {
+	for _, name := range bridge.toolNames() {
 		var definition *mcp.Tool
 		for _, tool := range list.Tools {
 			if tool.Name == name {

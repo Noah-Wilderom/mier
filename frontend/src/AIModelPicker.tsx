@@ -59,12 +59,14 @@ export function AIModelPicker({
   provider,
   disabled,
   onChange,
+  label = "AI review model",
 }: {
   models: AIModel[];
   value: string;
   provider: AIProvider;
   disabled: boolean;
   onChange: (value: string) => void;
+  label?: string;
 }) {
   const selected = models.find((model) => model.id === value);
   const options =
@@ -81,10 +83,7 @@ export function AIModelPicker({
           onChange(next === "provider-default" ? "" : next)
         }
       >
-        <Select.Trigger
-          className="ai-model-trigger"
-          aria-label="AI review model"
-        >
+        <Select.Trigger className="ai-model-trigger" aria-label={label}>
           <AIModelLogo
             model={value}
             name={selected?.name}

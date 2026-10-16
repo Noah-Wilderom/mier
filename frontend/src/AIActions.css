@@ -1,0 +1,183 @@
+.repository-modal:has(.ai-action-dialog) {
+  width: min(850px, calc(100vw - 40px));
+  max-width: none;
+}
+.ai-action-dialog {
+  display: flex;
+  height: min(76vh, 850px);
+  min-height: 320px;
+}
+.ai-action-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  font-size: 12px;
+}
+.ai-action-panel > .ai-review-error {
+  padding: 10px 14px;
+  margin: 0;
+  border-bottom: 1px solid var(--border);
+}
+.ai-action-state {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding-bottom: 10px;
+}
+.ai-action-state > span {
+  margin-left: auto;
+  color: var(--muted);
+  text-transform: capitalize;
+}
+.ai-action-result pre {
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow: auto;
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font: 12px/1.6 var(--font-mono, monospace);
+}
+.ai-action-proposal {
+  line-height: 1.6;
+}
+.ai-action-proposal > h3 {
+  margin: 8px 0;
+}
+.ai-action-proposal > .ai-conflict-proposal {
+  max-height: 420px;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+.ai-action-apply {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  margin-top: 12px;
+}
+.ai-action-worktree {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.ai-action-worktree code {
+  overflow-wrap: anywhere;
+}
+.ai-action-warnings {
+  padding-left: 20px;
+  color: var(--muted);
+}
+.repository-tool-panel:has(.ai-agent-panel) {
+  display: flex;
+  flex-direction: column;
+}
+.ai-agent-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  gap: 12px;
+}
+.ai-agent-layout {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  flex: 1;
+  min-height: 300px;
+  border: 1px solid var(--border);
+}
+.ai-agent-list {
+  border-right: 1px solid var(--border);
+  overflow: auto;
+  min-height: 0;
+}
+.ai-agent-list > button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 12px;
+  width: 100%;
+  color: var(--text);
+  background: transparent;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.ai-agent-list > button.selected {
+  background: var(--accent-soft);
+  box-shadow: inset 2px 0 var(--accent);
+}
+.ai-agent-list > button span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.ai-agent-task {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.ai-agent-task > header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.ai-agent-task > header strong {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.conflict-ai-sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 40%;
+  min-width: 300px;
+  min-height: 0;
+  border-left: 1px solid var(--border);
+}
+.conflict-ai-sidebar > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.conflict-workspace:has(.conflict-ai-sidebar) .conflict-shortcuts {
+  display: none;
+}
+.conflict-workspace:has(.conflict-ai-sidebar) .conflict-result-heading > span {
+  min-width: 150px;
+}
+.conflict-ai-sidebar .ai-review-selectors {
+  grid-template-columns: 1fr;
+}
+@media (max-width: 800px) {
+  .ai-agent-layout {
+    grid-template-columns: 160px minmax(0, 1fr);
+  }
+  .conflict-workspace {
+    flex-direction: column;
+    overflow: auto;
+  }
+  .conflict-workspace > .conflict-editor {
+    min-height: 480px;
+  }
+  .conflict-ai-sidebar {
+    width: 100%;
+    height: 500px;
+    min-height: 500px;
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+}

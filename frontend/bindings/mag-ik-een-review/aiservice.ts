@@ -13,8 +13,16 @@ import * as reviewagent$0 from "./internal/reviewagent/models.js";
 // @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
+export function AgentWorktrees(root: string): $CancellablePromise<$models.AIWorktreeInfo[] | null> {
+    return $Call.ByID(120036518, root);
+}
+
 export function BeginCodexLogin(): $CancellablePromise<$models.AILogin> {
     return $Call.ByID(890024148);
+}
+
+export function CancelAction(id: string): $CancellablePromise<void> {
+    return $Call.ByID(1373055347, id);
 }
 
 export function CancelCodexLogin(id: string): $CancellablePromise<void> {
@@ -23,6 +31,10 @@ export function CancelCodexLogin(id: string): $CancellablePromise<void> {
 
 export function CancelReview(id: string): $CancellablePromise<void> {
     return $Call.ByID(3186009501, id);
+}
+
+export function GetAction(id: string): $CancellablePromise<$models.AIActionSnapshot> {
+    return $Call.ByID(2522910147, id);
 }
 
 export function GetCodexLoginStatus(id: string): $CancellablePromise<$models.AILoginStatus> {
@@ -49,8 +61,20 @@ export function GetReview(id: string): $CancellablePromise<reviewagent$0.RunSnap
     return $Call.ByID(3818422893, id);
 }
 
+/**
+ * Removing an owned worktree uses the normal clean-only Git removal. Its branch
+ * remains available in history; active tasks must be stopped explicitly first.
+ */
+export function RemoveAgentWorktree(id: string): $CancellablePromise<void> {
+    return $Call.ByID(1187311733, id);
+}
+
 export function SavePreferences(input: $models.AIPreferences): $CancellablePromise<void> {
     return $Call.ByID(2296164736, input);
+}
+
+export function StartAction(request: $models.AIActionRequest): $CancellablePromise<$models.AIActionSnapshot> {
+    return $Call.ByID(2848136919, request);
 }
 
 export function StartMCPReview(request: $models.AIReviewRequest): $CancellablePromise<$models.AIConnection> {
@@ -59,4 +83,8 @@ export function StartMCPReview(request: $models.AIReviewRequest): $CancellablePr
 
 export function StartReview(request: $models.AIReviewRequest): $CancellablePromise<reviewagent$0.RunSnapshot> {
     return $Call.ByID(3703021689, request);
+}
+
+export function ValidateAction(id: string): $CancellablePromise<void> {
+    return $Call.ByID(3070045195, id);
 }

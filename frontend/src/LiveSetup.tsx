@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Icon } from './Icon'
 import ReviewProviderSettings from './ReviewProviderSettings'
 import type { useLiveWorkspace } from './useLiveWorkspace'
@@ -7,6 +7,7 @@ import {Avatar, ActorName} from './Avatar'
 import { ComparisonPreview, useBranchComparison } from './BranchComparison'
 import { pullRequestDraftKey, readPullRequestDraft, type PullRequestDraft } from './workspaceDrafts'
 import { usePersistentDraft } from './usePersistentDraft'
+const AIActionDialog = lazy(async () => ({default:(await import('./AIActionPanel')).AIActionDialog}))
 type Live = ReturnType<typeof useLiveWorkspace>
 export function RepositoryWelcome({live,onOpen,onDemo}:{live:Live;onOpen:()=>void;onDemo:()=>void}) {
   const [cloning,setCloning]=useState(false),[cloneBusy,setCloneBusy]=useState(false),[url,setURL]=useState(''),[directory,setDirectory]=useState(''),[error,setError]=useState('')
@@ -24,6 +25,7 @@ export function AccountSettings({live}:{live:Live}) {
 }
 
 export function LiveCreatePullRequest({live,onCancel,onCreated}:{live:Live;onCancel:()=>void;onCreated:(number:number)=>void}) {
+  const [aiDraft,setAIDraft]=useState<{base:string;head:string;sha:string}>()
   const repository=live.repository,identity=live.identity
   const branches=(repository?.branches??[]).filter(branch=>!branch.remote).map(branch=>branch.name)
   const defaultBase=branches.includes('main')?'main':branches.includes('master')?'master':branches[0]??''
@@ -57,8 +59,10 @@ export function LiveCreatePullRequest({live,onCancel,onCreated}:{live:Live;onCan
   }
   return <section className="create-pr-pane">
     <div className="create-pr-heading"><span className="eyebrow">{identity?`${identity.owner}/${identity.repo}`:'Local repository'}</span><h1>Create a pull request</h1><p>Give reviewers the context they need to understand your changes. Your draft is saved on this device.</p></div>
+    {aiDraft&&repository&&<Suspense fallback={<p role="status">Loading AI drafting…</p>}><AIActionDialog scope={{root:repository.root,kind:'pull_request',base:aiDraft.base,head:aiDraft.head,expectedHead:aiDraft.sha}} disabled={locked} onClose={()=>setAIDraft(undefined)} applyLabel="Use PR draft" onApply={proposal=>{patch({title:proposal.title??'',body:proposal.body??''});setAIDraft(undefined)}}/></Suspense>}
     <form onSubmit={create}>
       <div className="create-branches"><label>Base branch<select value={base} onChange={event=>patch({base:event.target.value})} disabled={locked}><option value="">Choose a base</option>{base&&!branches.includes(base)&&<option value={base} disabled>{base} (no longer available)</option>}{branches.map(branch=><option key={branch}>{branch}</option>)}</select></label><Icon name="arrow-left"/><label>Compare branch<select value={head} onChange={event=>patch({head:event.target.value})} disabled={locked}><option value="">Choose a branch</option>{head&&!branches.includes(head)&&<option value={head} disabled>{head} (no longer available)</option>}{branches.map(branch=><option key={branch}>{branch}</option>)}</select></label></div>
+      <div className="git-tool-actions"><button type="button" className="btn" disabled={locked||!valid||!headSHA||!!comparison.error||comparison.loading||!comparison.files?.length} onClick={()=>setAIDraft({base,head,sha:headSHA??''})}>Draft with AI</button></div>
       <label>Title<input autoFocus required maxLength={512} value={title} onChange={event=>patch({title:event.target.value})} placeholder="Describe what changed" disabled={locked}/></label>
       <label>Description<textarea rows={7} maxLength={65536} value={body} onChange={event=>patch({body:event.target.value})} placeholder="What changed, why, and what should reviewers look for?" disabled={locked}/></label>
       <label className="checkbox-label"><input type="checkbox" checked={draft} disabled={locked||live.account?.readOnly} onChange={event=>patch({draft:event.target.checked})}/>Create as draft</label>
