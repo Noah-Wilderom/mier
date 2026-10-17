@@ -111,7 +111,13 @@ func fixtureProgram(t *testing.T, path string, metadata fixtureMetadata) string 
 	if err := os.WriteFile(path+".json", data, 0600); err != nil {
 		t.Fatal(err)
 	}
-	return path
+	// Discovery returns a canonical executable path. Temp directories may use
+	// /var aliases on macOS or short names on Windows, including PATH fixtures.
+	canonical, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return canonical
 }
 
 func fixtureNode(t *testing.T, env environment, directory, version string, npm bool) string {
