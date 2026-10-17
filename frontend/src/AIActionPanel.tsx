@@ -7,6 +7,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import Modal from "./Modal";
+import WorktreeVerification from "./WorktreeVerification";
 import { Markdown } from "./Markdown";
 import { AIModelLogo, AIModelPicker } from "./AIModelPicker";
 import { AIReviewActivity } from "./AIReviewActivity";
@@ -558,6 +559,7 @@ function TaskPanel({
           }
           extras={
             <>
+              {task?.worktree&&<WorktreeVerification worktree={task.worktree} proposals={task.proposal?.checks} disabled={disabled||active||busy||starting} version={task.run.version}/>}
               {checking ? (
                 <p role="status">Checking provider…</p>
               ) : status?.authenticated ? (
@@ -589,7 +591,7 @@ function TaskPanel({
                 Starting sends the captured Git context and requested source to{" "}
                 {aiProviderName(preferences.provider)} using your account.
                 {scope.kind === "code"
-                  ? " File tools can read and edit the owned worktree. Review and run checks yourself before committing."
+                  ? " File tools can read and edit the owned worktree. Approved check results are included in follow-up tasks. Review edits and verification before committing."
                   : " Each request creates a proposal for you to review."}
               </p>
             </>

@@ -92,6 +92,8 @@ function LiveAssistant({
   const [open, setOpen] = useReviewSessionState("ai.open", false);
   const [saved, setSaved] = useState<Saved | undefined>(() => read(scope));
   const [run, setRun] = useState<AIReview>();
+  const [history,setHistory]=useState<AIReview[]>([]);
+  const [continueConversation,setContinueConversation]=useState(true);
   const [preferences, setPreferences] = useReviewSessionState<AIPreferences>(
     "ai.preferences",
     {
@@ -217,7 +219,14 @@ function LiveAssistant({
       stale = true;
     };
   }, [open, run?.id, run?.state, connection?.run.id]);
+  useEffect(()=>{
+    if(!open)return;
+    let canceled=false;
+    void services.ai.history({host:identity.host,owner:identity.owner,repository:identity.repo,pullRequest:pr.number}).then(items=>{if(!canceled){setHistory(items);if(!run&&!saved?.id&&items.length){const latest=items[items.length-1];setRun(latest);persist({id:latest.id,dismissed:[]})}}}).catch(issue=>{if(!canceled)setPollError(`Could not restore review history: ${String(issue)}`)});
+    return()=>{canceled=true};
+  },[open,scope,run?.id,run?.state]);
   const request = (focus = instructions): AIReviewRequest => ({
+    previousReviewId:continueConversation?run?.id:undefined,
     host: identity.host,
     owner: identity.owner,
     repository: identity.repo,
@@ -381,6 +390,7 @@ function LiveAssistant({
               >
                 <AIReviewChat
                   run={run}
+                  history={history}
                   active={active}
                   busy={busy}
                   disabled={
@@ -463,6 +473,7 @@ function LiveAssistant({
                   }
                   controls={
                     <>
+                      {run&&<label className="checkbox-label"><input type="checkbox" checked={continueConversation} disabled={active||busy} onChange={event=>setContinueConversation(event.target.checked)}/>Include earlier conversation in the next request</label>}
                       <div className="ai-review-selectors">
                         <label>
                           Provider

@@ -71,3 +71,15 @@ test('damaged or incompatible draft storage is ignored without blocking the app'
   assert.equal(readReviewDrafts(JSON.stringify({version:1,entries})).size, 1)
   assert.equal(readReviewDrafts(JSON.stringify({version:1,entries})).get(key).pendingComments[0].body,'Keep this feedback')
 })
+
+test('unchanged viewed files survive a restarted review at a new head without reanchoring old comments',async()=>{
+ const {fileSignature}=await import('./reviewFileSignature.ts')
+ const old=reviewing(),signatures=Object.fromEntries(old.files.map(file=>[file.path,fileSignature(file)]))
+ const saved={headSha:old.headSha,viewedFiles:old.viewedFiles,pendingComments:old.pendingComments,fileSignatures:signatures}
+ const newer=restoreReviewDraft({...old,headSha:'different-head',viewedFiles:[],pendingComments:[]},saved)
+ assert.deepEqual(newer.viewedFiles,old.viewedFiles)
+ assert.equal(newer.pendingComments[0].outdated,true)
+ const changed={...old.files[0],lines:old.files[0].lines.map((line,i)=>i===0?{...line,text:'different source'}:line)}
+ const invalidated=restoreReviewDraft({...old,headSha:'different-head',files:[changed,...old.files.slice(1)]},saved)
+ assert.ok(!invalidated.viewedFiles.includes(changed.path))
+})

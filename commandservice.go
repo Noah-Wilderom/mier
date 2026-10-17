@@ -195,6 +195,18 @@ func (s *CommandService) DeleteCommand(id string) error {
 	return s.writeCommands(kept)
 }
 func (s *CommandService) Start(ctx context.Context, path, id, expectedHead, expectedBranch string) (CommandRun, error) {
+	items, err := s.Commands()
+	if err != nil {
+		return CommandRun{}, err
+	}
+	for _, definition := range items {
+		if definition.ID == id {
+			return s.startDefinition(ctx, path, definition, expectedHead, expectedBranch, nil, "")
+		}
+	}
+	return CommandRun{}, errors.New("Save and select a command before running it")
+}
+func (s *CommandService) startDefinition(ctx context.Context, path string, definition CustomCommand, expectedHead, expectedBranch string, agent *gitclient.AgentWorktree, sourceStamp string) (CommandRun, error) {
 	if err := ctx.Err(); err != nil {
 		return CommandRun{}, err
 	}
@@ -213,21 +225,7 @@ func (s *CommandService) Start(ctx context.Context, path, id, expectedHead, expe
 	if old := s.jobs[s.latest[state.Root]]; old != nil && old.run.Status == "running" {
 		return CommandRun{}, errors.New("A custom command is already running for this repository")
 	}
-	items, err := s.readCommands()
-	if err != nil {
-		return CommandRun{}, err
-	}
-	var definition *CustomCommand
-	for _, item := range items {
-		if item.ID == id {
-			definition = &item
-			break
-		}
-	}
-	if definition == nil {
-		return CommandRun{}, errors.New("Save and select a command before running it")
-	}
-	if err = validateCustomCommand(*definition); err != nil {
+	if err = validateCustomCommand(definition); err != nil {
 		return CommandRun{}, err
 	}
 	execution, cancel := context.WithCancel(context.Background())
@@ -250,7 +248,7 @@ func (s *CommandService) Start(ctx context.Context, path, id, expectedHead, expe
 		}
 		delete(s.jobs, oldest)
 	}
-	request := gitclient.UserCommandRequest{Executable: definition.Executable, Arguments: append([]string{}, definition.Arguments...), TimeoutSeconds: definition.TimeoutSeconds, ExpectedHead: expectedHead, ExpectedBranch: expectedBranch}
+	request := gitclient.UserCommandRequest{Executable: definition.Executable, Arguments: append([]string{}, definition.Arguments...), TimeoutSeconds: definition.TimeoutSeconds, ExpectedHead: expectedHead, ExpectedBranch: expectedBranch, Agent: agent, ExpectedSourceStamp: sourceStamp}
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()

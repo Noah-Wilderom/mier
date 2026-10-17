@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type warmupJob struct {
@@ -38,6 +39,7 @@ func (m *Manager) Warmup(ctx context.Context, request CodePositionRequest) error
 		}
 		job = &warmupJob{done: make(chan struct{})}
 		m.warmups[key] = job
+		m.analysis[analysisKey(request)] = AnalysisStatus{Phase: "Waiting for analysis", StartedAt: time.Now()}
 		go func() {
 			workCtx, cancel := m.requestContext(m.ctx)
 			defer cancel()
@@ -59,6 +61,14 @@ func (m *Manager) Warmup(ctx context.Context, request CodePositionRequest) error
 			}
 			m.warmupMu.Lock()
 			job.err = err
+			status := m.analysis[analysisKey(request)]
+			status.ElapsedMS = time.Since(status.StartedAt).Milliseconds()
+			status.Phase = "Ready"
+			if err != nil {
+				status.Phase = "Failed"
+				status.Error = err.Error()
+			}
+			m.analysis[analysisKey(request)] = status
 			delete(m.warmups, key)
 			close(job.done)
 			m.warmupMu.Unlock()

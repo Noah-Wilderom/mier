@@ -42,7 +42,7 @@ type Handler = (args: any[]) => unknown | Promise<unknown>
 export async function desktopFixture(page: Page) {
   const fixture = {
     page, selected: root, repositories: new Map([[root, repository()]]), prs: [summary()], currentDetail: detail(), listed: new Map<number, PullRequestSummary>(),
-    calls: [] as { name: string; args: any[] }[], handlers: new Map<string, Handler>(), unexpected: [] as string[], pageErrors: [] as string[], recent: [] as string[],
+    calls: [] as { name: string; args: any[] }[], handlers: new Map<string, Handler>(), unexpected: [] as string[], pageErrors: [] as string[], recent: [] as string[], savedStates:new Map<string,string>(),
     async emit(update: Partial<WorkspaceUpdate> = {}) {
       const repo = fixture.repositories.get(fixture.selected)!
       await page.evaluate(update => (window as any)._wails.dispatchWailsEvent({ name: 'workspace:updated', data: update }), { path: repo.root, repository: repo, host: 'github.com', owner: 'fork', repo: 'app', pullRequests: fixture.prs, updatedAt: new Date().toISOString(), ...update })
@@ -64,6 +64,8 @@ export async function desktopFixture(page: Page) {
       else switch (name) {
         case 'main.PredictionService.GetStatus': result={configured:false,enabled:false,model:'jev-1.13.0',error:''};break;
         case 'main.ReviewProviderService.Connections': result=[]; break;
+        case 'main.WorkspaceService.LoadState': result=fixture.savedStates.get(args[0])??''; break
+        case 'main.WorkspaceService.SaveState': fixture.savedStates.set(args[0],args[1]);result=null;break
         case 'main.WorkspaceService.ChooseRepository': result = fixture.selected; break
         case 'main.WorkspaceService.RecentRepositories': result = fixture.recent; break
         case 'main.WorkspaceService.RememberRepository': fixture.recent = [...new Set([...fixture.recent, args[0]])]; result = null; break
@@ -81,7 +83,14 @@ export async function desktopFixture(page: Page) {
         case 'main.EditorService.PreferredEditor': result = 'vscode'; break
         case 'main.PRNotificationService.GetPreferences': result = { toastsEnabled: true, desktopEnabled: false, opened: true, closed: true, merged: true, reviewRequested: true }; break
         case 'main.LSPService.Servers': case 'main.LSPService.CheckServerUpdates': result = []; break
+        case 'main.GitHubService.GetCheckAnnotations': result={items:[],hasMore:false,headSha:args[4]};break
+        case 'main.GitHubService.ListWorkflowArtifacts': result={items:[],hasMore:false};break
+        case 'main.LSPService.AnalysisStatus': result={phase:'Ready',elapsedMs:5,cached:false,error:''};break
         case 'main.LSPService.Warmup': result = null; break
+        case 'main.CommandService.Commands':result=[];break
+        case 'main.AIService.WorktreeChecks': result=[];break
+        case 'main.AIService.SavePreferences':result=null;break
+        case 'main.AIService.ReviewHistory': result=[];break
         case 'main.AIService.GetPreferences': result = {provider:'codex',model:'',codexPath:'',copilotPath:''}; break
         case 'main.AIService.GetProviderStatus': result = {provider:args[0],installed:true,executable:`/fixture/${args[0]}`,authenticated:true,account:'reviewer',plan:'',models:[{id:'fixture-model',name:'Fixture model',default:true}],error:''}; break
         case 'main.IntegrationService.GetJiraStatus': result = { configured: false, connected: false, clientId: '', callbackPort: 43827, callbackUrl: 'http://localhost:43827/oauth/jira/callback', scopes: ['read:jira-work', 'offline_access'], state: 'idle', error: '', sites: [], defaultSiteId: '' }; break
@@ -121,7 +130,7 @@ export async function desktopFixture(page: Page) {
         default: fixture.unexpected.push(name); throw new Error(`Unexpected fixture RPC: ${name}`)
       }
       if (name === 'main.GitHubService.ListPullRequestsPage') for (const pr of (result as { items: PullRequestSummary[] }).items ?? []) fixture.listed.set(pr.number, pr)
-      await route.fulfill({ json: result ?? null })
+      await route.fulfill({ contentType:"application/json",json: result ?? null })
     } catch (error) {
       await route.fulfill({ status: 500, json: { kind: 'RuntimeError', message: error instanceof Error ? error.message : String(error) } })
     }

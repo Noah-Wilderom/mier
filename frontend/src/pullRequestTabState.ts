@@ -19,6 +19,7 @@ export type PullRequestTabsAction = { scope: string } & (
   | { type: "location"; number: number; location?: ReviewLocation }
   | { type: "reset" }
   | { type: "scope" }
+  | { type: "restore"; state: PullRequestTabsState }
 );
 export const emptyPullRequestTabs = (scope: string): PullRequestTabsState => ({
   scope,
@@ -37,6 +38,8 @@ export function pullRequestTabsReducer(
   if (previous.scope !== action.scope) return previous;
   const state = previous;
   switch (action.type) {
+    case "restore":
+      return {...action.state,scope:action.scope};
     case "reset":
       return emptyPullRequestTabs(action.scope);
     case "open": {

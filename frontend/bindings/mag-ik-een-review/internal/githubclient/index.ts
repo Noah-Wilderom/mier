@@ -4,6 +4,8 @@
 export type {
     Branch,
     ChangedFile,
+    CheckAnnotation,
+    CheckAnnotations,
     CheckRun,
     Comment,
     Commit,
@@ -26,6 +28,8 @@ export type {
     UpdateRequest,
     User,
     Workflow,
+    WorkflowArtifact,
+    WorkflowArtifacts,
     WorkflowDispatch,
     WorkflowDispatchRequest,
     WorkflowInput,

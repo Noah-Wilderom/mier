@@ -134,10 +134,70 @@ test("Actions loads real job logs, step groups and safe searchable output", asyn
   expect(request.args).toEqual(["github.com", "fork", "app", 99]);
 });
 
-test("Jev classifies a job failure without rerunning or cancelling it",async({desktop,page})=>{
- desktop.handlers.set('main.PredictionService.GetStatus',()=>({configured:true,enabled:true,model:'jev-1.13.0',error:''}));
- desktop.handlers.set('main.PredictionService.Evaluate',args=>{expect(args[0]).toEqual({kind:'ci',scope:{host:'github.com',owner:'fork',repo:'app'},jobId:99});return{id:'ci-a',kind:'ci',model:'jev-1.13.0',questionVersion:'mier-jev-1',createdAt:new Date().toISOString(),cached:false,durationMs:200,usage:{input_tokens:250,output_tokens:0},warnings:[],rows:[{id:'ci_category',label:'Likely failure category',answer:{type:'choice',choice:'build',confidence:.8,probabilities:{build:.9,unknown:.1}},options:{build:'Compiler, type checker, linter or packaging error',unknown:'Insufficient evidence'}}]}});
- await openActions(desktop);await page.getByRole('button',{name:/Review workflow 12/}).click();await page.getByRole('button',{name:'Assess job failure with Jev'}).click();const panel=page.getByRole('region',{name:'Assess job failure with Jev'});await panel.getByRole('button',{name:'Start assessment',exact:true}).click();await expect(panel).toContainText('Compiler, type checker, linter or packaging error');await expect(page.locator('.actions-log-output')).toContainText('Failure in attempt 2');expect(desktop.calls.filter(call=>call.name.endsWith('.MutateWorkflowRun'))).toHaveLength(0)
+test("Jev classifies a job failure without rerunning or cancelling it", async ({
+  desktop,
+  page,
+}) => {
+  desktop.handlers.set("main.PredictionService.GetStatus", () => ({
+    configured: true,
+    enabled: true,
+    model: "jev-1.13.0",
+    error: "",
+  }));
+  desktop.handlers.set("main.PredictionService.Evaluate", (args) => {
+    expect(args[0]).toEqual({
+      kind: "ci",
+      scope: { host: "github.com", owner: "fork", repo: "app" },
+      jobId: 99,
+    });
+    return {
+      id: "ci-a",
+      kind: "ci",
+      model: "jev-1.13.0",
+      questionVersion: "mier-jev-1",
+      createdAt: new Date().toISOString(),
+      cached: false,
+      durationMs: 200,
+      usage: { input_tokens: 250, output_tokens: 0 },
+      warnings: [],
+      rows: [
+        {
+          id: "ci_category",
+          label: "Likely failure category",
+          answer: {
+            type: "choice",
+            choice: "build",
+            confidence: 0.8,
+            probabilities: { build: 0.9, unknown: 0.1 },
+          },
+          options: {
+            build: "Compiler, type checker, linter or packaging error",
+            unknown: "Insufficient evidence",
+          },
+        },
+      ],
+    };
+  });
+  await openActions(desktop);
+  await page.getByRole("button", { name: /Review workflow 12/ }).click();
+  await page
+    .getByRole("button", { name: "Assess job failure with Jev" })
+    .click();
+  const panel = page.getByRole("region", {
+    name: "Assess job failure with Jev",
+  });
+  await panel
+    .getByRole("button", { name: "Start assessment", exact: true })
+    .click();
+  await expect(panel).toContainText(
+    "Compiler, type checker, linter or packaging error",
+  );
+  await expect(page.locator(".actions-log-output")).toContainText(
+    "Failure in attempt 2",
+  );
+  expect(
+    desktop.calls.filter((call) => call.name.endsWith(".MutateWorkflowRun")),
+  ).toHaveLength(0);
 });
 
 test("run filters, pagination and retries preserve useful results", async ({
@@ -495,4 +555,133 @@ test("polling waits for the current request and pauses while the view is hidden"
     document.dispatchEvent(new Event("visibilitychange"));
   });
   await expect.poll(() => requests).toBe(2);
+});
+
+test("artifacts use explicit native downloads and comparisons keep both run attempts", async ({
+  desktop,
+  page,
+}) => {
+  let duplicateJobs = false;
+  desktop.handlers.set("main.GitHubService.ListWorkflowArtifacts", () => ({
+    items: [
+      {
+        id: 7,
+        name: "desktop-build",
+        sizeInBytes: 1048576,
+        expired: false,
+        createdAt: "2026-10-14T10:00:00Z",
+        expiresAt: "2026-11-14T10:00:00Z",
+        digest: "",
+      },
+      {
+        id: 8,
+        name: "expired-build",
+        sizeInBytes: 1,
+        expired: true,
+        createdAt: "2026-10-14T10:00:00Z",
+        expiresAt: "2026-10-15T10:00:00Z",
+        digest: "",
+      },
+    ],
+    hasMore: false,
+  }));
+  desktop.handlers.set(
+    "main.GitHubService.DownloadWorkflowArtifact",
+    () => "/fixture/downloads/build.zip",
+  );
+  desktop.handlers.set("main.GitHubService.GetWorkflowRun", (args) => {
+    const attempt = args[4] || 2;
+    return {
+      run: {
+        ...run(args[3], attempt),
+        conclusion: attempt === 1 ? "failure" : "success",
+      },
+      jobs: [
+        {
+          ...job(attempt === 1 ? 98 : 99, attempt),
+          name: "Tests",
+          conclusion: attempt === 1 ? "failure" : "success",
+          steps: [
+            {
+              number: 1,
+              name: "Build application",
+              status: "completed",
+              conclusion: attempt === 1 ? "failure" : "success",
+              startedAt: "",
+              completedAt: "",
+            },
+          ],
+        },
+        ...(duplicateJobs && attempt === 1
+          ? [
+              {
+                ...job(198, 1),
+                name: "Tests",
+                conclusion: "cancelled",
+                steps: [],
+              },
+            ]
+          : []),
+      ],
+    };
+  });
+  await openActions(desktop);
+  await page.getByRole("button", { name: /Review workflow 12/ }).click();
+  expect(
+    desktop.calls.some((call) => call.name.endsWith(".ListWorkflowArtifacts")),
+  ).toBe(false);
+  await page.getByText("Artifacts", { exact: true }).click();
+  const artifacts = page.locator(".workflow-artifacts");
+  await expect(artifacts).toContainText("desktop-build");
+  await expect(
+    artifacts
+      .locator(".workflow-artifact")
+      .filter({ hasText: "expired-build" })
+      .getByRole("button"),
+  ).toBeDisabled();
+  await artifacts
+    .locator(".workflow-artifact")
+    .filter({ hasText: "desktop-build" })
+    .getByRole("button", { name: "Download ZIP" })
+    .click();
+  await expect(artifacts).toContainText(
+    "Saved desktop-build to /fixture/downloads/build.zip",
+  );
+  expect(
+    desktop.calls.find((call) =>
+      call.name.endsWith(".DownloadWorkflowArtifact"),
+    )?.args[3],
+  ).toMatchObject({ artifactId: 7, runId: 12, headSha: "b".repeat(40) });
+  await page.getByText("Compare runs and attempts", { exact: true }).click();
+  await page.getByLabel("Compare workflow baseline").selectOption("12:1");
+  const comparison = page.locator(".run-comparison");
+  await expect(
+    comparison.getByRole("cell", { name: "failure", exact: true }),
+  ).toBeVisible();
+  await expect(
+    comparison.getByRole("cell", { name: "success", exact: true }),
+  ).toBeVisible();
+  await expect(comparison).toContainText("Build application → None");
+  duplicateJobs = true;
+  await page.getByLabel("Compare workflow baseline").selectOption("");
+  await page.getByLabel("Compare workflow baseline").selectOption("12:1");
+  await expect(comparison).toContainText("Repeated job names are grouped");
+  await expect(
+    comparison.getByRole("cell", {
+      name: "failure · #98; cancelled · #198",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    comparison.getByRole("cell", { name: "success · #99", exact: true }),
+  ).toBeVisible();
+  await expect(
+    comparison.getByRole("cell", { name: "—", exact: true }),
+  ).toBeVisible();
+  await page.getByLabel("Run attempt").selectOption("1");
+  await expect(page.getByLabel("Compare workflow baseline")).toHaveCount(0);
+  await page.getByText("Compare runs and attempts", { exact: true }).click();
+  await expect(page.getByLabel("Compare workflow baseline")).toHaveValue("");
+  await page.getByLabel("Compare workflow baseline").selectOption("12:2");
+  await expect(comparison).toContainText("success");
 });

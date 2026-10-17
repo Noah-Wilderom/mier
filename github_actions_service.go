@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"mag-ik-een-review/internal/githubclient"
 	"time"
 )
@@ -78,4 +79,58 @@ func (s *GitHubService) MutateWorkflowRun(ctx context.Context, host, owner, repo
 		return err
 	}
 	return client.MutateWorkflowRun(ctx, owner, repo, input)
+}
+
+func (s *GitHubService) GetCheckAnnotations(ctx context.Context, host, owner, repo string, id int64, head string, page int) (githubclient.CheckAnnotations, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	client, err := s.client(ctx, host)
+	if err != nil {
+		return githubclient.CheckAnnotations{}, err
+	}
+	return client.GetCheckAnnotations(ctx, owner, repo, id, head, page)
+}
+func (s *GitHubService) ListWorkflowArtifacts(ctx context.Context, host, owner, repo string, run int64, page int) (githubclient.WorkflowArtifacts, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	client, err := s.client(ctx, host)
+	if err != nil {
+		return githubclient.WorkflowArtifacts{}, err
+	}
+	return client.ListWorkflowArtifacts(ctx, owner, repo, run, page)
+}
+
+type CheckAnnotationSource struct {
+	Path     string `json:"path"`
+	Revision string `json:"revision"`
+	Text     string `json:"text"`
+	Line     int    `json:"line"`
+}
+
+func (s *GitHubService) ReadCheckAnnotationSource(ctx context.Context, host, owner, repo string, id int64, head, path string, line, page int) (CheckAnnotationSource, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	client, err := s.client(ctx, host)
+	if err != nil {
+		return CheckAnnotationSource{}, err
+	}
+	annotations, err := client.GetCheckAnnotations(ctx, owner, repo, id, head, page)
+	if err != nil {
+		return CheckAnnotationSource{}, err
+	}
+	found := false
+	for _, annotation := range annotations.Items {
+		if annotation.Path == path && annotation.StartLine == line {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return CheckAnnotationSource{}, errors.New("This source location is no longer present in the selected check annotations")
+	}
+	text, err := client.ReadFileAtCommit(ctx, owner, repo, path, head)
+	if err != nil {
+		return CheckAnnotationSource{}, err
+	}
+	return CheckAnnotationSource{Path: path, Revision: head, Text: text, Line: line}, nil
 }

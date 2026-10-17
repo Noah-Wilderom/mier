@@ -25,16 +25,17 @@ type AIPreferences struct {
 	Intensity   string `json:"intensity"`
 }
 type AIReviewRequest struct {
-	Host         string `json:"host"`
-	Owner        string `json:"owner"`
-	Repository   string `json:"repository"`
-	PullRequest  int    `json:"pullRequest"`
-	HeadSHA      string `json:"headSha"`
-	BaseSHA      string `json:"baseSha"`
-	Provider     string `json:"provider"`
-	Model        string `json:"model"`
-	Instructions string `json:"instructions"`
-	Intensity    string `json:"intensity"`
+	PreviousReviewID string `json:"previousReviewId"`
+	Host             string `json:"host"`
+	Owner            string `json:"owner"`
+	Repository       string `json:"repository"`
+	PullRequest      int    `json:"pullRequest"`
+	HeadSHA          string `json:"headSha"`
+	BaseSHA          string `json:"baseSha"`
+	Provider         string `json:"provider"`
+	Model            string `json:"model"`
+	Instructions     string `json:"instructions"`
+	Intensity        string `json:"intensity"`
 }
 type AIConnection struct {
 	Run   reviewagent.RunSnapshot `json:"run"`
@@ -52,16 +53,23 @@ type AILoginStatus struct {
 	Error string `json:"error"`
 }
 type aiTask struct {
-	run        *reviewagent.Run
-	bridge     *reviewagent.Bridge
-	cancel     context.CancelFunc
-	action     *reviewagent.Action
-	capture    gitclient.AssistantCapture
-	actionKind string
-	worktreeID string
+	reviewRequest *AIReviewRequest
+	actionRequest *AIActionRequest
+	run           *reviewagent.Run
+	bridge        *reviewagent.Bridge
+	cancel        context.CancelFunc
+	action        *reviewagent.Action
+	capture       gitclient.AssistantCapture
+	actionKind    string
+	worktreeID    string
 }
 
 type AIService struct {
+	checkApprovals        map[string]AIWorktreeCheckApproval
+	worktreeChecks        map[string]AIWorktreeCheck
+	historyMu             sync.Mutex
+	historyVersions       map[string]uint64
+	commands              *CommandService
 	repositories          *RepositoryService
 	worktrees             map[string]aiWorktreeRecord
 	worktreesLoaded       bool
@@ -422,7 +430,11 @@ func (s *AIService) start(ctx context.Context, request AIReviewRequest, external
 	if err != nil {
 		return AIConnection{}, err
 	}
-	scope := reviewagent.Context{Key: key, Host: request.Host, Owner: request.Owner, Repository: request.Repository, PullRequest: request.PullRequest, HeadSHA: request.HeadSHA, BaseSHA: request.BaseSHA, MergeBaseSHA: changes.MergeBaseSHA, Title: changes.PullRequest.Title, Description: changes.PullRequest.Body, Files: []reviewagent.File{}, Warnings: []string{}, Intensity: intensity, Focus: request.Instructions}
+	previous, err := s.previousReviewContext(request)
+	if err != nil {
+		return AIConnection{}, err
+	}
+	scope := reviewagent.Context{PreviousReviews: previous, Key: key, Host: request.Host, Owner: request.Owner, Repository: request.Repository, PullRequest: request.PullRequest, HeadSHA: request.HeadSHA, BaseSHA: request.BaseSHA, MergeBaseSHA: changes.MergeBaseSHA, Title: changes.PullRequest.Title, Description: changes.PullRequest.Body, Files: []reviewagent.File{}, Warnings: []string{}, Intensity: intensity, Focus: request.Instructions}
 	bytes := 0
 	for _, file := range changes.Files {
 		if len(scope.Files) >= 64 || bytes+len(file.Patch) > 384*1024 {
@@ -485,7 +497,12 @@ func (s *AIService) start(ctx context.Context, request AIReviewRequest, external
 	}
 	runCtx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	run.SetCancel(cancel)
-	task := &aiTask{run: run, bridge: bridge, cancel: cancel}
+	task := &aiTask{run: run, bridge: bridge, cancel: cancel, reviewRequest: &request}
+	if err = s.persistAITask(task); err != nil {
+		cancel()
+		bridge.Close()
+		return AIConnection{}, fmt.Errorf("Save AI conversation: %w", err)
+	}
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
@@ -503,6 +520,11 @@ func (s *AIService) start(ctx context.Context, request AIReviewRequest, external
 }
 func (s *AIService) execute(ctx context.Context, request AIReviewRequest, task *aiTask, external bool) {
 	defer s.wg.Done()
+	defer func() {
+		if err := s.persistAITask(task); err != nil {
+			task.run.AddWarning("AI conversation could not be saved: " + err.Error())
+		}
+	}()
 	defer task.cancel()
 	defer task.bridge.Close()
 	run := task.run
@@ -543,6 +565,9 @@ func (s *AIService) execute(ctx context.Context, request AIReviewRequest, task *
 	}
 	prompt := "Review the captured pull request using the mier MCP tools. Start with get_review_context, then use read_review_ticket for linked tickets to understand requirements before assessing the code. Propose actionable findings with add_review_comment for the human to accept or dismiss, and record a summary with finish_review."
 	prompt += "\n" + reviewagent.IntensityInstructions(request.Intensity)
+	if request.PreviousReviewID != "" {
+		prompt += "\nThis is a follow-up. get_review_context includes previousReviews with earlier prompts, findings and commit IDs. Use that history to answer the user and re-check earlier findings against the current source; do not assume a past finding is still valid or duplicate it without new evidence."
+	}
 	if request.Instructions != "" {
 		prompt += "\nAdditional reviewer focus: " + request.Instructions
 	}
@@ -582,7 +607,14 @@ func (s *AIService) GetReview(id string) (reviewagent.RunSnapshot, error) {
 	task := s.tasks[id]
 	s.mu.Unlock()
 	if task == nil {
-		return reviewagent.RunSnapshot{}, errors.New("Review session not found. Start a new review")
+		record, err := s.readAIHistory(id)
+		if err != nil {
+			return reviewagent.RunSnapshot{}, errors.New("Review session not found. Start a new review")
+		}
+		return record.Run, nil
+	}
+	if err := s.persistAITask(task); err != nil {
+		return task.run.Snapshot(), fmt.Errorf("Save AI conversation: %w", err)
 	}
 	return task.run.Snapshot(), nil
 }
@@ -616,6 +648,13 @@ func (s *AIService) CancelReview(id string) error {
 func (s *AIService) ServiceShutdown() error {
 	s.mu.Lock()
 	s.closed = true
+	if s.commands != nil {
+		for _, check := range s.worktreeChecks {
+			if check.Run.Status == "running" {
+				_ = s.commands.Cancel(check.Run.ID)
+			}
+		}
+	}
 	tasks := make([]*aiTask, 0, len(s.tasks))
 	for _, task := range s.tasks {
 		tasks = append(tasks, task)

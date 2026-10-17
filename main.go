@@ -46,6 +46,8 @@ func main() {
 	linear := NewLinearService()
 	ai := NewAIService(github, credentials)
 	ai.repositories = repositories
+	commands := NewCommandService(repositories)
+	ai.commands = commands
 	ai.jira, ai.linear = jira, linear
 	predictions := NewPredictionService(ai, github, repositories)
 	workspace := NewWorkspaceService()
@@ -72,7 +74,7 @@ func main() {
 			application.NewService(jira),
 			application.NewService(linear),
 			application.NewService(NewEditorService(repositories)),
-			application.NewService(NewCommandService(repositories)),
+			application.NewService(commands),
 			application.NewService(NewLSPService(repositories)),
 			application.NewService(desktop),
 			application.NewService(prNotifications),

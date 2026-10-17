@@ -53,3 +53,7 @@
 @media (max-width: 760px) { .code-intelligence-hint { font-size: 12px; } .code-definition-header > code { display: none; } .code-definition-header { flex-wrap: wrap; gap: 5px; } .code-definition-header > strong { order: 2; flex-basis: 100%; } }
 @media (max-width: 480px) { .code-intelligence-hint { max-width: 190px; } .code-definition-button { font-size: 12px; } .code-intelligence-toolbar { gap: 5px; padding-right: 7px; padding-left: 7px; } }
 @media (prefers-reduced-motion: reduce) { .code-hover-loading .skeleton { animation: none; } }
+.code-navigation-actions {display:flex;align-items:center;gap:8px;margin-left:auto;font-size:12px}
+.code-navigation-actions form {display:flex;align-items:center;gap:4px}
+.code-navigation-actions input {width:145px;min-width:80px;background:var(--surface);color:var(--text);padding:5px;border:1px solid var(--border)}
+@media(max-width:1000px){.code-intelligence-toolbar{flex-wrap:wrap}.code-navigation-actions{margin-left:0}}

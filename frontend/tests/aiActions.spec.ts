@@ -543,3 +543,32 @@ test("coding worktrees show tool activity, retain stopped edits and confirm clea
     dialog.getByRole("navigation", { name: "Coding worktrees", exact: true }),
   ).toContainText("mier/agent/first");
 });
+
+test('worktree checks show exact approval, stream evidence and preserve cancellation',async({desktop,page})=>{
+ const worktree:AIWorktreeInfo={id:'agent-verification',repositoryRoot:root,path:'/fixture/agent-verification',branch:'mier/agent/verification',headSha:headSHA,state:'completed',createdAt:new Date().toISOString(),lastActionId:'action-fixture'}
+ const command={id:'',name:'Project tests',executable:'go',arguments:['test','./...'],timeoutSeconds:300,reason:'Validate the changed package'}
+ let current:AIActionSnapshot,checks:any[]=[]
+ desktop.handlers.set('main.RepositoryService.Tags',()=>[])
+ desktop.handlers.set('main.AIService.AgentWorktrees',()=>[])
+ desktop.handlers.set('main.AIService.StartAction',args=>{current=result(args[0],{worktree,proposal:{text:'Prepared changes; checks need your approval.',checks:[command]}});return current})
+ desktop.handlers.set('main.AIService.GetAction',()=>current)
+ desktop.handlers.set('main.AIService.WorktreeChecks',()=>checks)
+ desktop.handlers.set('main.AIService.PrepareWorktreeCheck',args=>{expect(args[0]).toBe(worktree.id);expect(args[1].arguments).toEqual(['test','./...']);return {id:'approval-1',worktree,command:{...command,executable:'/fixture/go/bin/go'},sourceStamp:'d'.repeat(64),expiresAt:new Date(Date.now()+600000).toISOString()}})
+ desktop.handlers.set('main.AIService.StartWorktreeCheck',args=>{expect(args).toEqual(['approval-1']);checks=[{id:'check-1',worktreeId:worktree.id,actionId:'action-fixture',command,sourceStamp:'d'.repeat(64),afterStamp:'',stale:false,error:'',run:{id:'check-1',root:worktree.path,name:'Project tests',status:'running',stdout:'Running project tests\n',stderr:'',truncated:false,exitCode:-1,error:'',startedAt:new Date().toISOString(),finishedAt:''}}];return checks[0]})
+ desktop.handlers.set('main.AIService.CancelWorktreeCheck',()=>{checks[0].run.status='canceled';checks[0].run.finishedAt=new Date().toISOString();return null})
+ await openFixture(desktop);await page.getByRole('button',{name:'Repository tools…',exact:true}).click()
+ const dialog=page.getByRole('dialog',{name:'Repository tools',exact:true});await dialog.getByRole('button',{name:'Coding agents',exact:true}).click()
+ await dialog.getByLabel('Coding task',{exact:true}).fill('Add validation and suggest a check');await dialog.getByLabel('Coding task',{exact:true}).press('Enter')
+ const verification=dialog.getByRole('region',{name:'Worktree verification'})
+ await verification.getByLabel('Worktree check',{exact:true}).selectOption('proposal:0')
+ await verification.getByRole('button',{name:'Review command',exact:true}).click()
+ expect(desktop.calls.some(call=>call.name.endsWith('.StartWorktreeCheck'))).toBe(false)
+ const approval=verification.getByRole('group',{name:'Approve worktree check'})
+ await expect(approval).toContainText('/fixture/go/bin/go');await expect(approval).toContainText('["test","./..."]');await expect(approval).toContainText(worktree.path)
+ await approval.getByRole('button',{name:'Approve and run check',exact:true}).click()
+ await verification.getByText('Command and output',{exact:false}).click()
+ await expect(verification).toContainText('Running project tests')
+ await verification.getByRole('button',{name:'Cancel check',exact:true}).click()
+ await expect(verification).toContainText('canceled · exit -1')
+ expect(desktop.calls.filter(call=>call.name.endsWith('.StartWorktreeCheck'))).toHaveLength(1)
+})

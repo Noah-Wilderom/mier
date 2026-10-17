@@ -20,7 +20,7 @@ import {
 import { Markdown } from "./Markdown";
 import type { AIReview } from "./aiTypes";
 
-const ResultContext = createContext<ReactNode>(null);
+const ResultContext = createContext<{id?:string;result:ReactNode}>({result:null});
 const defaultPrompt = "Review this pull request.";
 function MessageText({ text }: TextMessagePartProps) {
   return <Markdown>{text}</Markdown>;
@@ -34,10 +34,11 @@ function UserMessage() {
   );
 }
 function AssistantMessage() {
-  const result = useContext(ResultContext);
+  const {id,result} = useContext(ResultContext);
+  const messageId=useAuiState(state=>state.message.id);
   return (
     <MessagePrimitive.Root className="ai-chat-message ai-chat-assistant">
-      {result}
+      {messageId===`${id}:response`?result:<MessagePrimitive.Parts components={{Text:MessageText}}/>}
     </MessagePrimitive.Root>
   );
 }
@@ -48,6 +49,7 @@ function DraftObserver({ onChange }: { onChange: (text: string) => void }) {
 }
 type Props = {
   run?: AIReview;
+  history?:AIReview[];
   active: boolean;
   busy: boolean;
   disabled: boolean;
@@ -75,6 +77,7 @@ type Props = {
 };
 export function AIReviewChat({
   run,
+  history=[],
   active,
   busy,
   disabled,
@@ -96,39 +99,24 @@ export function AIReviewChat({
       "Review this pull request for concrete bugs, or give the reviewer a focus below.",
     focus: "Review focus (optional)",
     placeholder: "Check retries and failure handling…",
-    hint: "Enter to review · Shift+Enter for a new line",
+    hint: "Enter to send · Shift+Enter for a new line",
     stop: "Stop review",
     preparing: "Preparing review…",
     start: "Start AI review",
-    again: "Run a new review",
+    again: "Send follow-up",
     ...copy,
   };
   const [draftAtOpen] = useState(initialDraft);
   const focusId = useId();
   const [optionsOpen, setOptionsOpen] = useState(!run);
   useEffect(() => setOptionsOpen(!run), [run?.id]);
-  const messages = useMemo<ThreadMessageLike[]>(
-    () =>
-      run
-        ? [
-            {
-              id: `${run.id}:request`,
-              role: "user",
-              content: run.instructions || words.prompt,
-            },
-            {
-              id: `${run.id}:response`,
-              role: "assistant",
-              content:
-                run.summary || run.progress || run.error || "Review finished.",
-              status: active
-                ? { type: "running" }
-                : { type: "complete", reason: "stop" },
-            },
-          ]
-        : [],
-    [run, active, words.prompt],
-  );
+  const messages = useMemo<ThreadMessageLike[]>(()=>{
+    const runs=[...history.filter(item=>item.id!==run?.id),...(run?[run]:[])];
+    return runs.flatMap(item=>[
+      {id:`${item.id}:request`,role:'user' as const,content:item.instructions||words.prompt},
+      {id:`${item.id}:response`,role:'assistant' as const,content:[`**${item.provider} · ${item.model||'Provider default'} · ${item.headSha.slice(0,7)}**`,item.summary||item.progress||item.error||'Review finished.',...item.id===run?.id?[]:item.findings.map(finding=>`**${finding.path}:${finding.line}** · ${finding.severity}\n${finding.body}`)].join('\n\n'),status:item.id===run?.id&&active?{type:'running' as const}:{type:'complete' as const,reason:'stop' as const}}
+    ]);
+  },[history,run,active,words.prompt]);
   const runtime = useExternalStoreRuntime({
     messages,
     convertMessage: (message) => message,
@@ -152,7 +140,7 @@ export function AIReviewChat({
   );
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <ResultContext.Provider value={result}>
+      <ResultContext.Provider value={{id:run?.id,result}}>
         <ThreadPrimitive.Root
           className="ai-chat-thread"
           aria-label={words.label}

@@ -8,7 +8,7 @@ Manage branches and local changes, compare commits, and review pull requests wit
 
 [Stage individual sections, cherry-pick local commits, merge branches, and resolve conflicts](docs/LOCAL_GIT.md) with a side-by-side editor and editable result.
 
-Browse 57 language servers in Settings, with logos, search, install/update controls, and setup instructions. Includes Dockerfiles, YAML, GitHub Actions, and [many more](docs/LANGUAGE_SERVERS.md) for symbol hover and go to definition.
+Browse 57 language servers in Settings, with logos, search, install/update controls, and setup instructions. Includes Dockerfiles, YAML, GitHub Actions, and [many more](docs/LANGUAGE_SERVERS.md) for symbol hover, definitions, references, and symbol navigation.
 
 View related [Jira Cloud](docs/JIRA.md) and [Linear](docs/LINEAR.md) tickets alongside a PR using your own OAuth app.
 
@@ -19,6 +19,8 @@ Connect [GitHub, GitLab, Bitbucket Cloud, and Azure DevOps](docs/REVIEW_PROVIDER
 Review PRs with [ChatGPT/Codex, GitHub Copilot, or your own MCP client](docs/AI.md). AI suggestions become private native review comments for you to inspect before submitting.
 
 Use AI to draft commits and PRs, explain branch changes, propose conflict resolutions, or edit code in an isolated worktree. You choose when to use a proposal and commit the result.
+
+[Resume unfinished reviews, compare changes since your last review, browse all repositories, and forecast conflicts](docs/WORKSPACE.md).
 
 [Download the latest release](https://github.com/Noah-Wilderom/mier/releases/latest) · macOS, Windows, and Linux · Intel/AMD and ARM64
 

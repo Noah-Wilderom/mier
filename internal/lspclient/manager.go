@@ -40,6 +40,7 @@ type Manager struct {
 	tools          *toolInstaller
 	warmupMu       sync.Mutex
 	warmups        map[string]*warmupJob
+	analysis       map[string]AnalysisStatus
 }
 
 func New(options Options) *Manager {
@@ -63,6 +64,7 @@ func New(options Options) *Manager {
 	m := &Manager{options: options, ctx: ctx, cancel: cancel, gate: make(chan struct{}, 1), configuration: configuration, configErr: err, workspaces: map[string]*workspace{}, aliases: map[string]string{}, grants: map[string]definitionGrant{}}
 	m.gate <- struct{}{}
 	m.warmups = map[string]*warmupJob{}
+	m.analysis = map[string]AnalysisStatus{}
 	if options.ToolsDirectory == "" && options.ConfigPath != "" {
 		options.ToolsDirectory = filepath.Join(filepath.Dir(options.ConfigPath), "language-tools")
 	}
@@ -312,6 +314,7 @@ func (m *Manager) prepare(ctx context.Context, request CodePositionRequest) (*wo
 			if m.options.Archive == nil {
 				return nil, nil, "", "", "", nil, errors.New("Immutable Git snapshots are unavailable")
 			}
+			m.analysisPhase(request, "Reading immutable Git source", false)
 			archive, err := m.options.Archive(ctx, request)
 			if err != nil {
 				return nil, nil, "", "", "", nil, err
@@ -340,7 +343,7 @@ func (m *Manager) prepare(ctx context.Context, request CodePositionRequest) (*wo
 						return nil, nil, "", "", "", nil, err
 					}
 				}
-				w, err = extractWorkspace(ctx, root, m.cacheDirectory, archive, kind)
+				w, err = m.captureWorkspace(ctx, request, archive, kind)
 				if err != nil {
 					return nil, nil, "", "", "", nil, err
 				}
@@ -374,6 +377,7 @@ func (m *Manager) prepare(ctx context.Context, request CodePositionRequest) (*wo
 			}
 		}
 	}
+	m.analysisPhase(request, "Starting language server", false)
 	s, err := m.ensureSession(ctx, w, selected)
 	if err != nil {
 		return nil, nil, "", "", "", nil, err
@@ -557,13 +561,16 @@ func (m *Manager) Definition(ctx context.Context, request CodePositionRequest) (
 			return nil, err
 		}
 	}
+	return m.grantLocations(ctx, w, locations)
+}
+func (m *Manager) grantLocations(ctx context.Context, w *workspace, locations []definitionLocation) ([]DefinitionTarget, error) {
 	targets := []DefinitionTarget{}
 	release, err := m.lock(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer release()
-	for _, location := range locations {
+	for locationIndex, location := range locations {
 		targetPath, err := pathFromURI(location.URI)
 		if err != nil {
 			continue
@@ -587,8 +594,8 @@ func (m *Manager) Definition(ctx context.Context, request CodePositionRequest) (
 		}
 		id := hex.EncodeToString(token)
 		uri := "mier-lsp://definition/" + id
-		target := DefinitionTarget{ID: id, URI: uri, Path: label, Range: location.Range, Revision: w.revision, Language: languageForPath(targetPath), External: external}
-		for len(m.grantOrder) > 0 && (len(m.grants) >= 64 || m.grantBytes+len(content) > 32*1024*1024) {
+		target := DefinitionTarget{locationIndex: locationIndex, ID: id, URI: uri, Path: label, Range: location.Range, Revision: w.revision, Language: languageForPath(targetPath), External: external}
+		for len(m.grantOrder) > 0 && (len(m.grants) >= 512 || m.grantBytes+len(content) > 64*1024*1024) {
 			old := m.grantOrder[0]
 			m.grantOrder = m.grantOrder[1:]
 			if grant, ok := m.grants[old]; ok {
@@ -657,6 +664,9 @@ func validRange(value Range) bool {
 	return value.Start.Line >= 0 && value.Start.Character >= 0 && value.End.Line >= value.Start.Line && value.End.Character >= 0 && (value.End.Line > value.Start.Line || value.End.Character >= value.Start.Character)
 }
 func parseDefinitions(raw json.RawMessage) ([]definitionLocation, error) {
+	return parseLocations(raw, 32)
+}
+func parseLocations(raw json.RawMessage, limit int) ([]definitionLocation, error) {
 	if len(raw) == 0 || string(raw) == "null" {
 		return nil, nil
 	}
@@ -668,8 +678,8 @@ func parseDefinitions(raw json.RawMessage) ([]definitionLocation, error) {
 	} else {
 		items = []json.RawMessage{raw}
 	}
-	if len(items) > 32 {
-		return nil, errors.New("Language server returned more than 32 definition targets")
+	if len(items) > limit {
+		items = items[:limit]
 	}
 	locations := []definitionLocation{}
 	for _, item := range items {

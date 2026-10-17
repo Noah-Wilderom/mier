@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -124,6 +125,23 @@ func TestLSPRPCChild(t *testing.T) {
 			}
 		case "workspace/executeCommand":
 			reply(map[string]any{"body": map[string]any{"displayString": "Vue broker reached the peer TypeScript server"}})
+		case "textDocument/references":
+			var params struct {
+				TextDocument struct{ URI string } `json:"textDocument"`
+				Context      struct {
+					Include bool `json:"includeDeclaration"`
+				} `json:"context"`
+			}
+			json.Unmarshal(message.Params, &params)
+			if !params.Context.Include {
+				reply(nil)
+				continue
+			}
+			reply([]any{map[string]any{"uri": params.TextDocument.URI, "range": Range{Start: Position{0, 0}, End: Position{0, 5}}}})
+		case "textDocument/documentSymbol":
+			reply([]any{map[string]any{"name": "Example", "kind": 5, "range": Range{Start: Position{0, 0}, End: Position{0, 5}}, "selectionRange": Range{Start: Position{0, 0}, End: Position{0, 5}}, "children": []any{map[string]any{"name": "member", "kind": 6, "range": Range{Start: Position{0, 0}, End: Position{0, 5}}, "selectionRange": Range{Start: Position{0, 0}, End: Position{0, 5}}}}}})
+		case "workspace/symbol":
+			reply([]any{map[string]any{"name": "Example", "kind": 5, "location": map[string]any{"uri": fileURI(filepath.Join(initializationRoot, "definition.php")), "range": Range{Start: Position{0, 0}, End: Position{0, 5}}}}})
 		case "textDocument/definition":
 			var params struct {
 				TextDocument struct{ URI string } `json:"textDocument"`

@@ -24,6 +24,7 @@ export interface AIActionRequest extends AIActionScope {
   intensity: AIIntensity;
 }
 export interface AIActionProposal {
+  checks?:import("./WorktreeVerification").CheckProposal[];
   text?: string;
   title?: string;
   body?: string;

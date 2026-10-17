@@ -110,6 +110,9 @@ func (c *Client) GetWorkflowJobLog(ctx context.Context, owner, repo string, jobI
 }
 
 func (c *Client) jobLogResponse(ctx context.Context, endpoint string, authenticated, ranged bool) (*http.Response, error) {
+	return c.downloadResponse(ctx, endpoint, authenticated, ranged, 0)
+}
+func (c *Client) downloadResponse(ctx context.Context, endpoint string, authenticated, ranged bool, timeout time.Duration) (*http.Response, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -138,6 +141,9 @@ func (c *Client) jobLogResponse(ctx context.Context, endpoint string, authentica
 	}
 	// Isolate redirects and cookies, including when a caller injects a transport.
 	client := *c.http
+	if timeout > 0 {
+		client.Timeout = timeout
+	}
 	client.Jar = nil
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	response, err := client.Do(req)
@@ -162,8 +168,11 @@ func safeLogLocation(location, previous string) (string, error) {
 	return u.String(), nil
 }
 func (c *Client) followJobLog(ctx context.Context, target string, ranged bool) (*http.Response, error) {
+	return c.followDownload(ctx, target, ranged, 0)
+}
+func (c *Client) followDownload(ctx context.Context, target string, ranged bool, timeout time.Duration) (*http.Response, error) {
 	for redirects := 0; redirects < 4; redirects++ {
-		response, err := c.jobLogResponse(ctx, target, false, ranged)
+		response, err := c.downloadResponse(ctx, target, false, ranged, timeout)
 		if err != nil {
 			return nil, err
 		}

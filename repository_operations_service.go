@@ -54,3 +54,10 @@ func (s *RepositoryService) BranchCommits(ctx context.Context, path, branch, exp
 	}
 	return s.client.BranchCommits(ctx, path, branch, expectedTip)
 }
+
+func (s *RepositoryService) ForecastConflict(ctx context.Context, path string, request gitclient.ConflictForecastRequest) (gitclient.ConflictForecast, error) {
+	if s.initErr != nil {
+		return gitclient.ConflictForecast{}, s.initErr
+	}
+	return s.client.ForecastConflict(ctx, path, request)
+}

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { configureCurrentUser, type ChangedFile, type MergeMethod, type PullRequest } from './data'
 import { configureGitHubAccount, mapPullRequest, mapPullRequestSummary, mapRepositoryDiff, mapRepositorySnapshot, RemoteActionAppliedError, syncPullRequest } from './liveData'
 import { repositoryName, type RepositoryCard } from './RepositorySelector'
+import {fileSignature,saveCheckpoint} from './reviewCheckpoint'
+import {loadWorkspaceState,saveWorkspaceState} from './workspaceState'
 import { readReviewDrafts, restoreReviewDraft, reviewDraftStorageKey, type SavedReviewDraft } from './reviewDrafts'
 import { hasNativeBackend, services, subscribeWorkspaceUpdates, type AccountStatus, type PullRequestPageQuery, type PullRequestSummary, type RepositorySnapshot, type WorkspaceUpdate } from './services'
 import type { GitAction } from './gitWorkspace'
@@ -63,7 +65,7 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
   const setItems=useCallback((items:PullRequest[])=>{prsRef.current=items;setPrs(items)},[])
   const saveDraft=useCallback((pr:PullRequest)=>{
     const key=`${pr.provider?.host}/${pr.provider?.owner}/${pr.provider?.repo}/${pr.number}`
-    drafts.current.delete(key);drafts.current.set(key,{headSha:pr.headSha,viewedFiles:pr.viewedFiles,pendingComments:pr.pendingComments})
+    drafts.current.delete(key);drafts.current.set(key,{fileSignatures:Object.fromEntries(pr.files.map(file=>[file.path,fileSignature(file)])),headSha:pr.headSha,viewedFiles:pr.viewedFiles,pendingComments:pr.pendingComments})
     try{localStorage.setItem(reviewDraftStorageKey,JSON.stringify({version:1,entries:[...drafts.current.entries()].slice(-200)}))}catch{setError('Your review draft could not be saved on this device. Keep this window open until you submit it.')}
   },[])
   const draftKey=(pr:PullRequest)=>`${pr.provider?.host}/${pr.provider?.owner}/${pr.provider?.repo}/${pr.number}`
@@ -196,6 +198,7 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
         if(status.authenticated)configureGitHubAccount(status)
         else{setLoadingPullRequests(false);setError(authenticationError.current)}
       }).catch(issue=>{if(epoch===activeEpoch.current){authenticationError.current=issue instanceof Error?issue.message:String(issue);setLoadingPullRequests(false);setError(authenticationError.current)}})
+      saveWorkspaceState('last-workspace',{root:snapshot.root})
       setUpdatedAt(new Date().toISOString());notify(`Opened ${snapshot.name}.`)
     }finally{setOpeningRepository('')}
   })},[notify,perform,resetPullRequestPage,setItems])
@@ -240,7 +243,7 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
     setItems(prsRef.current.map(p=>p.number===next.number?{...p,pendingComments,viewedFiles:next.viewedFiles}:p));
     if(canonical!==next)notify("Pull request updated.");
     const saved=prsRef.current.find(pr=>pr.number===next.number)
-    if(saved)saveDraft(saved)
+    if(saved){saveDraft(saved);if(next.reviews.length>previous.reviews.length)saveCheckpoint(saved)}
     setError('')
   },epoch)},[applyDetail,perform,setItems,notify,saveDraft,loadDetail,refresh])
   const appendAISuggestions=useCallback(async(origin:{host:string;owner:string;repo:string;number:number},run:AIReview,findings:AIFinding[])=>{
@@ -374,6 +377,7 @@ export function useLiveWorkspace(notify: (message:string)=>void) {
       void services.workspace.recentRepositories().then(paths=>{
         if(canceled)return
         setRecent(paths)
+        void loadWorkspaceState<{root:string}>('last-workspace').then(saved=>{if(!canceled&&saved?.root&&paths.includes(saved.root)&&!repoRef.current&&openIntent.current===0)return openRepository(saved.root)}).catch(issue=>{if(!canceled)setError(`Could not restore the last repository: ${String(issue)}`)})
         for(const path of paths)void services.repository.snapshot(path).then(snapshot=>{
           if(canceled)return
           const identity=identityFor(snapshot)

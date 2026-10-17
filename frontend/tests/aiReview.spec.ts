@@ -375,7 +375,7 @@ test("findings support explicit batch selection, dismissal and restoration acros
     findings: [finding],
   });
   await page
-    .getByRole("button", { name: "Run a new review", exact: true })
+    .getByRole("button", { name: "Send follow-up", exact: true })
     .click();
   await expect(findings.locator("article")).toHaveCount(1);
   await expect(
@@ -529,7 +529,7 @@ test("activity shows actual tool outcomes, file reads and provider usage without
     findings: [],
   });
   await page
-    .getByRole("button", { name: "Run a new review", exact: true })
+    .getByRole("button", { name: "Send follow-up", exact: true })
     .click();
   await expect(metric("Input tokens")).toHaveText("Not reported");
   await expect(metric("Dollar cost")).toHaveText("Not reported");
@@ -624,7 +624,7 @@ test("stopping preserves partial suggestions and provider failures remain retrya
     .getByLabel("Review focus (optional)")
     .fill("Keep my focus for the retry");
   await page
-    .getByRole("button", { name: "Run a new review", exact: true })
+    .getByRole("button", { name: "Send follow-up", exact: true })
     .click();
   await expect(
     page
@@ -636,7 +636,7 @@ test("stopping preserves partial suggestions and provider failures remain retrya
     "Keep my focus for the retry",
   );
   await expect(
-    page.getByRole("button", { name: "Run a new review", exact: true }),
+    page.getByRole("button", { name: "Send follow-up", exact: true }),
   ).toBeEnabled();
 });
 

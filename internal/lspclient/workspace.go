@@ -31,6 +31,8 @@ type workspace struct {
 	sessions                  map[string]*session
 	leases                    int
 	dependencyBytes           int64
+	cacheRelease              func()
+	persistent                bool
 }
 
 func insideDirectory(root, path string) bool {
@@ -269,7 +271,12 @@ func (w *workspace) close() {
 	}
 	w.scopes = nil
 	w.scopeMu.Unlock()
-	_ = os.RemoveAll(w.directory)
+	if w.cacheRelease != nil {
+		w.cacheRelease()
+		w.cacheRelease = nil
+	} else if !w.persistent {
+		_ = os.RemoveAll(w.directory)
+	}
 }
 func validatePosition(text string, request CodePositionRequest) error {
 	if request.Line < 0 || request.Character < 0 {

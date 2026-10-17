@@ -73,6 +73,7 @@ export interface LSPHover {
   language: string;
 }
 export interface LSPDefinitionTarget {
+  name?:string;kind?:number;container?:string;depth?:number;
   id: string;
   uri: string;
   path: string;
@@ -494,6 +495,14 @@ async function invoke<T>(method: string, ...args: unknown[]): Promise<T> {
   return (await Call.ByName(method, ...args)) as T;
 }
 
+async function invokeRepository<T>(method:string,args:unknown[],signal?:AbortSignal):Promise<T> {
+ if(signal?.aborted)throw new DOMException('Request cancelled','AbortError');
+ const {Call}=await import('@wailsio/runtime');
+ if(signal?.aborted)throw new DOMException('Request cancelled','AbortError');
+ const promise=Call.ByName(`main.RepositoryService.${method}`,...args);
+ const abort=()=>{void promise.cancel().catch(()=>undefined)};signal?.addEventListener('abort',abort,{once:true});
+ try{return await promise as T}finally{signal?.removeEventListener('abort',abort)}
+}
 async function invokeActions<T>(method: string, repository: RepositoryIdentity, args: unknown[], signal?: AbortSignal): Promise<T> {
   if (!hasNativeBackend()) throw new Error('Open a GitHub repository in the desktop app to use Actions.');
   if (signal?.aborted) throw new DOMException('Request cancelled', 'AbortError');
@@ -547,6 +556,10 @@ export const services = {
     disconnect:(host:string)=>invoke<void>('main.ReviewProviderService.Disconnect',host),
   },
   actions: {
+    annotationSource:(repository:RepositoryIdentity,id:number,head:string,path:string,line:number,page:number,signal?:AbortSignal)=>invokeActions<{path:string;revision:string;text:string;line:number}>('ReadCheckAnnotationSource',repository,[id,head,path,line,page],signal),
+    annotations:(repository:RepositoryIdentity,id:number,head:string,page=1,signal?:AbortSignal)=>invokeActions<import('./actionsTypes').CheckAnnotations>('GetCheckAnnotations',repository,[id,head,page],signal),
+    artifacts:(repository:RepositoryIdentity,run:number,page=1,signal?:AbortSignal)=>invokeActions<import('./actionsTypes').WorkflowArtifacts>('ListWorkflowArtifacts',repository,[run,page],signal),
+    downloadArtifact:(repository:RepositoryIdentity,request:{runId:number;artifactId:number;headSha:string},signal?:AbortSignal)=>invokeActions<string>('DownloadWorkflowArtifact',repository,[request],signal),
     dispatchConfig: (repository: RepositoryIdentity, id: number, ref: string, signal?: AbortSignal) => invokeActions<import('./actionsTypes').WorkflowDispatch>('GetWorkflowDispatch', repository, [id, ref], signal),
     dispatch: (repository: RepositoryIdentity, input: import('./actionsTypes').WorkflowDispatchRequest) => invokeActions<void>('DispatchWorkflow', repository, [input]),
     workflows: (repository: RepositoryIdentity, signal?: AbortSignal) => invokeActions<import('./actionsTypes').Workflow[]>('ListWorkflows', repository, [], signal),
@@ -586,6 +599,11 @@ export const services = {
     openRepository: (root:string, editor:string) => invoke<void>("main.EditorService.OpenRepository",root,editor),
   },
   lsp: {
+    restartAnalysis:(root:string)=>invoke<void>("main.LSPService.RestartAnalysis",root),
+    analysisStatus:(request:CodePositionRequest,signal?:AbortSignal)=>invokeLSP<{phase:string;elapsedMs:number;cached:boolean;error:string}>("main.LSPService.AnalysisStatus",request,signal),
+    references:async(request:CodePositionRequest,signal?:AbortSignal)=>(await invokeLSP<LSPDefinitionTarget[]|null>("main.LSPService.References",request,signal))??[],
+    documentSymbols:async(request:CodePositionRequest,signal?:AbortSignal)=>(await invokeLSP<LSPDefinitionTarget[]|null>("main.LSPService.DocumentSymbols",request,signal))??[],
+    workspaceSymbols:async(request:CodePositionRequest&{query:string},signal?:AbortSignal)=>(await invokeLSP<LSPDefinitionTarget[]|null>("main.LSPService.WorkspaceSymbols",request,signal))??[],
     servers: async (root: string) => (await invoke<LSPServerStatus[] | null>("main.LSPService.Servers", root)) ?? [],
     warmup: (request: CodePositionRequest, signal?: AbortSignal) => invokeLSP<void>("main.LSPService.Warmup", request, signal),
     hover: (request: CodePositionRequest, signal?: AbortSignal) => invokeLSP<LSPHover>("main.LSPService.Hover", request, signal),
@@ -614,6 +632,8 @@ export const services = {
     installJira: () => invoke<void>("main.IntegrationService.InstallJira"),
   },
   workspace: {
+    loadState:(scope:string)=>invoke<string>('main.WorkspaceService.LoadState',scope),
+    saveState:(scope:string,data:string)=>invoke<void>('main.WorkspaceService.SaveState',scope,data),
     choosePatch:()=>invoke<string>('main.WorkspaceService.ChoosePatch'),
     savePatch:(content:string,name:string)=>invoke<string>('main.WorkspaceService.SavePatch',content,name),
     chooseRepository: () => invoke<string>("main.WorkspaceService.ChooseRepository"),
@@ -653,8 +673,8 @@ export const services = {
     retarget:(host:string,owner:string,repo:string,number:number,request:{base:string;expectedBase:string;expectedHead:string})=>invoke<PullRequestSummary>('main.GitHubService.RetargetPullRequest',host,owner,repo,number,request),
     getCommitDiff: (host: string, owner: string, repo: string, sha: string) => invoke<{sha:string; files:GitHubChangedFile[]; warnings:string[]}>("main.GitHubService.GetCommitDiff", host, owner, repo, sha),
     listPullRequests: async (host: string, owner: string, repo: string, state: "open" | "closed" | "all" = "open") => (await invoke<PullRequestSummary[] | null>("main.GitHubService.ListPullRequests", host, owner, repo, state)) ?? [],
-    listPullRequestsPage: (host: string, owner: string, repo: string, request: PullRequestPageRequest) => invoke<PullRequestPage>("main.GitHubService.ListPullRequestsPage", host, owner, repo, request),
-    getPullRequest: (host: string, owner: string, repo: string, number: number) => invoke<PullRequestDetail>("main.GitHubService.GetPullRequest", host, owner, repo, number),
+    listPullRequestsPage: (host: string, owner: string, repo: string, request: PullRequestPageRequest,signal?:AbortSignal) => invokeActions<PullRequestPage>("ListPullRequestsPage", {host,owner,repo},[request],signal),
+    getPullRequest: (host: string, owner: string, repo: string, number: number,signal?:AbortSignal) => invokeActions<PullRequestDetail>("GetPullRequest",{host,owner,repo},[number],signal),
     createPullRequest: (host: string, owner: string, repo: string, request: CreatePullRequestRequest) => invoke<PullRequestSummary>("main.GitHubService.CreatePullRequest", host, owner, repo, request),
     updatePullRequest: (host: string, owner: string, repo: string, number: number, request: UpdatePullRequestRequest) => invoke<PullRequestSummary>("main.GitHubService.UpdatePullRequest", host, owner, repo, number, request),
     setDraft: (host: string, owner: string, repo: string, number: number, draft: boolean) => invoke<void>("main.GitHubService.SetDraft", host, owner, repo, number, draft),
@@ -670,6 +690,8 @@ export const services = {
     setLabels: async (host: string, owner: string, repo: string, number: number, labels: string[]) => (await invoke<string[] | null>("main.GitHubService.SetLabels", host, owner, repo, number, labels)) ?? [],
   },
   repository: {
+    forecastConflict:(root:string,request:{target:string;expectedTarget:string;expectedHead:string;expectedBranch:string;rebase:boolean},signal?:AbortSignal)=>invokeRepository<import("./ConflictForecast").ConflictForecastResult>("ForecastConflict",[root,request],signal),
+    compareReviewHeads:(request:{root:string;host:string;owner:string;repo:string;number:number;previousHead:string;head:string})=>invoke<RepositoryDiff[]>('main.RepositoryService.CompareReviewHeads',request),
     branchStacks:(root:string)=>invoke<import('./repositoryToolTypes').BranchStacks>('main.RepositoryService.BranchStacks',root),
     stackForkPoint:(root:string,parent:string)=>invoke<string>('main.RepositoryService.StackForkPoint',root,parent),
     mutateStackBranch:(root:string,request:import('./repositoryToolTypes').StackBranchRequest)=>invoke<void>('main.RepositoryService.MutateStackBranch',root,request),
@@ -744,6 +766,11 @@ export const services = {
     clone: (url: string, directory: string) => invoke<RepositorySnapshot>("main.RepositoryService.Clone", url, directory),
   },
   ai: {
+    prepareWorktreeCheck:(id:string,command:import('./repositoryToolTypes').CustomCommand)=>invoke<import('./WorktreeVerification').CheckApproval>('main.AIService.PrepareWorktreeCheck',id,command),
+    startWorktreeCheck:(id:string)=>invoke<import('./WorktreeVerification').WorktreeCheck>('main.AIService.StartWorktreeCheck',id),
+    worktreeChecks:(id:string,signal?:AbortSignal)=>invokeLSP<import('./WorktreeVerification').WorktreeCheck[]>('main.AIService.WorktreeChecks',id,signal),
+    cancelWorktreeCheck:(id:string)=>invoke<void>('main.AIService.CancelWorktreeCheck',id),
+    history:(request:{host:string;owner:string;repository:string;pullRequest:number})=>invoke<import("./aiTypes").AIReview[]>("main.AIService.ReviewHistory",request),
     startAction:(request:import('./aiActionTypes').AIActionRequest)=>invoke<import('./aiActionTypes').AIActionSnapshot>('main.AIService.StartAction',request),
     getAction:(id:string)=>invoke<import('./aiActionTypes').AIActionSnapshot>('main.AIService.GetAction',id),
     validateAction:(id:string)=>invoke<void>('main.AIService.ValidateAction',id),

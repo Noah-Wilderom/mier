@@ -74,13 +74,14 @@ type Hover struct {
 	Language string `json:"language"`
 }
 type DefinitionTarget struct {
-	ID       string `json:"id"`
-	URI      string `json:"uri"`
-	Path     string `json:"path"`
-	Range    Range  `json:"range"`
-	Revision string `json:"revision"`
-	Language string `json:"language"`
-	External bool   `json:"external"`
+	locationIndex int
+	ID            string `json:"id"`
+	URI           string `json:"uri"`
+	Path          string `json:"path"`
+	Range         Range  `json:"range"`
+	Revision      string `json:"revision"`
+	Language      string `json:"language"`
+	External      bool   `json:"external"`
 }
 type ReadDefinitionRequest struct {
 	Root     string `json:"root"`

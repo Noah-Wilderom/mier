@@ -96,3 +96,8 @@ export interface WorkflowDispatchRequest {
   ref: string;
   inputs: Record<string, string>;
 }
+
+export interface CheckAnnotation {path:string;startLine:number;endLine:number;startColumn:number;endColumn:number;annotationLevel:'notice'|'warning'|'failure';message:string;title:string;rawDetails:string}
+export interface CheckAnnotations {items:CheckAnnotation[];hasMore:boolean;headSha:string}
+export interface WorkflowArtifact {id:number;name:string;sizeInBytes:number;expired:boolean;createdAt:string;expiresAt:string;digest:string}
+export interface WorkflowArtifacts {items:WorkflowArtifact[];hasMore:boolean}

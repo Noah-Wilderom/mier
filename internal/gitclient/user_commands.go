@@ -4,20 +4,24 @@ import (
 	"context"
 	"errors"
 	"io"
-	"os"
+	"mag-ik-een-review/internal/desktopruntime"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
 type UserCommandRequest struct {
-	Executable     string
-	Arguments      []string
-	TimeoutSeconds int
-	ExpectedHead   string
-	ExpectedBranch string
+	Agent               *AgentWorktree
+	ExpectedSourceStamp string
+	Executable          string
+	Arguments           []string
+	TimeoutSeconds      int
+	ExpectedHead        string
+	ExpectedBranch      string
 }
 
-// RunUserCommand only runs a locally saved command explicitly selected by the
+// RunUserCommand only runs a command explicitly approved by the
 // user. Arguments are literal; repository configuration never supplies code.
 func (c *Client) RunUserCommand(ctx context.Context, path string, request UserCommandRequest, stdout, stderr io.Writer) (int, error) {
 	exitCode := -1
@@ -32,11 +36,23 @@ func (c *Client) RunUserCommand(ctx context.Context, path string, request UserCo
 		if request.TimeoutSeconds < 1 || request.TimeoutSeconds > 900 {
 			return errors.New("Choose a command timeout between 1 and 900 seconds")
 		}
+		if request.Agent != nil {
+			stamp, err := c.agentWorktreeStamp(ctx, root, *request.Agent)
+			if err != nil {
+				return err
+			}
+			if stamp != request.ExpectedSourceStamp {
+				return errors.New("Worktree source changed after approval. Review and approve the command again")
+			}
+		}
 		ctx, cancel := context.WithTimeout(ctx, time.Duration(request.TimeoutSeconds)*time.Second)
 		defer cancel()
 		command := exec.CommandContext(ctx, request.Executable, request.Arguments...)
 		command.Dir = root
-		command.Env = os.Environ()
+		command.Env = desktopruntime.CLIEnvironment(ctx, request.Executable)
+		if name := filepath.Base(request.Executable); strings.EqualFold(name, "node") || strings.EqualFold(name, "node.exe") {
+			command.Env = desktopruntime.WithPath(command.Env, filepath.Dir(request.Executable))
+		}
 		command.Stdout = stdout
 		command.Stderr = stderr
 		command.Stdin = nil

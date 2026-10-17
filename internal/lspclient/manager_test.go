@@ -399,3 +399,46 @@ func TestMutableRequestsRecaptureDigestRejectStaleLinesAndKeepFrozenGrants(t *te
 		t.Fatal("Mutable position accepted without displayed line validation")
 	}
 }
+
+func TestReferencesAndHierarchicalSymbolsUseRevisionBoundReader(t *testing.T) {
+	m, root := managerHarness(t, map[string]string{"use.php": "<?php use Example;", "definition.php": "<?php class Example {}"})
+	request := requestFor(root, "use.php")
+	references, err := m.References(context.Background(), request)
+	if err != nil || len(references) != 1 || references[0].Path != "use.php" {
+		t.Fatalf("references: %#v %v", references, err)
+	}
+	outline, err := m.DocumentSymbols(context.Background(), request)
+	if err != nil || len(outline) != 2 || outline[1].Depth != 1 || outline[1].Container != "Example" {
+		t.Fatalf("outline: %#v %v", outline, err)
+	}
+	symbols, err := m.WorkspaceSymbols(context.Background(), SymbolRequest{CodePositionRequest: request, Query: "Example"})
+	if err != nil || len(symbols) != 1 || symbols[0].Path != "definition.php" {
+		t.Fatalf("workspace symbols: %#v %v", symbols, err)
+	}
+	doc, err := m.ReadDefinition(context.Background(), ReadDefinitionRequest{Root: root, Revision: testRevision, Target: symbols[0].URI})
+	if err != nil || !strings.Contains(doc.Text, "class Example") {
+		t.Fatalf("symbol reader: %#v %v", doc, err)
+	}
+	if _, err = m.ReadDefinition(context.Background(), ReadDefinitionRequest{Root: t.TempDir(), Revision: testRevision, Target: references[0].URI}); err == nil {
+		t.Fatal("cross-repository reference grant accepted")
+	}
+}
+
+func TestRestartAnalysisInvalidatesGrantsAndRecapturesInstalledDependencies(t *testing.T) {
+	m, root := managerHarness(t, map[string]string{"use.php": "<?php use Original;", "definition.php": "<?php class Original {}"})
+	request := requestFor(root, "use.php")
+	targets, err := m.Definition(context.Background(), request)
+	if err != nil || len(targets) != 1 {
+		t.Fatal(targets, err)
+	}
+	if err = m.RestartAnalysis(context.Background(), root); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = m.ReadDefinition(context.Background(), ReadDefinitionRequest{Root: root, Revision: testRevision, Target: targets[0].URI}); err == nil {
+		t.Fatal("restart retained an old navigation grant")
+	}
+	hover, err := m.Hover(context.Background(), request)
+	if err != nil || !strings.Contains(hover.Contents, "Original") {
+		t.Fatalf("analysis did not restart: %#v %v", hover, err)
+	}
+}

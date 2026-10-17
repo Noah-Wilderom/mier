@@ -76,3 +76,4 @@
   flex: 1;
   min-width: 0;
 }
+.conflict-forecast{border-bottom:1px solid var(--border);font-size:12px;flex-shrink:0}.conflict-forecast-bar,.conflict-forecast-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:7px 14px}.conflict-forecast-bar>button{display:flex;align-items:center;gap:6px}.conflict-forecast section{padding:0 14px 12px;max-height:300px;overflow:auto}.conflict-forecast-controls{padding:6px 0}.conflict-forecast label{display:flex;align-items:center;gap:7px}.conflict-forecast select{padding:5px;background:var(--surface);color:var(--text);border:1px solid var(--border)}

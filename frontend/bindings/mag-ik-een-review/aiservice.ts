@@ -33,6 +33,10 @@ export function CancelReview(id: string): $CancellablePromise<void> {
     return $Call.ByID(3186009501, id);
 }
 
+export function CancelWorktreeCheck(id: string): $CancellablePromise<void> {
+    return $Call.ByID(1747411428, id);
+}
+
 export function GetAction(id: string): $CancellablePromise<$models.AIActionSnapshot> {
     return $Call.ByID(2522910147, id);
 }
@@ -61,12 +65,20 @@ export function GetReview(id: string): $CancellablePromise<reviewagent$0.RunSnap
     return $Call.ByID(3818422893, id);
 }
 
+export function PrepareWorktreeCheck(id: string, command: $models.CustomCommand): $CancellablePromise<$models.AIWorktreeCheckApproval> {
+    return $Call.ByID(1806338925, id, command);
+}
+
 /**
  * Removing an owned worktree uses the normal clean-only Git removal. Its branch
  * remains available in history; active tasks must be stopped explicitly first.
  */
 export function RemoveAgentWorktree(id: string): $CancellablePromise<void> {
     return $Call.ByID(1187311733, id);
+}
+
+export function ReviewHistory(request: $models.AIReviewHistoryRequest): $CancellablePromise<reviewagent$0.RunSnapshot[] | null> {
+    return $Call.ByID(4281544513, request);
 }
 
 export function SavePreferences(input: $models.AIPreferences): $CancellablePromise<void> {
@@ -85,6 +97,14 @@ export function StartReview(request: $models.AIReviewRequest): $CancellablePromi
     return $Call.ByID(3703021689, request);
 }
 
+export function StartWorktreeCheck(approvalID: string): $CancellablePromise<$models.AIWorktreeCheck> {
+    return $Call.ByID(369039016, approvalID);
+}
+
 export function ValidateAction(id: string): $CancellablePromise<void> {
     return $Call.ByID(3070045195, id);
+}
+
+export function WorktreeChecks(id: string): $CancellablePromise<$models.AIWorktreeCheck[] | null> {
+    return $Call.ByID(322223415, id);
 }

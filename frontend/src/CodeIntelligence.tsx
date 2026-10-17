@@ -86,6 +86,9 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
   const [location, setLocation] = useState<DOMCodeLocation>()
   const [hover, setHover] = useState<HoverState>()
   const [targets, setTargets] = useState<LSPDefinitionTarget[]>([])
+  const [targetLabel,setTargetLabel]=useState('Definitions')
+  const [symbolQuery,setSymbolQuery]=useState('')
+  const [analysis,setAnalysis]=useState<{phase:string;elapsedMs:number;cached:boolean;error:string}>()
   const [readerHistory, setReaderHistory] = useState<ReaderEntry[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -261,6 +264,7 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
     if (!element || !active || !serverStatuses) return
     let controller: AbortController | undefined
     let key = ''
+    let statusTimer:ReturnType<typeof setInterval>|undefined
     let stale = false
     const prepare = () => {
       if (reader) return
@@ -279,11 +283,16 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
       controller = pending
       setPreparing(true)
       setPreparationError('')
+      setAnalysis(undefined)
+      clearInterval(statusTimer)
+      const status=()=>void services.lsp.analysisStatus(request,pending.signal).then(value=>{if(!stale&&!pending.signal.aborted)setAnalysis(value)}).catch(()=>{})
+      statusTimer=setInterval(status,600)
       void services.lsp.warmup(request, pending.signal).then(() => {
-        if (!stale && !pending.signal.aborted) setPreparing(false)
+        if (!stale && !pending.signal.aborted) {setPreparing(false);clearInterval(statusTimer);status()}
       }).catch(issue => {
         if (!stale && !pending.signal.aborted) {
           setPreparing(false)
+          clearInterval(statusTimer)
           setPreparationError(issue instanceof Error ? issue.message : 'Code analysis could not be prepared.')
         }
       })
@@ -293,7 +302,7 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
     prepare()
     const observer = new MutationObserver(prepare)
     observer.observe(element, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-code-path'] })
-    return () => { stale = true; controller?.abort(); observer.disconnect() }
+    return () => { stale = true; clearInterval(statusTimer); controller?.abort(); observer.disconnect() }
   }, [context, active, serverStatuses, !!reader, preparationAttempt])
 
   useEffect(() => {
@@ -340,7 +349,8 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
     }
   }
 
-  const goToDefinition = async (position?: DOMCodeLocation) => {
+  const firstPosition=()=>{const code=container.current?.querySelector<HTMLElement>(reader?'.code-definition-reader [data-code-path]':'.code-intelligence-review [data-code-side="new"][data-code-path]')??container.current?.querySelector<HTMLElement>('.code-intelligence-review [data-code-path]');return code?codeLocation(code,code,0):undefined}
+  const goToDefinition = async (position?: DOMCodeLocation,kind:'definition'|'references'|'outline'|'symbols'='definition') => {
     if (!position || busy) return
     const language = languageFor(position)
     if (!language) {setNotice(serverStatuses ? 'Choose a language server for this file in the Settings catalog.' : 'Language server availability is still loading.');return}
@@ -362,12 +372,14 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
     setNotice('')
     setTargets([])
     try {
-      const found = await services.lsp.definition(request, controller.signal)
+      const labels={definition:'Definitions',references:'References',outline:'Document outline',symbols:'Repository symbols'}
+      setTargetLabel(labels[kind])
+      const found = await (kind==='references'?services.lsp.references(request,controller.signal):kind==='outline'?services.lsp.documentSymbols(request,controller.signal):kind==='symbols'?services.lsp.workspaceSymbols({...request,query:symbolQuery},controller.signal):services.lsp.definition(request,controller.signal))
       if (!mounted.current || sequence !== navigationSequence.current || currentContext.current !== expectedContext) return
       const resolvedSnapshot = !!request.comparisonHead || request.revision === 'working' || request.revision === 'index'
       if (found.some(target => !completeRevision.test(target.revision) || (!resolvedSnapshot && target.revision !== request.revision))) throw new Error('The definition response belongs to another revision. Try again.')
-      if (!found.length) setNotice('The language server found no definition at this position.')
-      else if (found.length === 1) {
+      if (!found.length) setNotice(`The language server found no ${kind==='definition'?'definition':kind==='references'?'references':'symbols'} in the selected revision.`)
+      else if (found.length === 1&&kind==='definition') {
         await openTarget(found[0])
       } else setTargets(found)
     } catch (issue) {
@@ -410,7 +422,7 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
         event.preventDefault()
         event.stopPropagation()
         gPressedAt.current = 0
-        void goToDefinition(position)
+        void goToDefinition(position,event.shiftKey?'references':'definition')
       } else gPressedAt.current = event.key.toLowerCase() === 'g' ? Date.now() : 0
     }
     container.current?.addEventListener('keydown', keydown)
@@ -513,7 +525,8 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
     }
   }}>
     <div className="code-intelligence-toolbar">
-      <span className="code-intelligence-hint" title={availabilityError || preparationError || undefined} role={preparing ? 'status' : undefined}><Icon name="code" size={14} />{!active ? 'Language intelligence is available in the desktop app' : availabilityError ? 'Language server availability could not be checked' : !serverStatuses ? 'Checking language servers…' : preparationError ? 'Code analysis could not be prepared' : preparing ? 'Preparing code analysis…' : availableServers ? 'Hover symbols · Ctrl/Cmd click or F12 for definition' : 'Language servers need setup'}{active && !availableServers && onOpenSettings && <button type="button" className="btn-ghost" onClick={onOpenSettings}>Set up</button>}{preparationError && <button type="button" className="btn-ghost" onClick={() => setPreparationAttempt(value => value + 1)}>Retry</button>}</span>
+      <span className="code-intelligence-hint" title={availabilityError || preparationError || (analysis?`Analysis ready in ${(analysis.elapsedMs/1000).toFixed(1)}s${analysis.cached?' using cached source':''}`:undefined)} role={preparing ? 'status' : undefined}><Icon name="code" size={14} />{!active ? 'Language intelligence is available in the desktop app' : availabilityError ? 'Language server availability could not be checked' : !serverStatuses ? 'Checking language servers…' : preparationError ? 'Code analysis could not be prepared' : preparing ? `${analysis?.phase||'Preparing code analysis'}${analysis?` · ${(analysis.elapsedMs/1000).toFixed(1)}s`:''}…` : availableServers ? 'Hover symbols · Ctrl/Cmd click or F12 for definition' : 'Language servers need setup'}{active && !availableServers && onOpenSettings && <button type="button" className="btn-ghost" onClick={onOpenSettings}>Set up</button>}{preparationError && <button type="button" className="btn-ghost" onClick={() => setPreparationAttempt(value => value + 1)}>Retry</button>}</span>
+      {active&&availableServers>0&&<div className="code-navigation-actions"><button type="button" className="icon-button" aria-label="Restart code analysis" title="Restart analysis and re-check installed dependency source" disabled={busy||preparing} onClick={()=>{clearHover();setReaderHistory([]);setTargets([]);void services.lsp.restartAnalysis(root).then(()=>setPreparationAttempt(value=>value+1)).catch(issue=>setPreparationError(String(issue)))}}><Icon name="refresh" size={13}/></button><button type="button" className="btn-ghost" disabled={busy||!location} onClick={()=>void goToDefinition(locationRef.current,'references')}>References</button><button type="button" className="btn-ghost" disabled={busy} onClick={()=>void goToDefinition(firstPosition(),'outline')}>Outline</button><form onSubmit={event=>{event.preventDefault();void goToDefinition(firstPosition(),'symbols')}}><input aria-label="Search repository symbols" placeholder="Search symbols…" maxLength={200} value={symbolQuery} onChange={event=>setSymbolQuery(event.target.value)}/><button type="submit" className="btn-ghost" disabled={busy||!symbolQuery.trim()}>Find</button></form></div>}
       <button type="button" className="btn-ghost code-definition-button" disabled={!active || !location || busy} onClick={() => void goToDefinition(container.current ? codeLocationFromSelection(container.current) ?? locationRef.current : locationRef.current)}><Icon name="external" size={13} />{busy ? 'Loading definition…' : 'Go to definition'}</button>
     </div>
     {(error || notice) && <div className={`code-intelligence-message ${error ? 'is-error' : ''}`} role={error ? 'alert' : 'status'}><span>{error || notice}</span>{error && onOpenSettings && <button className="btn-ghost" type="button" onClick={onOpenSettings}>Language server settings</button>}<button className="icon-button" type="button" aria-label="Dismiss code navigation message" onClick={() => {setError('');setNotice('')}}><Icon name="close" size={13} /></button></div>}
@@ -524,7 +537,7 @@ export default function CodeIntelligence({ root, host, owner, repo, pullRequest,
         {documentLines.map((line, index) => <div className={`code-definition-row ${index === reader.document.range.start.line ? 'is-target' : ''}`} data-definition-line={index + 1} key={index}><span className="code-definition-line-number" aria-hidden="true">{index + 1}</span><code data-code-path={reader.document.uri || reader.target.uri} data-code-line={index + 1} data-code-side="new" data-code-revision={reader.document.revision} data-code-language={reader.document.language}>{documentHighlight?.lines[index]?.map((token, tokenIndex) => <span key={tokenIndex} style={syntaxTokenStyle(token)}>{token.content}</span>) ?? line}</code></div>)}
       </div>
     </section>}
-    {!!targets.length && <div className="code-intelligence-targets" role="dialog" aria-label="Choose a definition"><div><strong>Definitions</strong><button className="icon-button" type="button" aria-label="Close definition choices" onClick={() => setTargets([])}><Icon name="close" size={14} /></button></div><ul>{targets.map(target => <li key={target.id || `${target.uri}:${target.range.start.line}:${target.range.start.character}`}><button type="button" disabled={busy} onClick={() => void openTarget(target)}><Icon name="file" size={16} /><span><strong>{target.path}:{target.range.start.line + 1}</strong><span>{target.external ? 'Dependency file' : 'Repository file'} · {target.language}</span></span><Icon name="chevron-right" size={14} /></button></li>)}</ul></div>}
+    {!!targets.length && <div className="code-intelligence-targets" role="dialog" aria-label={targetLabel==='Definitions'?'Choose a definition':targetLabel}><div><strong>{targetLabel}{targets.length===128?' · First 128 results':''}</strong><button className="icon-button" type="button" aria-label="Close definition choices" onClick={() => setTargets([])}><Icon name="close" size={14} /></button></div><ul>{targets.map(target => <li key={target.id || `${target.uri}:${target.range.start.line}:${target.range.start.character}`}><button type="button" disabled={busy} onClick={() => void openTarget(target)}><Icon name="file" size={16} /><span><strong style={{paddingLeft:(target.depth??0)*12}}>{target.name?`${target.name} · `:''}{target.path}:{target.range.start.line + 1}</strong><span>{target.external ? 'Dependency file' : 'Repository file'} · {target.language}</span></span><Icon name="chevron-right" size={14} /></button></li>)}</ul></div>}
     {hover && <div ref={hoverPanel} className="code-intelligence-hover" role="dialog" aria-label="Symbol information" style={{ left: hover.x, top: hover.y, ...codeReviewStyleVariables(preferences) }} onPointerEnter={() => {clearTimeout(hideTimer.current);hideTimer.current = undefined;hoverEligible.current = true}} onKeyDown={event => {if (event.key === 'Escape') {event.preventDefault();event.stopPropagation();clearHover()}}}>
       <div className="code-hover-heading"><div><span className="code-hover-language">{symbolLanguageLabel(hover.result?.language || languageFor(hover.location) || '', hover.location)}</span><span className="code-hover-location" title={reader?.document.path || hover.location.path}>{(reader?.document.path || hover.location.path).split('/').pop()}:{hover.location.line + 1}</span></div><button className="icon-button" type="button" aria-label="Close symbol information" onClick={clearHover}><Icon name="close" size={13} /></button></div>
       {hover.loading ? <div className="code-hover-loading" role="status"><span>{preparing ? 'Preparing code analysis…' : 'Loading symbol information…'}</span><span className="skeleton" aria-hidden="true" /><span className="skeleton" aria-hidden="true" /></div> : hover.error ? <p className="code-hover-error" role="alert">{hover.error}{onOpenSettings && <button className="btn-ghost" type="button" onClick={onOpenSettings}>Language server settings</button>}</p> : hover.result && <SymbolInformation contents={hover.result.contents} kind={hover.result.kind} language={hover.result.language} theme={codeTheme} />}

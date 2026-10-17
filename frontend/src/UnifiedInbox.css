@@ -1,0 +1,109 @@
+.unified-inbox {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+.unified-inbox > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.unified-inbox h1 {
+  font-size: 20px;
+  margin: 0 0 5px;
+}
+.unified-inbox p {
+  font-size: 12px;
+  margin: 6px 0;
+  color: var(--muted);
+}
+.unified-inbox-filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.unified-inbox-filters label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.unified-inbox select,
+.unified-inbox input:not([type="checkbox"]) {
+  padding: 6px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.unified-inbox-saved {
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.unified-inbox-saved summary {
+  cursor: pointer;
+}
+.unified-inbox-saved .unified-inbox-filters {
+  padding: 10px 0;
+}
+.inbox-saved-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 4px 10px 0 0;
+}
+.inbox-saved-item > button:last-child {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+}
+.unified-inbox-results {
+  overflow: auto;
+  padding: 0 20px 20px;
+}
+.unified-inbox-results h2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  margin: 18px 0 8px;
+}
+.unified-inbox-results h2 span {
+  font-size: 11px;
+  font-weight: 400;
+}
+.unified-pr-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  text-align: left;
+  gap: 12px;
+  background: none;
+  color: var(--text);
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 12px 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.unified-pr-row:hover {
+  background: var(--hover);
+}
+.unified-pr-row strong {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.unified-pr-row time {
+  color: var(--muted);
+}

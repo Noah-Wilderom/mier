@@ -40,6 +40,9 @@ import NotificationSettings from "./NotificationSettings";
 import EditorActions from "./EditorActions";
 import {Avatar, ActorName, personLabel} from "./Avatar";
 import CodeIntelligence from "./CodeIntelligence";
+import IncrementalReview from "./IncrementalReview";
+import UnifiedInbox from "./UnifiedInbox";
+import ConflictForecast from "./ConflictForecast";
 import {CodeReviewSettings} from "./CodeReviewSettings";
 import LanguageServerSettings from "./LanguageServerSettings";
 import {NotificationToasts, type PullRequestNotice} from "./NotificationToasts";
@@ -68,6 +71,7 @@ type Destination =
   | "requested"
   | "assigned"
   | "drafts"
+  | "all-inbox"
   | "actions"
   | "history"
   | "local-changes"
@@ -204,8 +208,9 @@ export default function App() {
     clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(""), 4200);
   }, []);
+  useEffect(()=>{const report=(event:Event)=>notify((event as CustomEvent<string>).detail);window.addEventListener("mier:state-error",report);return()=>window.removeEventListener("mier:state-error",report)},[notify]);
   const live = useLiveWorkspace(notify);
-  const tabScope = live.enabled ? JSON.stringify(["live", live.repository?.root ?? "", live.identity?.host ?? "", live.identity?.owner ?? "", live.identity?.repo ?? ""]) : "demo";
+  const tabScope = live.enabled ? JSON.stringify(["live", live.repository?.root ?? "", live.identity?.host ?? "", live.identity?.owner ?? "", live.identity?.repo ?? "", live.account?.login ?? ""]) : "demo";
   const reviewTabs = usePullRequestTabs(tabScope);
   const selected = reviewTabs.active, setSelected = reviewTabs.open;
   const tab = reviewTabs.selected?.section ?? "changes", setTab = reviewTabs.setSection;
@@ -354,16 +359,17 @@ export default function App() {
     return () => media.removeEventListener("change", apply);
   }, [theme]);
   useEffect(() => {
+    if (!reviewTabs.ready) return;
+    if (live.enabled && live.identity && !live.account?.authenticated) return;
     if (pendingReview) {
       if (pendingReview.ready) {
-        if (live.repository?.root === pendingReview.root) reviewTabs.open(pendingReview.number, "conversation");
-        setPendingReview(undefined);
+        if (live.repository?.root === pendingReview.root) void reviewTabs.open(pendingReview.number, "conversation").then(opened=>{if(opened)setPendingReview(current=>current?.id===pendingReview.id?undefined:current)});
       }
       return;
     }
     if (!reviewTabs.initialized && isPRView && visiblePRs.length && !creating)
       reviewTabs.open((!live.enabled && visiblePRs.find(item => item.number === 142) || visiblePRs[0]).number);
-  }, [tabScope, reviewTabs.initialized, visiblePRs.map(p => p.number).join(","), isPRView, creating, live.enabled, pendingReview, reviewTabs.open]);
+  }, [tabScope, reviewTabs.ready, reviewTabs.initialized, visiblePRs.map(p => p.number).join(","), isPRView, creating, live.enabled, live.account?.authenticated, pendingReview, reviewTabs.open]);
   useEffect(() => {
     const command = (action: string, value?: string) => {
       if (action === "navigate")
@@ -526,6 +532,7 @@ export default function App() {
     navigate('inbox');setFilter(notice.type==='merged'?'merged':notice.type==='closed'?'closed':'open');
   };
   const navTitles: Record<Destination, string> = {
+    "all-inbox":"All repositories",
     inbox: "Review inbox",
     mine: "My pull requests",
     requested: "Review requested",
@@ -634,6 +641,7 @@ export default function App() {
           {(
             [
               ["inbox", "inbox", "Inbox", undefined],
+              ["all-inbox", "inbox", "All repositories", undefined],
               ["mine", "pull-request", "My pull requests", undefined],
               [
                 "requested",
@@ -801,7 +809,7 @@ export default function App() {
         )}
       </header>
 
-      {live.enabled && live.repository && !focusMode && destination !== 'settings' && <div className="repository-tools"><RepositoryToolbar key={live.repository.root} repository={live.repository} busy={live.busy} onGit={live.git} onRefresh={live.refresh} onOperate={live.operate} onConflicts={()=>navigate('local-changes')} onOpenRepository={path=>void live.openRepository(path).catch(()=>{})}/>{live.repository.operation&&<GitOperationBanner key={live.repository.root+live.repository.operation.token} operation={live.repository.operation} busy={live.busy} onOperate={live.operate} onResolve={()=>navigate('local-changes')}/>}</div>}
+      {live.enabled && live.repository && !focusMode && destination !== 'settings' && <div className="repository-tools"><RepositoryToolbar key={live.repository.root} repository={live.repository} busy={live.busy} onGit={live.git} onRefresh={live.refresh} onOperate={live.operate} onConflicts={()=>navigate('local-changes')} onOpenRepository={path=>void live.openRepository(path).catch(()=>{})}/>{live.repository.operation&&<GitOperationBanner key={live.repository.root+live.repository.operation.token} operation={live.repository.operation} busy={live.busy} onOperate={live.operate} onResolve={()=>navigate('local-changes')}/>}<ConflictForecast key={`forecast:${live.repository.root}`} repository={live.repository}/></div>}
 
       <main
         aria-busy={!!live.openingRepository||(isPRView&&live.loadingPullRequests)}
@@ -1010,7 +1018,7 @@ export default function App() {
               >
                 {live.enabled&&pr.provider?.detailLoaded===false ? <ReviewSkeleton/> : <>
                 {tab === "changes" && (
-                  <CodeIntelligence key={`intelligence-${pr.number}`} root={live.enabled?live.repository?.root??'':''} host={pr.provider?.host} owner={pr.provider?.owner} repo={pr.provider?.repo} pullRequest={pr.number} headSha={pr.headSha} baseSha={pr.baseSha} enabled={live.enabled} onOpenSettings={()=>navigate('settings')}>
+                  <IncrementalReview pr={pr} root={live.repository?.root??""}><CodeIntelligence key={`intelligence-${pr.number}`} root={live.enabled?live.repository?.root??'':''} host={pr.provider?.host} owner={pr.provider?.owner} repo={pr.provider?.repo} pullRequest={pr.number} headSha={pr.headSha} baseSha={pr.baseSha} enabled={live.enabled} onOpenSettings={()=>navigate('settings')}>
                   <ReviewWorkspace
                     key={pr.number}
                     pr={pr}
@@ -1021,7 +1029,7 @@ export default function App() {
                     busy={live.busy}
                     requestedLocation={reviewLocation}
                   />
-                  </CodeIntelligence>
+                  </CodeIntelligence></IncrementalReview>
                 )}
                 {tab === "conversation" && (
                   <Conversation
@@ -1074,7 +1082,7 @@ export default function App() {
                     ))}
                   </div>
                 )}
-                {tab === "checks" && <Checks pr={pr} repository={live.enabled ? live.identity : undefined} account={live.account?.login} />}
+                {tab === "checks" && <Checks onOpenAnnotation={annotation=>{if(!pr.files.some(file=>file.path===annotation.path))return false;setReviewLocation({path:annotation.path,line:annotation.startLine,side:"new",annotation:true});setTab("changes");return true}} pr={pr} repository={live.enabled ? live.identity : undefined} account={live.account?.login} />}
                 </>}
               </div>
               {(!live.enabled||pr.provider?.detailLoaded)&&<ReviewFooter
@@ -1108,6 +1116,10 @@ export default function App() {
             </section>
           )}
           </ReviewSessionProvider></div></section>}
+        {destination === "all-inbox"&&<UnifiedInbox repositories={Object.values(live.repositoryCards)} onOpen={async(root,number)=>{
+          const id=newId();setPendingReview({id,root,number,ready:false});
+          try{if(root!==live.repository?.root)await live.openRepository(root);setPendingReview(current=>current?.id===id?{...current,ready:true}:current);navigate('inbox');setFilter('open')}catch(issue){setPendingReview(current=>current?.id===id?undefined:current);throw issue}
+        }}/>}
         {destination === "actions" && (!live.enabled || !!live.repository) && <ActionsPage repository={live.enabled && supportsActions(live.identity) ? live.identity : undefined} account={live.account?.login}/>}
         {destination === "history" && (!live.enabled || !!live.repository) && (
           <HistoryView

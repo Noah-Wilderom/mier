@@ -6,11 +6,14 @@ import { currentUser, latestReview, submitReview } from './data'
 import type { ChangedFile, DiffLine, PendingComment, PullRequest, ReviewDecision, Thread } from './data'
 import './review.css'
 import PredictionPanel from './PredictionPanel'
+import {useCIAnnotations} from './useCIAnnotations'
+import {DeferredDiffRows,diffChunks} from './DeferredDiffRows'
+import {saveCheckpoint} from './reviewCheckpoint'
 import {reviewPriority,type PredictionResult} from './predictionTypes'
 import {services} from './services'
 import {diffSections,type ReviewFileContent,type ContextWindow} from './diffContext'
 const ReviewFullFile=lazy(()=>import('./ReviewFullFile'))
-import { useReviewSessionState, useReviewSessionRef } from './ReviewSession'
+import { useReviewSessionState, useReviewSessionRef, useReviewSessionTouch } from './ReviewSession'
 import { Markdown } from './Markdown'
 import FileChangeIcon from './FileChangeIcon'
 import { ActorName, Avatar } from './Avatar'
@@ -24,7 +27,7 @@ type ReviewProps = {
   busy?: boolean
 }
 
-export type ReviewLocation = { path: string; threadId?: string; line?: number; side?: 'old' | 'new' }
+export type ReviewLocation = { annotation?:boolean; path: string; threadId?: string; line?: number; side?: 'old' | 'new' }
 export type ReviewWorkspaceProps = ReviewProps & {
   focusMode: boolean
   onToggleFocus: () => void
@@ -193,6 +196,7 @@ export default function ReviewWorkspace({ pr, onUpdate, onNotify, focusMode, onT
   const appearance = useSyncExternalStore(subscribeCodeAppearance, getCodeAppearance, () => 'light' as const)
   const syntaxTheme = effectiveCodeTheme(appearance, codePreferences)
   const [highlighted, setHighlighted] = useState<{ source: string; theme: string; result: HighlightedDiff } | null>(null)
+  const ciAnnotations=useCIAnnotations(pr)
   const [activePath, setActivePath] = useReviewSessionState('workspace.activePath', () => requestedLocation && pr.files.some(item => item.path === requestedLocation.path) ? requestedLocation.path : pr.files[0]?.path ?? '')
   const [query, setQuery] = useReviewSessionState('workspace.query', '')
   const [diffMode, setDiffMode] = useReviewSessionState<'split' | 'unified'>('workspace.diffMode', 'split')
@@ -211,6 +215,7 @@ export default function ReviewWorkspace({ pr, onUpdate, onNotify, focusMode, onT
   const resizeOrigin = useRef({ x: 0, width: 218 })
   const lastRequestedLocation = useReviewSessionRef<ReviewLocation | undefined>('workspace.lastLocation', undefined)
   const requestedScrollPending = useRef(false)
+  const touchSession=useReviewSessionTouch()
   const scrollPositions = useReviewSessionRef('workspace.scroll', new Map<string, {top: number; left: number}>())
   const file = pr.files.find(item => item.path === activePath) ?? pr.files[0]
   const [predictionKind,setPredictionKind]=useState<'review'|'tickets'>('review')
@@ -270,6 +275,9 @@ export default function ReviewWorkspace({ pr, onUpdate, onNotify, focusMode, onT
     return [...folders.entries()]
   }, [visibleFiles,suggestedOrder,reviewAssessment])
   const navigableFiles = useMemo(() => groups.flatMap(([, files]) => files), [groups])
+  const originalLines=useMemo(()=>new Set(file?.lines??[]),[file])
+  const originalContexts=useMemo(()=>new Set((file?.lines??[]).filter(line=>line.kind==='context').map(line=>`${line.oldLine}:${line.newLine}`)),[file])
+  const commentable=(line:DiffLine)=>originalLines.has(line)||line.kind==='context'&&originalContexts.has(`${line.oldLine}:${line.newLine}`)
   const splitRows = useMemo(() => alignLines(displayedFile?.lines ?? [], ignoreWhitespace), [displayedFile, ignoreWhitespace])
   const hunkHeaders = useMemo(() => [...(file?.rawPatch ?? '').matchAll(/^@@ .+? @@.*$/gm)].map(match => match[0]), [file])
   const unifiedLines = useMemo(() => {
@@ -291,6 +299,13 @@ export default function ReviewWorkspace({ pr, onUpdate, onNotify, focusMode, onT
   const editable = ['open', 'draft'].includes(pr.status) && pr.provider?.detailLoaded !== false && allowsReview(pr,'inlineComments')
   const composerOutdated = composerHeadSha !== null && composerHeadSha !== pr.headSha
   const composerDetached = commentAt !== null && (composerPath !== file?.path || !file?.lines.some(line => commentAt.side === 'old' ? line.oldLine === commentAt.line : line.newLine === commentAt.line))
+
+  useEffect(()=>{
+    if(!requestedLocation?.annotation||requestedLocation.path!==file?.path||!requestedLocation.line||file.lines.some(line=>line.newLine===requestedLocation.line))return
+    let canceled=false
+    void loadSource().then(value=>{if(value&&!canceled)setEntireFile({key:sourceKey,value})})
+    return()=>{canceled=true}
+  },[requestedLocation,file?.path,sourceKey])
 
   const previousPath = useRef(activePath)
   useEffect(() => {
@@ -414,7 +429,7 @@ export default function ReviewWorkspace({ pr, onUpdate, onNotify, focusMode, onT
       <span className="review-line-number" aria-hidden="true">{number ?? ''}</span>
       <span className="review-line-marker" aria-hidden="true">{line?.kind === 'add' ? '+' : line?.kind === 'remove' ? '−' : ''}</span>
       <code className="review-code-text" data-code-path={number !== undefined ? side === 'old' ? file?.previousPath || file?.path : file?.path : undefined} data-code-line={number} data-code-side={number !== undefined ? side : undefined}>{line ? tokenLine(syntax?.[side].get(syntaxLineKey(line, side)), line.text) : ''}</code>
-      {line && number !== undefined && editable && file?.lines.includes(line) && <button className="review-add-comment" disabled={busy || saving} aria-label={`Comment on ${side === 'old' ? 'original' : 'changed'} line ${number} in ${file?.path}`} title={`Comment on line ${number}`} onClick={() => beginComment({ line: number, side })}><Icon name="plus" size={12} /></button>}
+      {line && number !== undefined && editable && originalLines.has(line) && <button className="review-add-comment" disabled={busy || saving} aria-label={`Comment on ${side === 'old' ? 'original' : 'changed'} line ${number} in ${file?.path}`} title={`Comment on line ${number}`} onClick={() => beginComment({ line: number, side })}><Icon name="plus" size={12} /></button>}
     </div>
   }
 
@@ -433,7 +448,7 @@ export default function ReviewWorkspace({ pr, onUpdate, onNotify, focusMode, onT
         <button className="btn btn-ghost review-expand" aria-label={focusMode ? 'Exit expanded review' : 'Expand review to fill the window'} aria-pressed={focusMode} onClick={onToggleFocus}><Icon name={focusMode ? 'minimize' : 'maximize'} size={14} /><span>{focusMode ? 'Exit focus' : 'Expand review'}</span></button>
       </div>
     </div>
-    {entireFile?.key===sourceKey&&<Suspense fallback={<p role="status">Loading entire file…</p>}><ReviewFullFile source={entireFile.value} onClose={()=>{setEntireFile(undefined);requestAnimationFrame(()=>entireFileButton.current?.focus())}}/></Suspense>}
+    {entireFile?.key===sourceKey&&<Suspense fallback={<p role="status">Loading entire file…</p>}><ReviewFullFile revealLine={requestedLocation?.annotation?requestedLocation.line:undefined} source={entireFile.value} onClose={()=>{setEntireFile(undefined);requestAnimationFrame(()=>entireFileButton.current?.focus())}}/></Suspense>}
     {mutationError && <p className="review-mutation-error" role="alert">{mutationError}</p>}
     {composerDetached && renderComposer()}
     <div className="review-panes">
@@ -473,29 +488,32 @@ export default function ReviewWorkspace({ pr, onUpdate, onNotify, focusMode, onT
               if (first) document.getElementById(`review-thread-${first.id}`)?.scrollIntoView({ block: 'center' })
             }}><Icon name="message-circle" size={13} />{activeThreads}</button>}<label className="review-viewed-control"><input type="checkbox" checked={pr.viewedFiles.includes(file.path)} disabled={busy || saving} onChange={event => setViewed(file.path, event.target.checked)} />Viewed</label><div className="review-file-navigation"><button className="icon-button" disabled={activeIndex <= 0} onClick={() => selectAdjacent(-1)} aria-label="Previous file" title="Previous file ([)"><Icon name="chevron-up" size={14} /></button><button className="icon-button" disabled={activeIndex < 0 || activeIndex >= navigableFiles.length - 1} onClick={() => selectAdjacent(1)} aria-label="Next file" title="Next file (])"><Icon name="chevron-down" size={14} /></button></div></div>
           </div>
+          {ciAnnotations.error&&<p className="review-diff-notice" role="status">Some CI annotations could not be loaded. <button className="btn-ghost" onClick={ciAnnotations.retry}>Retry annotations</button></p>}
           {sourceError&&<p className="review-mutation-error" role="alert">{sourceError}</p>}
           {file.truncated && file.lines.length > 0 && <div className="review-diff-notice"><Icon name="alert-circle" size={14} />This diff is truncated. Only the available patch lines are shown.</div>}
-          <div className="review-diff-scroll" ref={diffScrollRef} onScroll={event => scrollPositions.current.set(scrollKey, {top:event.currentTarget.scrollTop,left:event.currentTarget.scrollLeft})} tabIndex={0} aria-label={`Code changes in ${file.path}`}>
+          <div className="review-diff-scroll" ref={diffScrollRef} onScroll={event => {scrollPositions.current.set(scrollKey, {top:event.currentTarget.scrollTop,left:event.currentTarget.scrollLeft});touchSession()}} tabIndex={0} aria-label={`Code changes in ${file.path}`}>
             {file.lines.length ? <div className={`review-diff-content ${diffMode === 'split' ? 'is-split' : 'is-unified'} ${wrapLines ? 'wrap-lines' : ''}`}>
               {diffMode === 'split' ? <>
                 <div className="review-diff-column-labels"><span><Icon name="git-branch" size={12} />{pr.base}<span className="muted">Original</span></span><span><Icon name="git-branch" size={12} />{pr.head}<span className="muted">Changed</span></span></div>
                 <div className="review-hunk-label"><span>{hunkHeaders[0] ?? `@@ −${file.lines.find(line => line.oldLine)?.oldLine ?? 0},${file.lines.filter(line => line.oldLine !== undefined).length} +${file.lines.find(line => line.newLine)?.newLine ?? 0},${file.lines.filter(line => line.newLine !== undefined).length} @@`}</span><span>{ignoreWhitespace ? 'Whitespace changes ignored' : 'Click + beside a line to comment'}</span></div>
                 {renderContext(splitRows[0]?.old?.hunk??splitRows[0]?.next?.hunk??0,'above')}
-                {splitRows.map((row, index) => {
+                {diffChunks(splitRows).map((chunk,chunkIndex)=><DeferredDiffRows key={`${file.path}:${chunkIndex}`} rows={chunk.length} force={chunkIndex===0||chunk.some(row=>[row.old,row.next].some(line=>line&&((requestedLocation?.path===file.path&&(requestedLocation.side==='old'?line.oldLine:line.newLine)===requestedLocation.line)||pr.threads.some(thread=>thread.path===file.path&&(thread.side==='old'?line.oldLine:line.newLine)===thread.line))))}>{()=>chunk.map((row,offset) => {
+                  const index=chunkIndex*60+offset
                   const hunk = row.old?.hunk ?? row.next?.hunk
                   const previous = splitRows[index - 1]
                   const previousHunk = previous?.old?.hunk ?? previous?.next?.hunk
-                  return <div className="review-diff-row-block" key={row.key}>{index > 0 && hunk !== undefined && hunk !== previousHunk && <div className="review-hunk-label"><span>{hunkHeaders[hunk]}</span><span>Next changed section</span></div>}{index>0&&hunk!==previousHunk&&renderContext(hunk??0,'above')}<div className="review-split-row">{renderCell(row.old, 'old')}{renderCell(row.next, 'new')}</div>{renderDiscussion([...(row.old?.oldLine !== undefined ? [{ line: row.old.oldLine, side: 'old' as const }] : []), ...(row.next?.newLine !== undefined ? [{ line: row.next.newLine, side: 'new' as const }] : [])])}{(index===splitRows.length-1||hunk!==(splitRows[index+1]?.old?.hunk??splitRows[index+1]?.next?.hunk))&&renderContext(hunk??0,'below')}</div>
-                })}
+                  return <div className="review-diff-row-block" key={row.key}>{index > 0 && hunk !== undefined && hunk !== previousHunk && <div className="review-hunk-label"><span>{hunkHeaders[hunk]}</span><span>Next changed section</span></div>}{index>0&&hunk!==previousHunk&&renderContext(hunk??0,'above')}<div className="review-split-row">{renderCell(row.old, 'old')}{renderCell(row.next, 'new')}</div>{row.next?.newLine&&ciAnnotations.items.filter(item=>item.path===file.path&&item.startLine===row.next!.newLine).map((item,i)=><div className={`ci-inline is-${item.annotationLevel}`} key={`ci:${i}`}><strong>{item.title||item.annotationLevel}</strong><p>{item.message}</p></div>)}{renderDiscussion([...(row.old?.oldLine !== undefined ? [{ line: row.old.oldLine, side: 'old' as const }] : []), ...(row.next?.newLine !== undefined ? [{ line: row.next.newLine, side: 'new' as const }] : [])])}{(index===splitRows.length-1||hunk!==(splitRows[index+1]?.old?.hunk??splitRows[index+1]?.next?.hunk))&&renderContext(hunk??0,'below')}</div>
+                })}</DeferredDiffRows>)}
               </> : <>
                 <div className="review-diff-column-labels review-unified-column-label"><span><Icon name="git-branch" size={12} />{pr.base}<Icon name="arrow-right" size={12} />{pr.head}<span className="muted">Unified diff</span></span></div>
                 <div className="review-hunk-label"><span>{hunkHeaders[0] ?? `@@ −${file.lines.find(line => line.oldLine)?.oldLine ?? 0} +${file.lines.find(line => line.newLine)?.newLine ?? 0} @@`}</span><span>{ignoreWhitespace ? 'Whitespace changes ignored' : 'Click + beside a line to comment'}</span></div>
                 {renderContext(unifiedLines[0]?.hunk??0,'above')}
-                {unifiedLines.map((line, index) => {
+                {diffChunks(unifiedLines).map((chunk,chunkIndex)=><DeferredDiffRows key={`${file.path}:${chunkIndex}`} rows={chunk.length} force={chunkIndex===0||chunk.some(line=>(requestedLocation?.path===file.path&&(requestedLocation.side==='old'?line.oldLine:line.newLine)===requestedLocation.line)||pr.threads.some(thread=>thread.path===file.path&&(thread.side==='old'?line.oldLine:line.newLine)===thread.line))}>{()=>chunk.map((line,offset) => {
+                  const index=chunkIndex*60+offset
                   const side = line.kind === 'remove' ? 'old' : 'new'
                   const number = side === 'old' ? line.oldLine : line.newLine
-                  return <div className="review-diff-row-block" key={`${line.kind}-${index}`}>{index > 0 && line.hunk !== undefined && line.hunk !== unifiedLines[index - 1].hunk && <div className="review-hunk-label"><span>{hunkHeaders[line.hunk]}</span><span>Next changed section</span></div>}{index>0&&line.hunk!==unifiedLines[index-1].hunk&&renderContext(line.hunk??0,'above')}<div className={`review-unified-row diff-${line.kind}${requestedLocation?.path === file.path && (requestedLocation.side === "old" ? line.oldLine : line.newLine) === requestedLocation.line && requestedLocation.line !== undefined ? " is-review-target" : ""}`} data-review-old-line={line.oldLine} data-review-new-line={line.newLine}><span className="review-line-number" aria-hidden="true">{line.oldLine ?? ''}</span><span className="review-line-number" aria-hidden="true">{line.newLine ?? ''}</span><span className="review-line-marker" aria-hidden="true">{line.kind === 'add' ? '+' : line.kind === 'remove' ? '−' : ''}</span><code className="review-code-text" data-code-path={number !== undefined ? side === 'old' ? file.previousPath || file.path : file.path : undefined} data-code-line={number} data-code-side={number !== undefined ? side : undefined}>{tokenLine(syntax?.[side].get(syntaxLineKey(line, side)), line.text)}</code>{number !== undefined && editable && file.lines.some(original=>original===line||(original.kind==='context'&&original.oldLine===line.oldLine&&original.newLine===line.newLine)) && <button className="review-add-comment" disabled={busy || saving} aria-label={`Comment on ${side === 'old' ? 'original' : 'changed'} line ${number} in ${file.path}`} title={`Comment on line ${number}`} onClick={() => beginComment({ line: number, side })}><Icon name="plus" size={12} /></button>}</div>{renderDiscussion([...(line.oldLine !== undefined ? [{ line: line.oldLine, side: 'old' as const }] : []), ...(line.newLine !== undefined ? [{ line: line.newLine, side: 'new' as const }] : [])])}{(index===unifiedLines.length-1||line.hunk!==unifiedLines[index+1]?.hunk)&&renderContext(line.hunk??0,'below')}</div>
-                })}
+                  return <div className="review-diff-row-block" key={`${line.kind}-${index}`}>{index > 0 && line.hunk !== undefined && line.hunk !== unifiedLines[index - 1].hunk && <div className="review-hunk-label"><span>{hunkHeaders[line.hunk]}</span><span>Next changed section</span></div>}{index>0&&line.hunk!==unifiedLines[index-1].hunk&&renderContext(line.hunk??0,'above')}<div className={`review-unified-row diff-${line.kind}${requestedLocation?.path === file.path && (requestedLocation.side === "old" ? line.oldLine : line.newLine) === requestedLocation.line && requestedLocation.line !== undefined ? " is-review-target" : ""}`} data-review-old-line={line.oldLine} data-review-new-line={line.newLine}><span className="review-line-number" aria-hidden="true">{line.oldLine ?? ''}</span><span className="review-line-number" aria-hidden="true">{line.newLine ?? ''}</span><span className="review-line-marker" aria-hidden="true">{line.kind === 'add' ? '+' : line.kind === 'remove' ? '−' : ''}</span><code className="review-code-text" data-code-path={number !== undefined ? side === 'old' ? file.previousPath || file.path : file.path : undefined} data-code-line={number} data-code-side={number !== undefined ? side : undefined}>{tokenLine(syntax?.[side].get(syntaxLineKey(line, side)), line.text)}</code>{number !== undefined && editable && commentable(line) && <button className="review-add-comment" disabled={busy || saving} aria-label={`Comment on ${side === 'old' ? 'original' : 'changed'} line ${number} in ${file.path}`} title={`Comment on line ${number}`} onClick={() => beginComment({ line: number, side })}><Icon name="plus" size={12} /></button>}</div>{side==='new'&&ciAnnotations.items.filter(item=>item.path===file.path&&item.startLine===line.newLine).map((item,i)=><div className={`ci-inline is-${item.annotationLevel}`} key={`ci:${i}`}><strong>{item.title||item.annotationLevel}</strong><p>{item.message}</p></div>)}{renderDiscussion([...(line.oldLine !== undefined ? [{ line: line.oldLine, side: 'old' as const }] : []), ...(line.newLine !== undefined ? [{ line: line.newLine, side: 'new' as const }] : [])])}{(index===unifiedLines.length-1||line.hunk!==unifiedLines[index+1]?.hunk)&&renderContext(line.hunk??0,'below')}</div>
+                })}</DeferredDiffRows>)}
               </>}
               <div className="review-diff-end"><Icon name="check" size={13} />End of displayed changes<button className="btn-ghost review-text-button" disabled={busy || saving} onClick={async () => { const wasViewed = pr.viewedFiles.includes(file.path); const saved = await setViewed(file.path, !wasViewed); if (saved && !wasViewed) selectAdjacent(1) }}>{pr.viewedFiles.includes(file.path) ? 'Mark as not viewed' : activeIndex < navigableFiles.length - 1 ? 'Mark viewed and next file' : 'Mark as viewed'}<Icon name="arrow-right" size={12} /></button></div>
             </div> : <div className="review-code-empty"><Icon name="file" size={28} /><strong>{file.binary ? 'Binary file' : file.truncated ? 'Diff too large to display' : file.patchUnavailable ? 'Text diff unavailable' : 'No text changes to display'}</strong><p>{file.binary ? 'Binary contents cannot be compared as text.' : file.truncated ? 'This file exceeds the available diff limit.' : file.patchUnavailable ? 'The provider did not supply a text patch for this file.' : 'This file has no reviewable text diff.'}</p><button className="btn" disabled={busy || saving} onClick={() => setViewed(file.path, !pr.viewedFiles.includes(file.path))}>{pr.viewedFiles.includes(file.path) ? 'Mark as not viewed' : 'Mark as viewed'}</button></div>}
@@ -556,6 +574,7 @@ export function ReviewFooter({ pr, onUpdate, onNotify, busy = false }: ReviewPro
     try {
       const next = submitReview(pr, decision, body.trim())
       await onUpdate(next)
+      if(!pr.provider)saveCheckpoint(next)
       setExpanded(false)
       setBody('')
       setError('')

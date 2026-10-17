@@ -7,7 +7,15 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as lspclient$0 from "./internal/lspclient/models.js";
+
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as $models from "./models.js";
+
+export function AnalysisStatus(r: $models.CodePositionRequest): $CancellablePromise<lspclient$0.AnalysisStatus> {
+    return $Call.ByID(777599610, r);
+}
 
 export function CancelServerInstall(language: string): $CancellablePromise<void> {
     return $Call.ByID(3640043458, language);
@@ -25,6 +33,10 @@ export function Definition(request: $models.CodePositionRequest): $CancellablePr
     return $Call.ByID(4271973707, request);
 }
 
+export function DocumentSymbols(r: $models.CodePositionRequest): $CancellablePromise<lspclient$0.SymbolTarget[] | null> {
+    return $Call.ByID(3702899044, r);
+}
+
 export function Hover(request: $models.CodePositionRequest): $CancellablePromise<$models.CodeHover> {
     return $Call.ByID(1347530412, request);
 }
@@ -37,10 +49,22 @@ export function ReadDefinition(request: $models.ReadDefinitionRequest): $Cancell
     return $Call.ByID(534248627, request);
 }
 
+export function References(r: $models.CodePositionRequest): $CancellablePromise<$models.CodeDefinitionTarget[] | null> {
+    return $Call.ByID(365713268, r);
+}
+
+export function RestartAnalysis(root: string): $CancellablePromise<void> {
+    return $Call.ByID(4243330699, root);
+}
+
 export function Servers(root: string): $CancellablePromise<$models.LSPServerStatus[] | null> {
     return $Call.ByID(3616121914, root);
 }
 
 export function Warmup(request: $models.CodePositionRequest): $CancellablePromise<void> {
     return $Call.ByID(2894802898, request);
+}
+
+export function WorkspaceSymbols(r: lspclient$0.SymbolRequest): $CancellablePromise<lspclient$0.SymbolTarget[] | null> {
+    return $Call.ByID(2696971320, r);
 }

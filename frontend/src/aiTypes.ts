@@ -108,6 +108,7 @@ export interface AIUsage {
   billingStatus?: "complete" | "partial" | "unavailable";
 }
 export interface AIReviewRequest {
+  previousReviewId?:string;
   host: string;
   owner: string;
   repository: string;

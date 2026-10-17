@@ -29,6 +29,14 @@ export function DispatchWorkflow(host: string, owner: string, repo: string, inpu
     return $Call.ByID(790088297, host, owner, repo, input);
 }
 
+export function DownloadWorkflowArtifact(host: string, owner: string, repo: string, request: $models.ArtifactDownloadRequest): $CancellablePromise<string> {
+    return $Call.ByID(195088797, host, owner, repo, request);
+}
+
+export function GetCheckAnnotations(host: string, owner: string, repo: string, id: number, head: string, page: number): $CancellablePromise<githubclient$0.CheckAnnotations> {
+    return $Call.ByID(2954318516, host, owner, repo, id, head, page);
+}
+
 export function GetCheckWorkflowJob(host: string, owner: string, repo: string, id: number): $CancellablePromise<githubclient$0.WorkflowJob | null> {
     return $Call.ByID(190804278, host, owner, repo, id);
 }
@@ -69,6 +77,10 @@ export function ListPullRequestsPage(host: string, owner: string, repo: string, 
     return $Call.ByID(268554336, host, owner, repo, request);
 }
 
+export function ListWorkflowArtifacts(host: string, owner: string, repo: string, run: number, page: number): $CancellablePromise<githubclient$0.WorkflowArtifacts> {
+    return $Call.ByID(983557142, host, owner, repo, run, page);
+}
+
 export function ListWorkflowRuns(host: string, owner: string, repo: string, input: githubclient$0.WorkflowRunsRequest): $CancellablePromise<githubclient$0.WorkflowRunsPage> {
     return $Call.ByID(2255738273, host, owner, repo, input);
 }
@@ -83,6 +95,10 @@ export function MergePullRequest(host: string, owner: string, repo: string, $num
 
 export function MutateWorkflowRun(host: string, owner: string, repo: string, input: githubclient$0.WorkflowMutation): $CancellablePromise<void> {
     return $Call.ByID(570442726, host, owner, repo, input);
+}
+
+export function ReadCheckAnnotationSource(host: string, owner: string, repo: string, id: number, head: string, path: string, line: number, page: number): $CancellablePromise<$models.CheckAnnotationSource> {
+    return $Call.ByID(3295103366, host, owner, repo, id, head, path, line, page);
 }
 
 export function RemoveReviewers(host: string, owner: string, repo: string, $number: number, reviewers: string[] | null): $CancellablePromise<void> {

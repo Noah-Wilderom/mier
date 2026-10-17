@@ -17,6 +17,24 @@ export interface ChangedFile {
     "patch": string;
 }
 
+export interface CheckAnnotation {
+    "path": string;
+    "startLine": number;
+    "endLine": number;
+    "startColumn": number;
+    "endColumn": number;
+    "annotationLevel": string;
+    "message": string;
+    "title": string;
+    "rawDetails": string;
+}
+
+export interface CheckAnnotations {
+    "items": CheckAnnotation[] | null;
+    "hasMore": boolean;
+    "headSha": string;
+}
+
 export interface CheckRun {
     "id": number;
     "name": string;
@@ -260,6 +278,22 @@ export interface Workflow {
     "path": string;
     "state": string;
     "url": string;
+}
+
+export interface WorkflowArtifact {
+    "id": number;
+    "name": string;
+    "sizeInBytes": number;
+    "expired": boolean;
+    "createdAt": string;
+    "expiresAt": string;
+    "digest": string;
+    "workflowRun": {"id": number, "headSha": string};
+}
+
+export interface WorkflowArtifacts {
+    "items": WorkflowArtifact[] | null;
+    "hasMore": boolean;
 }
 
 export interface WorkflowDispatch {

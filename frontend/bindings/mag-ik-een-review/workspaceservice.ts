@@ -18,6 +18,14 @@ export function ChooseRepository(): $CancellablePromise<string> {
     return $Call.ByID(1018947409);
 }
 
+/**
+ * LoadState restores private, local UI data. Credentials and live execution
+ * capabilities belong to their own services and must never be stored here.
+ */
+export function LoadState(scope: string): $CancellablePromise<string> {
+    return $Call.ByID(4044373529, scope);
+}
+
 export function RecentRepositories(): $CancellablePromise<string[] | null> {
     return $Call.ByID(1362022687);
 }
@@ -28,4 +36,12 @@ export function RememberRepository(path: string): $CancellablePromise<void> {
 
 export function SavePatch(content: string, name: string): $CancellablePromise<string> {
     return $Call.ByID(66694665, content, name);
+}
+
+/**
+ * SaveState uses a private atomic file so interruption cannot truncate a draft.
+ * Empty data removes a record. Old records are bounded by count and disk usage.
+ */
+export function SaveState(scope: string, data: string): $CancellablePromise<void> {
+    return $Call.ByID(991106134, scope, data);
 }

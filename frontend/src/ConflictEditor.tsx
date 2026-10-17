@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, useSyncExternalStore, type UIEvent, type KeyboardEvent } from 'react'
 import { services } from './services'
+import {loadWorkspaceState,saveWorkspaceState} from './workspaceState'
 import { conflictChunks, containsConflictMarkers, resolveChunk, type ConflictFile, type GitMutation, type ResolveConflictRequest } from './gitOperations'
 import { Icon } from './Icon'
 import './GitOperations.css'
@@ -8,7 +9,7 @@ import { DEFAULT_CODE_REVIEW_PREFERENCES, effectiveCodeTheme, getCodeAppearance,
 import { highlightCodeLines, syntaxTokenStyle, type HighlightedCode } from './syntaxHighlighter'
 
 // Keep unsaved resolutions when moving between files or application views.
-// Source code stays in memory; it is not copied into browser persistence.
+// Restored edits live in private native files and retain the original conflict token.
 const drafts = new Map<string,{file:ConflictFile;result:string;choice:ResolveConflictRequest['choice']}>()
 const AIActionPanel=lazy(()=>import('./AIActionPanel'))
 const CodeEditor=lazy(()=>import('./CodeEditor'))
@@ -16,6 +17,7 @@ const CodeEditor=lazy(()=>import('./CodeEditor'))
 export default function ConflictEditor({ root, path, headSha, operationToken, busy, onOperate }: { root: string; path: string; headSha?: string; operationToken?: string; busy: boolean; onOperate: (mutation: GitMutation) => Promise<unknown> }) {
   const [aiOpen,setAIOpen]=useState(false)
   const [file, setFile] = useState<ConflictFile>()
+  const [loadedKey,setLoadedKey]=useState('')
   const [result, setResult] = useState('')
   const [choice, setChoice] = useState<ResolveConflictRequest['choice']>('result')
   const [error, setError] = useState('')
@@ -34,9 +36,10 @@ export default function ConflictEditor({ root, path, headSha, operationToken, bu
   useEffect(() => {
     let canceled = false
     setLoading(true); setError('')
-    void services.repository.conflict(root, path).then(next => {
+    void Promise.all([services.repository.conflict(root,path),loadWorkspaceState<{token:string;result:string;choice:ResolveConflictRequest['choice']}>(`conflict:${draftKey}`)]).then(([next,persisted]) => {
       if(canceled)return
-      const saved=drafts.get(draftKey)
+      const saved=drafts.get(draftKey)??(persisted&&typeof persisted.result==='string'&&['result','current','incoming','delete'].includes(persisted.choice)?{file:{...next,token:persisted.token},result:persisted.result,choice:persisted.choice}:undefined)
+      setLoadedKey(draftKey)
       setFile(saved?.file??next);setResult(saved?.result??next.working);setChoice(saved?.choice??(next.editable?'result':'current'));setIndex(0);setUndo([])
       if(saved&&saved.file.token!==next.token)setError('This conflict changed on disk. Your unsaved result was retained. Copy it if needed, then reload the file before saving.')
     }).catch(issue => {if(!canceled)setError(issue instanceof Error?issue.message:String(issue))}).finally(()=>{if(!canceled)setLoading(false)})
@@ -47,14 +50,15 @@ export default function ConflictEditor({ root, path, headSha, operationToken, bu
   const locked = busy || loading || pending
   const dirty = !!file && (result !== file.working || choice !== (file.editable?'result':'current'))
   useEffect(()=>{
-    if(!file)return
+    if(!file||loadedKey!==draftKey||loading)return
+    saveWorkspaceState(`conflict:${draftKey}`,dirty?{token:file.token,result,choice}:undefined)
     if(dirty){drafts.set(draftKey,{file,result,choice});while(drafts.size>20)drafts.delete(drafts.keys().next().value!)}else drafts.delete(draftKey)
-  },[draftKey,file,result,choice,dirty])
+  },[draftKey,file,result,choice,dirty,loadedKey,loading])
   useEffect(()=>{
     const warn=(event:BeforeUnloadEvent)=>{if(dirty){event.preventDefault();event.returnValue=''}}
     window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn)
   },[dirty])
-  const reloadFile=()=>{drafts.delete(draftKey);setReloadConfirm(false);setReload(n=>n+1)}
+  const reloadFile=()=>{drafts.delete(draftKey);saveWorkspaceState(`conflict:${draftKey}`,undefined);setReloadConfirm(false);setReload(n=>n+1)}
   const replace = (value:string) => {setUndo(items=>[...items.slice(-19),result]);setResult(value);setChoice('result')}
   const choose=(choice:'current'|'incoming'|'both'|'incoming-first')=>{if(active&&!locked)replace(resolveChunk(result,active,choice))}
   const syncSources=(event:UIEvent<HTMLPreElement>)=>{
@@ -76,7 +80,7 @@ export default function ConflictEditor({ root, path, headSha, operationToken, bu
   const save = async () => {
     if(locked||guard.current||!file)return
     guard.current=true;setPending(true);setError('')
-    try{await onOperate({kind:'resolve',request:{path,token:file.token,choice,content:choice==='result'?result:''}});drafts.delete(draftKey)}
+    try{await onOperate({kind:'resolve',request:{path,token:file.token,choice,content:choice==='result'?result:''}});drafts.delete(draftKey);saveWorkspaceState(`conflict:${draftKey}`,undefined)}
     catch(issue){setError(issue instanceof Error?issue.message:String(issue))}
     finally{guard.current=false;setPending(false)}
   }

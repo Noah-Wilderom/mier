@@ -4,6 +4,7 @@
 export type {
     ActionProposal,
     ActivityTotals,
+    CheckProposal,
     Finding,
     Model,
     ProviderStatus,

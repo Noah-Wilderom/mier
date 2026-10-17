@@ -68,7 +68,15 @@ export interface AIPreferences {
     "intensity": string;
 }
 
+export interface AIReviewHistoryRequest {
+    "host": string;
+    "owner": string;
+    "repository": string;
+    "pullRequest": number;
+}
+
 export interface AIReviewRequest {
+    "previousReviewId": string;
     "host": string;
     "owner": string;
     "repository": string;
@@ -79,6 +87,26 @@ export interface AIReviewRequest {
     "model": string;
     "instructions": string;
     "intensity": string;
+}
+
+export interface AIWorktreeCheck {
+    "id": string;
+    "worktreeId": string;
+    "actionId": string;
+    "command": CustomCommand;
+    "run": CommandRun;
+    "sourceStamp": string;
+    "afterStamp": string;
+    "stale": boolean;
+    "error": string;
+}
+
+export interface AIWorktreeCheckApproval {
+    "id": string;
+    "worktree": AIWorktreeInfo;
+    "command": CustomCommand;
+    "sourceStamp": string;
+    "expiresAt": string;
 }
 
 export interface AIWorktreeInfo {
@@ -111,7 +139,20 @@ export interface AccountStatus {
     "error": string;
 }
 
+export interface ArtifactDownloadRequest {
+    "runId": number;
+    "artifactId": number;
+    "headSha": string;
+}
+
 export type ChangedFile = gitclient$0.ChangedFile;
+
+export interface CheckAnnotationSource {
+    "path": string;
+    "revision": string;
+    "text": string;
+    "line": number;
+}
 
 export type CodeDefinitionTarget = lspclient$0.DefinitionTarget;
 
@@ -142,6 +183,16 @@ export interface CustomCommand {
 }
 
 export type DefinitionDocument = lspclient$0.DefinitionDocument;
+
+export interface IncrementalReviewRequest {
+    "root": string;
+    "host": string;
+    "owner": string;
+    "repo": string;
+    "number": number;
+    "previousHead": string;
+    "head": string;
+}
 
 export interface JiraAppConfiguration {
     "clientId": string;

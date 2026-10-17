@@ -14,6 +14,9 @@ import Modal from "./Modal";
 import { openWebURL } from "./native";
 import "./Actions.css";
 import PredictionPanel from "./PredictionPanel";
+import WorkflowArtifacts from "./WorkflowArtifacts";
+import RunComparison from "./RunComparison";
+import CIAnnotations from "./CIAnnotations";
 
 export function ActionsStatus({
   status,
@@ -421,6 +424,7 @@ function RunDetails({
           have failed before starting.
         </p>
       )}
+      {detail.data&&<><WorkflowArtifacts key={`artifacts:${run.id}`} repository={repository} run={run}/><RunComparison key={`comparison:${run.id}:${run.runAttempt}`} repository={repository} run={run} jobs={jobs} latestAttempt={latestAttempt}/></>}
       {!!jobs.length && (
         <div className="actions-job-layout">
           <nav className="actions-jobs" aria-label="Workflow jobs">
@@ -455,6 +459,7 @@ function RunDetails({
                   </li>
                 ))}
               </ol>
+              {/^https:\/\//.test(job.checkRunUrl)&&/\/check-runs\/(\d+)$/.test(job.checkRunUrl)&&<CIAnnotations key={`annotations:${job.id}`} repository={repository} id={Number(job.checkRunUrl.match(/\/check-runs\/(\d+)$/)![1])} head={run.headSha}/>}
               <JobLogs key={job.id} repository={repository} job={job} />
             </div>
           )}

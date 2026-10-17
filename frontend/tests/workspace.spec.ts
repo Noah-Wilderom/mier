@@ -82,7 +82,7 @@ test('local diff failures preserve the commit draft through navigation and refre
   await page.locator('.sidebar').getByRole('button', { name: /^Changes/ }).click()
   await expect(page.getByLabel('Commit message')).toHaveValue('fix: preserve my draft')
   await page.reload()
-  await page.locator('.repository-welcome').getByRole('button', { name: 'Open repository', exact: true }).click()
+  await page.getByRole('region', { name: 'Repository Git actions' }).waitFor()
   await page.locator('.sidebar').getByRole('button', { name: /^Changes/ }).click()
   await expect(page.getByLabel('Commit message')).toHaveValue('fix: preserve my draft')
 })

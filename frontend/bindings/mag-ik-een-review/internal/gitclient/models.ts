@@ -112,6 +112,26 @@ export interface ConflictFile {
     "incomingLabel": string;
 }
 
+export interface ConflictForecast {
+    "head": string;
+    "target": string;
+    "base": string;
+    "clean": boolean;
+    "conflicts": string[] | null;
+    "overlap": string[] | null;
+    "rebase": RebasePreviewStep[] | null;
+    "rebaseComplete": boolean;
+    "note": string;
+}
+
+export interface ConflictForecastRequest {
+    "target": string;
+    "expectedTarget": string;
+    "expectedHead": string;
+    "expectedBranch": string;
+    "rebase": boolean;
+}
+
 export interface ConflictVersion {
     "exists": boolean;
     "sha": string;
@@ -328,6 +348,12 @@ export interface RebasePreviewRequest {
     "upstream": string;
     "expectedHead": string;
     "expectedBranch": string;
+}
+
+export interface RebasePreviewStep {
+    "commit": string;
+    "clean": boolean;
+    "conflicts": string[] | null;
 }
 
 export interface RebaseRequest {

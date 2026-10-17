@@ -138,7 +138,14 @@ func (s *AIService) GetAction(id string) (AIActionSnapshot, error) {
 	task := s.tasks[id]
 	s.mu.Unlock()
 	if task == nil || task.action == nil {
+		record, err := s.readAIHistory(id)
+		if err == nil && record.Action != nil {
+			return *record.Action, nil
+		}
 		return AIActionSnapshot{}, errors.New("AI task not found. Start a new task")
+	}
+	if err := s.persistAITask(task); err != nil {
+		return s.actionSnapshot(task), fmt.Errorf("Save AI task history: %w", err)
 	}
 	return s.actionSnapshot(task), nil
 }
@@ -374,7 +381,30 @@ func (s *AIService) StartAction(ctx context.Context, request AIActionRequest) (A
 	if err != nil {
 		return AIActionSnapshot{}, err
 	}
-	action, err := reviewagent.NewAction(request.Provider, request.Model, scope, reviewagent.ActionContext{Kind: request.Kind, Instructions: request.Instructions, Input: string(data)}, reader, worktree)
+	actionContext := reviewagent.ActionContext{Kind: request.Kind, Instructions: request.Instructions, Input: string(data)}
+	if record.ID != "" {
+		if previous, e := s.readAIHistory(record.LastActionID); e == nil {
+			actionContext.PreviousSummary = previous.Run.Summary
+		}
+		reports, e := s.WorktreeChecks(ctx, record.ID)
+		if e == nil && len(reports) > 0 {
+			stamp, e := client.AgentWorktreeStamp(ctx, record.guard())
+			for i, report := range reports {
+				if i >= 3 {
+					break
+				}
+				out, errOut := report.Run.Stdout, report.Run.Stderr
+				if len(out) > 12000 {
+					out = out[len(out)-12000:]
+				}
+				if len(errOut) > 8000 {
+					errOut = errOut[len(errOut)-8000:]
+				}
+				actionContext.Verification = append(actionContext.Verification, reviewagent.VerificationEvidence{Name: report.Command.Name, Executable: report.Command.Executable, Arguments: report.Command.Arguments, Status: report.Run.Status, ExitCode: report.Run.ExitCode, Stale: report.Stale || e != nil || report.SourceStamp != stamp || report.AfterStamp != report.SourceStamp, Stdout: out, Stderr: errOut})
+			}
+		}
+	}
+	action, err := reviewagent.NewAction(request.Provider, request.Model, scope, actionContext, reader, worktree)
 	if err != nil {
 		return AIActionSnapshot{}, err
 	}
@@ -408,12 +438,21 @@ func (s *AIService) StartAction(ctx context.Context, request AIActionRequest) (A
 	s.mu.Unlock()
 	registered = true
 	prepared = true
+	task.actionRequest = &request
+	if err = s.persistAITask(task); err != nil {
+		task.run.AddWarning("AI task history could not be saved: " + err.Error())
+	}
 	go s.executeAction(runCtx, request, task)
 	return s.actionSnapshot(task), nil
 }
 
 func (s *AIService) executeAction(ctx context.Context, request AIActionRequest, task *aiTask) {
 	defer s.wg.Done()
+	defer func() {
+		if err := s.persistAITask(task); err != nil {
+			task.run.AddWarning("AI task history could not be saved: " + err.Error())
+		}
+	}()
 	defer task.cancel()
 	defer task.bridge.Close()
 	defer func() {

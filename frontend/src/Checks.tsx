@@ -1,4 +1,6 @@
 import { useState } from "react";
+import CIAnnotations from "./CIAnnotations";
+import type {CheckAnnotation} from "./actionsTypes";
 import type { Check, PullRequest } from "./data";
 import type { RepositoryIdentity } from "./services";
 import { services } from "./services";
@@ -35,10 +37,12 @@ export default function Checks({
   pr,
   repository,
   account,
+  onOpenAnnotation,
 }: {
   pr: PullRequest;
   repository?: RepositoryIdentity;
   account?: string;
+  onOpenAnnotation?:(annotation:CheckAnnotation)=>boolean|void;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   return (
@@ -96,6 +100,7 @@ export default function Checks({
                   {check.output.join("\n\n")}
                 </Markdown>
               )}
+              {repository&&check.checkRunId&&(!repository.kind||repository.kind==='github')&&<CIAnnotations key={`${check.id}:${pr.checkHeadSha||pr.headSha}`} repository={repository} id={check.checkRunId} head={pr.checkHeadSha||pr.headSha} onOpen={pr.checkHeadSha&&pr.checkHeadSha!==pr.headSha?undefined:onOpenAnnotation}/>}
               <ActionsLink url={check.detailsUrl} label="View check details" />
               {repository &&
               check.checkRunId &&

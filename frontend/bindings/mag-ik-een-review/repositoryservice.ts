@@ -90,6 +90,10 @@ export function CompareExact(path: string, base: string, head: string): $Cancell
     return $Call.ByID(1449707687, path, base, head);
 }
 
+export function CompareReviewHeads(request: $models.IncrementalReviewRequest): $CancellablePromise<$models.ChangedFile[] | null> {
+    return $Call.ByID(2701627291, request);
+}
+
 export function Conflict(path: string, file: string): $CancellablePromise<gitclient$0.ConflictFile> {
     return $Call.ByID(2431303519, path, file);
 }
@@ -132,6 +136,10 @@ export function Fetch(path: string, remote: string): $CancellablePromise<void> {
 
 export function Flow(path: string): $CancellablePromise<gitclient$0.FlowState> {
     return $Call.ByID(3461403173, path);
+}
+
+export function ForecastConflict(path: string, request: gitclient$0.ConflictForecastRequest): $CancellablePromise<gitclient$0.ConflictForecast> {
+    return $Call.ByID(2806637442, path, request);
 }
 
 export function HistoryPage(path: string, query: gitclient$0.HistoryQuery): $CancellablePromise<gitclient$0.HistoryPage> {

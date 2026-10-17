@@ -77,3 +77,21 @@ func (s *LSPService) Definition(ctx context.Context, request CodePositionRequest
 func (s *LSPService) ReadDefinition(ctx context.Context, request ReadDefinitionRequest) (DefinitionDocument, error) {
 	return s.manager.ReadDefinition(ctx, request)
 }
+
+func (s *LSPService) AnalysisStatus(ctx context.Context, r CodePositionRequest) (lspclient.AnalysisStatus, error) {
+	return s.manager.AnalysisStatus(ctx, r)
+}
+
+func (s *LSPService) References(ctx context.Context, r CodePositionRequest) ([]CodeDefinitionTarget, error) {
+	return s.manager.References(ctx, r)
+}
+func (s *LSPService) DocumentSymbols(ctx context.Context, r CodePositionRequest) ([]lspclient.SymbolTarget, error) {
+	return s.manager.DocumentSymbols(ctx, r)
+}
+func (s *LSPService) WorkspaceSymbols(ctx context.Context, r lspclient.SymbolRequest) ([]lspclient.SymbolTarget, error) {
+	return s.manager.WorkspaceSymbols(ctx, r)
+}
+
+func (s *LSPService) RestartAnalysis(ctx context.Context, root string) error {
+	return s.manager.RestartAnalysis(ctx, root)
+}

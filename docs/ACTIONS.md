@@ -29,3 +29,15 @@ GitHub rechecks repository permissions. M.I.E.R. also verifies the current attem
 Fine-grained tokens need repository **Actions: read** for runs, jobs and logs, **Actions: write** for rerun/cancel/manual dispatch, and **Contents: read** to read manual workflow inputs. Reading PR checks also needs the existing **Checks: read** permission. Classic tokens need `repo` for private repositories. Organization SSO, repository access, approval requirements and Actions policies still apply.
 
 Official API references: [workflow runs](https://docs.github.com/en/rest/actions/workflow-runs), [workflow jobs and logs](https://docs.github.com/en/rest/actions/workflow-jobs), and [workflow dispatch](https://docs.github.com/en/rest/actions/workflows#create-a-workflow-dispatch-event).
+
+## Source annotations
+
+Failed GitHub checks expose their first 100 annotations inline in the PR diff (up to eight failed checks). Expand a check in **Checks** for paginated annotations, including third-party check apps. Clicking a changed-file annotation returns to its diff; a line outside the displayed hunks opens the exact read-only full file. Other source locations open a read-only CI source viewer. Native requests validate the check's immutable head and the selected annotation before reading source. Newer-head checks cannot be attached to an older displayed PR patch.
+
+## Artifacts and comparisons
+
+In a selected run, expand **Artifacts** to page through its archives and **Download ZIP** to choose a native save location. Expired artifacts are disabled. Metadata is revalidated against the run/commit before downloading; archives are streamed into private temporary files, capped at 512 MiB, and checked against GitHub's SHA-256 digest when present. Credentials stay on the API request and are not forwarded to signed storage URLs. Archives are never automatically extracted or executed. Artifacts belong to the run and may include several attempts.
+
+**Compare runs and attempts** lets you choose another attempt or a completed run of the same workflow/branch. The table compares job conclusions, duration changes and failed steps. Repeated job names are grouped with every job ID visible; individual duration changes are shown only when a name uniquely identifies a job in each run. Both commit IDs remain visible; different-source comparisons are explicitly identified. Changing the current attempt clears the selected baseline. Artifacts and comparison lists load when their sections are first expanded.
+
+These features use GitHub's [artifact API](https://docs.github.com/en/rest/actions/artifacts) and [check-run annotations API](https://docs.github.com/en/rest/checks/runs#list-check-run-annotations). Fine-grained credentials need Actions read for artifacts and Checks read for annotations, plus Contents read for source. Existing workflow write controls retain their separate permissions.

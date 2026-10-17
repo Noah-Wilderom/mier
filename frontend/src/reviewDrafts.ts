@@ -1,6 +1,8 @@
 import type { PullRequest } from './data'
+import {fileSignature} from './reviewFileSignature.ts'
 
 export interface SavedReviewDraft {
+  fileSignatures?:Record<string,string>
   headSha: string
   viewedFiles: string[]
   pendingComments: PullRequest['pendingComments']
@@ -25,5 +27,5 @@ export function readReviewDrafts(value: string | null): Map<string, SavedReviewD
 
 export function restoreReviewDraft(pr: PullRequest, saved?: SavedReviewDraft): PullRequest {
   if (!saved) return pr
-  return {...pr, viewedFiles: saved.headSha === pr.headSha ? saved.viewedFiles.filter(path => pr.files.some(file => file.path === path)) : [], pendingComments: saved.pendingComments.map(comment => ({...comment, headSha: comment.headSha ?? saved.headSha, outdated: comment.outdated || (comment.headSha ?? saved.headSha) !== pr.headSha}))}
+  return {...pr, viewedFiles: saved.viewedFiles.filter(path=>pr.files.some(file=>file.path===path&&(saved.headSha===pr.headSha||saved.fileSignatures?.[path]===fileSignature(file)))), pendingComments: saved.pendingComments.map(comment => ({...comment, headSha: comment.headSha ?? saved.headSha, outdated: comment.outdated || (comment.headSha ?? saved.headSha) !== pr.headSha}))}
 }
