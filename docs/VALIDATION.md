@@ -1,5 +1,11 @@
 # Validation record
 
+## Conflict forecast response identity — 2026-10-17
+
+The first cross-platform CI run exposed a conflict-forecast browser retry: switching to rebase could briefly render the earlier merge response as a rebase conclusion. Forecast responses now carry the full request identity, including repository, target branch, branch tips, mode and refresh. A result is rendered only when that identity matches the current request.
+
+`wails3 build` and **20 consecutive browser cases** (ten Chromium and ten WebKit) passed after the correction. The regression holds the rebase response pending, verifies that no conclusion appears, then releases the response and checks its immutable branch arguments.
+
 ## Review workspace additions — 2026-10-17
 
 Added private workspace/draft restoration, exact review checkpoints, reusable analysis captures and deferred diff rows, references/outlines/symbol search, an attention inbox across repositories, merge/rebase conflict forecasts, CI source annotations/artifacts/run comparisons, and persistent AI conversations with explicitly approved worktree verification. Behavior and limits are in [Review workspace](WORKSPACE.md), [Actions](ACTIONS.md), and [AI assistance](AI.md).

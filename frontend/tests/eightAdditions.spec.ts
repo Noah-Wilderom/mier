@@ -295,19 +295,29 @@ test("optional conflict forecast refreshes on target changes and previews each r
   desktop,
   page,
 }) => {
-  desktop.handlers.set("main.RepositoryService.ForecastConflict", (args) => ({
-    head: headSHA,
-    target: args[1].expectedTarget,
-    base: baseSHA,
-    clean: false,
-    conflicts: ["src/feature.ts"],
-    overlap: ["src/feature.ts"],
-    rebase: args[1].rebase
-      ? [{ commit: headSHA, clean: false, conflicts: ["src/feature.ts"] }]
-      : [],
-    rebaseComplete: false,
-    note: "",
-  }));
+  let finishRebase: (() => void) | undefined;
+  desktop.handlers.set(
+    "main.RepositoryService.ForecastConflict",
+    async (args) => {
+      if (args[1].rebase)
+        await new Promise<void>((resolve) => {
+          finishRebase = resolve;
+        });
+      return {
+        head: headSHA,
+        target: args[1].expectedTarget,
+        base: baseSHA,
+        clean: false,
+        conflicts: ["src/feature.ts"],
+        overlap: ["src/feature.ts"],
+        rebase: args[1].rebase
+          ? [{ commit: headSHA, clean: false, conflicts: ["src/feature.ts"] }]
+          : [],
+        rebaseComplete: false,
+        note: "",
+      };
+    },
+  );
   await openFixture(desktop);
   expect(
     desktop.calls.some((call) => call.name.endsWith(".ForecastConflict")),
@@ -324,6 +334,12 @@ test("optional conflict forecast refreshes on target changes and previews each r
     "A merge is expected to stop for conflicts.",
   );
   await panel.getByRole("button", { name: "Preview rebase" }).click();
+  await expect.poll(() => typeof finishRebase).toBe("function");
+  await expect(panel).not.toContainText(
+    "Rebase preview stopped at the first conflict",
+  );
+  await expect(panel).not.toContainText("Rebase preview completed");
+  finishRebase!();
   await expect(panel).toContainText(
     "Rebase preview stopped at the first conflict",
   );

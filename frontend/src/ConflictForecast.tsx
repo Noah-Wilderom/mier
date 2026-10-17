@@ -21,7 +21,10 @@ export default function ConflictForecast({
   const [settings, setSettings] = useState({ enabled: false, target: "" }),
     [ready, setReady] = useState(false),
     [open, setOpen] = useState(false),
-    [result, setResult] = useState<ConflictForecastResult>(),
+    [result, setResult] = useState<{
+      key: string;
+      value: ConflictForecastResult;
+    }>(),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(false),
     [rebase, setRebase] = useState(false),
@@ -33,8 +36,10 @@ export default function ConflictForecast({
   );
   const target = branches.find((branch) => branch.name === settings.target);
   const key = JSON.stringify([
+    root,
     repository.headSha,
     repository.currentBranch,
+    target?.name,
     target?.commitSha,
     rebase,
     refresh,
@@ -81,7 +86,8 @@ export default function ConflictForecast({
             controller.signal,
           )
           .then((value) => {
-            if (!canceled && sequence === epoch.current) setResult(value);
+            if (!canceled && sequence === epoch.current)
+              setResult({ key, value });
           })
           .catch((issue) => {
             if (!canceled) setError(String(issue));
@@ -98,10 +104,10 @@ export default function ConflictForecast({
     };
   }, [root, key, settings.enabled, ready]);
   const current =
-    result &&
-    result.head === repository.headSha &&
-    result.target === target?.commitSha
-      ? result
+    result?.key === key &&
+    result.value.head === repository.headSha &&
+    result.value.target === target?.commitSha
+      ? result.value
       : undefined;
   return (
     <div className="conflict-forecast">
