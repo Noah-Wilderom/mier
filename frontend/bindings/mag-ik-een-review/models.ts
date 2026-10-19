@@ -322,6 +322,7 @@ export interface PRNotificationEvent {
  * Feedback deliberately contains no source, ticket bodies, prompts or findings.
  */
 export interface PredictionFeedback {
+    "provider": string;
     "id": string;
     "kind": string;
     "model": string;
@@ -343,6 +344,7 @@ export interface PredictionRequest {
 }
 
 export interface PredictionResult {
+    "provider": string;
     "id": string;
     "kind": string;
     "model": string;
@@ -379,6 +381,7 @@ export interface PredictionScope {
 }
 
 export interface PredictionStatus {
+    "provider": string;
     "configured": boolean;
     "enabled": boolean;
     "model": string;

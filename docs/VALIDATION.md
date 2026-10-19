@@ -1,5 +1,13 @@
 # Validation record
 
+## Jev provider smoke tests and connection repair — 2026-10-19
+
+A native regression reproduced a successful connection retaining an unavailable `jev-1.13.0` selection. Connecting and refreshing the catalog now preserve an available pin or choose an available replacement. Another browser regression caught status refresh unmounting the settings form, discarding its catalog and notice; status now remains available for the same repository while refreshing. Delayed connections cannot restore a key after disconnect, and a failed keychain write restores the previous model configuration.
+
+The optional [local fake provider](PREDICTIONS.md#local-fake-provider) uses the normal JSON client, response validation, native context capture, cache and feedback. It has separate consent/preferences, does not access the TypeSafe keychain entry, and labels its deterministic answers as synthetic. Tests cover all five assessment types, linked ticket criteria, real local HTTP serialization, an actual disposable Git merge conflict, rate limits, provider failures, malformed answers and cancellation. `go test -p 1 -race ./...`, `go vet -p 1 ./...`, all **88 frontend unit tests**, all **76 affected Chromium/WebKit browser cases**, and `wails3 build` passed. The rebuilt Linux desktop opened successfully with the isolated test profile; this host emitted its usual software rendering/accessibility warnings.
+
+T3 exercised the production frontend against the actual Go Wails HTTP backend with only the desktop-environment bootstrap injected. A disposable conflict assessment returned both answers in about 0.27 seconds, was cached on repetition, and accepted feedback. A synthetic rate limit cleared the displayed answers while retaining the editor. Cancelling the slow scenario returned control immediately; a subsequent assessment completed without reusing the cancelled call. Git's conflict/index state stayed unchanged and the separate test preferences had `0600` permissions. This fixture timing includes an artificial delay and does not measure Jev performance. No real TypeSafe key or paid inference was used; live account access and model quality remain separate checks.
+
 ## Conflict forecast response identity — 2026-10-17
 
 The first cross-platform CI run exposed a conflict-forecast browser retry: switching to rebase could briefly render the earlier merge response as a rebase conclusion. Forecast responses now carry the full request identity, including repository, target branch, branch tips, mode and refresh. A result is rendered only when that identity matches the current request.

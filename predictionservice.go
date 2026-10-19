@@ -29,6 +29,7 @@ type PredictionScope struct {
 	Root  string `json:"root,omitempty"`
 }
 type PredictionStatus struct {
+	Provider   string `json:"provider"`
 	Configured bool   `json:"configured"`
 	Enabled    bool   `json:"enabled"`
 	Model      string `json:"model"`
@@ -63,6 +64,7 @@ type PredictionRow struct {
 	Options        map[string]string `json:"options,omitempty"`
 }
 type PredictionResult struct {
+	Provider        string          `json:"provider"`
 	ID              string          `json:"id"`
 	Kind            string          `json:"kind"`
 	Model           string          `json:"model"`
@@ -84,6 +86,7 @@ type predictionCached struct {
 
 // Feedback deliberately contains no source, ticket bodies, prompts or findings.
 type PredictionFeedback struct {
+	Provider   string `json:"provider"`
 	ID         string `json:"id"`
 	Kind       string `json:"kind"`
 	Model      string `json:"model"`
@@ -109,17 +112,40 @@ type PredictionService struct {
 	github       *GitHubService
 	repositories *RepositoryService
 	newClient    func(string) (*typesafe.Client, error)
+	fake         bool
 }
 
 func NewPredictionService(ai *AIService, github *GitHubService, repositories *RepositoryService) *PredictionService {
 	directory, err := os.UserConfigDir()
+	return newPredictionService(ai, github, repositories, directory, err)
+}
+
+func newPredictionService(ai *AIService, github *GitHubService, repositories *RepositoryService, directory string, err error) *PredictionService {
 	s := &PredictionService{store: systemSecretStore{}, config: predictionConfig{Model: "jev-1.13.0", Scopes: map[string]bool{}}, configPath: filepath.Join(directory, "mag-ik-een-review", "predictions.json"), initErr: err, active: map[uint64]context.CancelFunc{}, cache: map[string]predictionCached{}, feedback: map[string]PredictionFeedback{}, ai: ai, github: github, repositories: repositories, newClient: typesafe.New}
+	if os.Getenv("MIER_JEV_FAKE") == "1" {
+		s.fake = true
+		s.configPath = filepath.Join(directory, "mag-ik-een-review", "predictions-fake.json")
+		s.config.Model = typesafe.FakeModel
+		s.keyLoaded, s.key = true, "local-test-only"
+		client, fakeErr := typesafe.NewFake(os.Getenv("MIER_JEV_FAKE_SCENARIO"))
+		if fakeErr != nil {
+			s.initErr = fakeErr
+		}
+		s.newClient = func(string) (*typesafe.Client, error) { return client, fakeErr }
+	}
 	if data, e := os.ReadFile(s.configPath); e == nil {
 		if len(data) > 128*1024 || json.Unmarshal(data, &s.config) != nil || !typesafe.ValidModel(s.config.Model) || s.config.Scopes == nil {
 			s.initErr = errors.New("Prediction settings could not be read. Reconnect TypeSafe in Settings to reset them")
 		}
 	}
 	return s
+}
+
+func (s *PredictionService) provider() string {
+	if s.fake {
+		return "fake"
+	}
+	return "typesafe"
 }
 func predictionScopeKey(scope PredictionScope) (string, error) {
 	if scope.Root != "" {
@@ -175,7 +201,7 @@ func (s *PredictionService) GetStatus(scope PredictionScope) (PredictionStatus, 
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	status := PredictionStatus{Model: s.config.Model, Enabled: s.config.Scopes[key]}
+	status := PredictionStatus{Provider: s.provider(), Model: s.config.Model, Enabled: s.config.Scopes[key]}
 	if s.initErr != nil {
 		status.Error = s.initErr.Error()
 		return status, nil
@@ -189,6 +215,9 @@ func (s *PredictionService) GetStatus(scope PredictionScope) (PredictionStatus, 
 	return status, nil
 }
 func (s *PredictionService) Connect(ctx context.Context, key string) ([]typesafe.Model, error) {
+	s.mu.Lock()
+	epoch := s.epoch
+	s.mu.Unlock()
 	client, err := s.newClient(key)
 	if err != nil {
 		return nil, err
@@ -202,25 +231,65 @@ func (s *PredictionService) Connect(ctx context.Context, key string) ([]typesafe
 	if s.closed {
 		return nil, errors.New("M.I.E.R. is shutting down")
 	}
-	if err = s.store.Set(predictionKeyringService, "api-key", strings.TrimSpace(key)); err != nil {
-		return nil, errors.New("TypeSafe key could not be saved in the OS keychain. Unlock it and retry")
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
-	s.key = strings.TrimSpace(key)
-	s.keyLoaded = true
-	s.invalidateLocked()
-	// Reconnecting repairs malformed metadata without persisting the secret.
+	if s.epoch != epoch {
+		return nil, errors.New("Prediction settings changed. Connect again when ready")
+	}
+	previous := s.config
 	if s.initErr != nil {
-		s.config = predictionConfig{Model: "jev-1.13.0", Scopes: map[string]bool{}}
+		s.config = predictionConfig{Scopes: map[string]bool{}}
+	}
+	s.config.Model = availablePredictionModel(s.config.Model, models)
+	changed := s.initErr != nil || previous.Model != s.config.Model
+	if changed {
 		if err = s.persistLocked(); err != nil {
+			s.config = previous
 			return nil, err
 		}
-		s.initErr = nil
 	}
+	if !s.fake {
+		err = s.store.Set(predictionKeyringService, "api-key", strings.TrimSpace(key))
+	}
+	if err != nil {
+		s.config = previous
+		if changed {
+			if restoreErr := s.persistLocked(); restoreErr != nil {
+				s.initErr = restoreErr
+			}
+		}
+		return nil, errors.New("TypeSafe key could not be saved in the OS keychain. Unlock it and retry")
+	}
+	if !s.fake {
+		s.key = strings.TrimSpace(key)
+	}
+	s.keyLoaded = true
+	s.invalidateLocked()
+	s.initErr = nil
 	return models, nil
 }
+
+// A successful connection must be usable with the account's actual catalog.
+// Keep an available pinned model; otherwise prefer the provider's stable alias.
+func availablePredictionModel(current string, models []typesafe.Model) string {
+	for _, model := range models {
+		if model.Name == current {
+			return current
+		}
+	}
+	for _, model := range models {
+		if model.Name == "jev-latest" {
+			return model.Name
+		}
+	}
+	return models[0].Name
+}
+
 func (s *PredictionService) Models(ctx context.Context) ([]typesafe.Model, error) {
 	s.mu.Lock()
 	key, err := s.keyLocked()
+	epoch := s.epoch
 	s.mu.Unlock()
 	if err != nil {
 		return nil, err
@@ -229,7 +298,26 @@ func (s *PredictionService) Models(ctx context.Context) ([]typesafe.Model, error
 	if err != nil {
 		return nil, err
 	}
-	return client.Models(ctx)
+	models, err := client.Models(ctx)
+	if err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed || s.epoch != epoch || ctx.Err() != nil {
+		return nil, errors.New("Prediction settings changed. Refresh models again")
+	}
+	model := availablePredictionModel(s.config.Model, models)
+	if s.config.Model != model {
+		previous := s.config.Model
+		s.config.Model = model
+		if err := s.persistLocked(); err != nil {
+			s.config.Model = previous
+			return nil, err
+		}
+		s.invalidateLocked()
+	}
+	return models, nil
 }
 func (s *PredictionService) SaveSettings(scope PredictionScope, model string, enabled bool) error {
 	if !typesafe.ValidModel(model) {
@@ -306,6 +394,9 @@ func (s *PredictionService) invalidateLocked() {
 func (s *PredictionService) Disconnect() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.fake {
+		return errors.New("Local Jev test mode is enabled by MIER_JEV_FAKE. Restart without it to use TypeSafe")
+	}
 	if err := s.store.Delete(predictionKeyringService, "api-key"); err != nil && !errors.Is(err, keyring.ErrNotFound) {
 		return errors.New("TypeSafe key could not be removed from the OS keychain")
 	}
@@ -359,6 +450,9 @@ func (s *PredictionService) Evaluate(ctx context.Context, request PredictionRequ
 		return PredictionResult{}, err
 	}
 	prepared.Model = model
+	if s.fake {
+		warnings = append([]string{"LOCAL TEST PROVIDER: these are deterministic synthetic answers, not Jev predictions. No source was sent to TypeSafe and no inference was billed."}, warnings...)
+	}
 	state, _ := json.Marshal(prepared.State)
 	if len(state) > 24*1024 {
 		return PredictionResult{}, errors.New("This assessment exceeds the 24 KiB context limit. Select fewer findings or a smaller change")
@@ -394,7 +488,7 @@ func (s *PredictionService) Evaluate(ctx context.Context, request PredictionRequ
 	for i := range rows {
 		rows[i].Answer = response.Answers[rows[i].ID]
 	}
-	result := PredictionResult{ID: cacheKey, Kind: request.Kind, Model: response.Model, QuestionVersion: predictionVersion, HeadSHA: request.HeadSHA, BaseSHA: request.BaseSHA, Rows: rows, Warnings: warnings, Usage: response.Usage, DurationMS: time.Since(started).Milliseconds(), CreatedAt: time.Now().UTC().Format(time.RFC3339)}
+	result := PredictionResult{Provider: s.provider(), ID: cacheKey, Kind: request.Kind, Model: response.Model, QuestionVersion: predictionVersion, HeadSHA: request.HeadSHA, BaseSHA: request.BaseSHA, Rows: rows, Warnings: warnings, Usage: response.Usage, DurationMS: time.Since(started).Milliseconds(), CreatedAt: time.Now().UTC().Format(time.RFC3339)}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed || s.epoch != epoch || ctx.Err() != nil {
@@ -430,7 +524,7 @@ func (s *PredictionService) Feedback(scope PredictionScope, id string, useful bo
 			break
 		}
 	}
-	s.feedback[id] = PredictionFeedback{ID: id, Kind: cached.value.Kind, Model: cached.value.Model, Useful: useful, DurationMS: cached.value.DurationMS, CreatedAt: time.Now().UTC().Format(time.RFC3339)}
+	s.feedback[id] = PredictionFeedback{Provider: s.provider(), ID: id, Kind: cached.value.Kind, Model: cached.value.Model, Useful: useful, DurationMS: cached.value.DurationMS, CreatedAt: time.Now().UTC().Format(time.RFC3339)}
 	return nil
 }
 func (s *PredictionService) Evaluation() []PredictionFeedback {

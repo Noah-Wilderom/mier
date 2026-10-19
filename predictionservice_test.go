@@ -23,6 +23,7 @@ import (
 
 func predictionFixture(t *testing.T, block <-chan struct{}) (*PredictionService, PredictionRequest, *atomic.Int32) {
 	t.Helper()
+	t.Setenv("MIER_JEV_FAKE", "")
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	scope := PredictionScope{Host: "github.com", Owner: "team", Repo: "app"}
 	run := reviewagent.NewRun("external", "", reviewagent.Context{Host: scope.Host, Owner: scope.Owner, Repository: scope.Repo, PullRequest: 12, HeadSHA: strings.Repeat("b", 40), BaseSHA: strings.Repeat("a", 40), Files: []reviewagent.File{{Path: "source.go", Patch: "@@ -1 +1 @@\n-old\n+new"}}}, nil)
@@ -182,6 +183,107 @@ func TestPredictionSettingsPreserveConsentOnGlobalModelChangeAndFailedKeychainWr
 	}
 	if key, _ := store.Get(predictionKeyringService, "api-key"); key != "api-private" {
 		t.Fatal("previous secret lost")
+	}
+}
+
+func TestPredictionConnectSelectsAnAvailableModelBeforeAssessment(t *testing.T) {
+	s, request, _ := predictionFixture(t, nil)
+	s.newClient = func(string) (*typesafe.Client, error) { return typesafe.NewFake("success") }
+	if _, err := s.Connect(context.Background(), "local-test-credential"); err != nil {
+		t.Fatal(err)
+	}
+	status, err := s.GetStatus(request.Scope)
+	if err != nil || status.Model != typesafe.FakeModel {
+		t.Fatalf("connection retained an unavailable model: %+v, %v", status, err)
+	}
+	if err := s.SaveSettings(request.Scope, status.Model, true); err != nil {
+		t.Fatal(err)
+	}
+	result, err := s.Evaluate(context.Background(), request)
+	if err != nil || len(result.Rows) != 2 {
+		t.Fatalf("connected provider could not assess findings: %+v, %v", result, err)
+	}
+}
+
+func TestPredictionModelCatalogPreservesPinsAndRepairsUnavailableSelections(t *testing.T) {
+	models := []typesafe.Model{{Name: "jev-other"}, {Name: "jev-latest"}}
+	if availablePredictionModel("jev-other", models) != "jev-other" || availablePredictionModel("jev-removed", models) != "jev-latest" {
+		t.Fatal("available pins or stable alias not respected")
+	}
+	s, request, _ := predictionFixture(t, nil)
+	if _, err := s.Connect(context.Background(), "api-private"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SaveSettings(request.Scope, "jev-removed", true); err != nil {
+		t.Fatal(err)
+	}
+	s.newClient = func(string) (*typesafe.Client, error) { return typesafe.NewFake("success") }
+	if _, err := s.Models(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	status, err := s.GetStatus(request.Scope)
+	if err != nil || status.Model != typesafe.FakeModel || !status.Enabled {
+		t.Fatal("refresh retained unavailable selection or lost consent", status, err)
+	}
+	restored := NewPredictionService(nil, nil, nil)
+	data, err := os.ReadFile(s.configPath)
+	if err != nil || json.Unmarshal(data, &restored.config) != nil || restored.config.Model != typesafe.FakeModel {
+		t.Fatal("available model not saved", string(data), err)
+	}
+}
+
+func TestPredictionCatalogRepairRollsBackWhenTheKeyCannotBeSaved(t *testing.T) {
+	s, request, _ := predictionFixture(t, nil)
+	ctx := context.Background()
+	if _, err := s.Connect(ctx, "api-private"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SaveSettings(request.Scope, "jev-original-pin", true); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(s.configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.store.(*memorySecrets).fail = true
+	s.newClient = func(string) (*typesafe.Client, error) { return typesafe.NewFake("success") }
+	if _, err := s.Connect(ctx, "replacement-test-key"); err == nil {
+		t.Fatal("keychain failure was hidden")
+	}
+	status, err := s.GetStatus(request.Scope)
+	if err != nil || status.Model != "jev-original-pin" || !status.Enabled || s.key != "api-private" {
+		t.Fatal("failed connection replaced the previous configuration", status, err)
+	}
+	after, err := os.ReadFile(s.configPath)
+	if err != nil || string(before) != string(after) {
+		t.Fatal("failed connection persisted the replacement model", err)
+	}
+}
+
+func TestPredictionDisconnectInvalidatesPendingConnection(t *testing.T) {
+	s, _, _ := predictionFixture(t, nil)
+	started, release := make(chan struct{}), make(chan struct{})
+	s.newClient = func(key string) (*typesafe.Client, error) {
+		return typesafe.NewWithHTTPClient(key, &http.Client{Transport: jiraTransport(func(r *http.Request) (*http.Response, error) {
+			close(started)
+			<-release
+			return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(`{"models":[{"name":"jev-latest"}]}`))}, nil
+		})})
+	}
+	done := make(chan error, 1)
+	go func() { _, err := s.Connect(context.Background(), "fixture-only-key"); done <- err }()
+	<-started
+	if err := s.Disconnect(); err != nil {
+		close(release)
+		t.Fatal(err)
+	}
+	close(release)
+	if err := <-done; err == nil {
+		t.Fatal("stale connection reconnected after disconnect")
+	}
+	status, err := s.GetStatus(PredictionScope{})
+	if err != nil || status.Configured {
+		t.Fatal("disconnected key was restored by an older request", status, err)
 	}
 }
 func TestPredictionCriteriaAndLogExcerptsStayBoundedAndPreserveEvidence(t *testing.T) {
